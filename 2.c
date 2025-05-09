@@ -14,13 +14,15 @@ typedef struct {
 // Corrigindo typos nas descrições
 static const CmdEntry cmds[] = {
 	{ "listar", "pwd && ls -l", "Diretorio atual e lista arquivos detalhadamente." },
-	{ "listar_tudo", "pwd && ls -la", "Igual o listar, mas todos os arquivos (incluindo ocultos)." },
+	{ "listart", "pwd && ls -la", "Igual o listar, mas todos os arquivos (incluindo ocultos)." },
 	{ "data", "date", "Data e hora atual." },
 	{ "quem", "whoami", "Nome do usuário atual." },
 	{ "espaco", "df -h .", "Espaço livre do sistema de arquivos atual." },
 	{ "sysatt?", "pop-upgrade release check", "Verifica se há atualizações do sistema disponíveis (Pop!_OS)." },
 	{ "sudo", "sudo su", "Entra no modo super usuário (USE COM CUIDADO!)." }, // Adicionando aviso
 	{ "help", NULL, "Lista todos os comandos disponíveis e suas descrições." },
+	{ "criador", "echo lucasplayagemes é o criador deste codigo.", "lucasplayagemes é o criador deste codigo." },
+	
 };
 
 void display_help() { // Renomeando para consistência com chamadas anteriores
