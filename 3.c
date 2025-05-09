@@ -1,9 +1,18 @@
 #include <stdio.h>
+
+#define MAX_PROMPT_LEN 256
+#define MAX_OLLAMA_CMD (MAX_PROMPT_LEN + 128)
+#define OLLAMA_BUFFER_SIZE 1024
+#define MODEL_OLLAMA "llama2"
 #include <string.h>
 #include <stdlib.h>
 #include <sys/wait.h>
-//teste git
-//
+//codigo não finalizado do JTND + 2B
+void handle_ollama_interaction() {
+
+
+
+
 
 typedef struct {
 	const char *key;
@@ -22,7 +31,7 @@ static const CmdEntry cmds[] = {
 	{ "sudo", "sudo su", "Entra no modo super usuário (USE COM CUIDADO!)." }, // Adicionando aviso
 	{ "help", NULL, "Lista todos os comandos disponíveis e suas descrições." },
 	{ "criador", "echo lucasplayagemes é o criador deste codigo.", "lucasplayagemes é o criador deste codigo." },
-	{ "2B", "
+	{ "ia", NULL,
 };
 
 void display_help() { // Renomeando para consistência com chamadas anteriores
