@@ -1,5 +1,6 @@
 # JNTD
-This is a simple code where you can automate shell commands and other tasks in your system.
+"Just Need To Do", or JNTD is a code where you do, what you need to do, every other problematic or slow thing, let it to JNTD.
+This is a simple code where you can automate commands and other tasks in your system.
 The objective of this code is let me integrate my own LLM with my system, i haven't finished it yet, but i'm already making the preaparations when i finished her.
 
 # How to use
