@@ -18,56 +18,8 @@ static char ult_calc_resu[1024] = "";
 typedef struct {
     const char *key;
     const char *shell_command;
-    const char *descri;
+    const char *descri; // Mantendo 'descri' como você usou
 } CmdEntry;
-
-
-int i_s_c(const char *cmd) {
-	for(size_t = 0; i < sizeof(cmds) / sizeof(cmds[0]); ++i) {
-		if(strcasecmp(cmd, cmd[i].key) == 0) {
-			return 1;
-		}
-
-	}
-	return 0; //comando não reconhecido
-}
-
-
-if(i_s_c(ollama_output_line)) {
-	printf("/// Processando comando seguro da 2B: '%s'\n", ollama_output_line);
-	dispatch(ollama_output_line);
-	} else {
-		printf("/// Aviso: Comando '%s' da 2B não é reconhecido como seguro. Ignorando.\n", ollama_output_line);
-		printf("	Digite 'help' para ver os comandos permitidos.\n");
-	}
-
-///Historico de comandos///
-
-void adth(const char *cmd) {
-	if(history_count < MAX_HISTORY) {
-		command_history[history_count] = strdup(cmd);
-		history_count++;
-
-	} else {
-		free(command_history[0]);
-		for(int i = 1; i < MAX_HISTORY; i++) {
-			command_history[i - 1] = command_history[i];
-		}
-		command_history[MAX_HISTORY - 1] = strdup(cmd);
-	}
-}
-
-void d_h() {
-	printf("Historico de comandos:\n");
-	for(int i = 0; i < history_count; i++) {
-		printf("  %d : $s\n", i +1, command_history[i]);
-	}
-}
-
-
-
-
-
 
 // Declaração antecipada da função dispatch
 void dispatch(const char *user_in);
@@ -222,56 +174,3 @@ int main(void) {
     printf("Saindo....\n");
     return 0;
 }
-
-/// Um Log do codigo, salvo em jntdlog ///
-
-void log_action(const char *action, const char *details) {
-	FILE *log = fopen("jntd_log.txt", "a");
-	if(log == NULL) {
-		perror("Erro ao abrir arquivo de log");
-		return;
-	}
-
-	time_t now = time(NULL);
-	char time_str[26];
-	ctime_r(&now, time_str);
-	time_str[24] = '\0';
-	fprint(log, "[%s] %s: %s\n", time_str, action, details);
-	fclose(log_file);
-
-}
-/// Intermediador entre 2b e calculadora ///
-//
-void h_c_i(const char *args) {
-	char calc_c[256];
-	char calc_o[1024];
-	FILE *calc_pipe;
-
-
-	l_c_r[0] = '\0'; /// Limpa o resultado anterior (se houver)///
-	if(args && strlen(args) > 0) {
-		snprintf(calc_c, sizeof(calc_c), "./calc %s", args);
-	} else {
-		snprintf(calc_c, sizeof(calc_c), "./calc");
-	}
-
-	printf("executando calculadora: %s\n", calc_c);
-
-	calc_pipe = popen(calc_c, "r");
-
-	if(calc_pipe == NULL) {
-		perror("Falha ao executar a calculadora com popen");
-		fprint(stderr, "Verifque se ./calc está no diretorio atual.\n");
-		return;
-	}
-
-	printf("--------- Saída da Calculadora ----------\n");
-	while(fgets(calc_o, sizeof(calc_o), calc_pipe) != NULL) {
-		printf("%s", calc_o);
-		//Acumula a saida no l_c_r
-		//
-
-
-
-
-
