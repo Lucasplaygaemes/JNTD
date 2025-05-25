@@ -7,12 +7,15 @@
 #define MAX_OLLAMA_CMD_LEN (MAX_PROMPT_LEN + 128)
 #define OLLAMA_BUFFER_SIZE 1024
 #define OLLAMA_MODEL "llama2"
+<<<<<<< HEAD
 #define MAX_HISTORY 50
 
 char *command_history[MAX_HISTORY];
 int history_count = 0;
 
 static char ult_calc_resu[1024] = "";
+=======
+>>>>>>> f6092731e993f9e439fe7c591bb7e7197b6fdfc4
 
 // Estrutura de comando
 typedef struct {
