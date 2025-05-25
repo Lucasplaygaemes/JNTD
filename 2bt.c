@@ -12,8 +12,37 @@
 typedef struct {
     const char *key;
     const char *shell_command;
-    const char *descri; // Mantendo 'descri' como você usou
+    const char *descri;
 } CmdEntry;
+
+
+int i_s_c(const char *cmd) {
+	for(size_t = 0; i < sizeof(cmds) / sizeof(cmds[0]); ++i) {
+		if(strcasecmp(cmd, cmd[i].key) == 0) {
+			return 1;
+		}
+
+	}
+	return 0; //comando não reconhecido
+}
+
+
+if(i_s_c(ollama_output_line)) {
+	printf("/// Processando comando seguro da 2B: '%s'\n", ollama_output_line);
+	dispatch(ollama_output_line);
+	} else {
+		printf("/// Aviso: Comando '%s' da 2B não é reconhecido como seguro. Ignorando.\n", ollama_output_line);
+		printf("	Digite 'help' para ver os comandos permitidos.\n");
+	}
+
+
+
+
+
+
+
+
+
 
 // Declaração antecipada da função dispatch
 void dispatch(const char *user_in);
