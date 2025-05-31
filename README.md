@@ -19,3 +19,11 @@ My next update to the code will add the possibility to automate the webscraping 
 
 # 9S!
 One day i may have the specs to use the most heavy LLM that i can put my hands on, until there i will need to change my mind to one that i can afford, i was already wating to train more than one AI, and i was't going to need a LLM, because of 2B, so i figured out that i can make 9S too, so i can use both of them. 9S will not have the ability to chat like 2B, it's obvius he will be able to speak with the user, but his function is to read a image text, graphs and figures, and transcribe that to text, or a understandable data tha 2B will be able to use. He is not designed to understand every image, personally, i just wanted him to function like a translator, from him to 2B. 
+
+# Log!
+I have maked a file named, log, it's self explanatory what it does, but it will be also my changes and thoughts about the code, what to change, in this journey.
+There is not much to talk about it.
+
+# Don't confuse with Log.
+Log will be the Log output of 2b(JNTD), log is my personal annotations.
+Log ≠ log.
