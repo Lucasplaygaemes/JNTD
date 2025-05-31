@@ -2,6 +2,8 @@
 #include <string.h>
 #include <stdlib.h>
 #include <sys/wait.h>
+#include <time.h>
+
 
 #define MAX_PROMPT_LEN 256
 #define MAX_OLLAMA_CMD_LEN (MAX_PROMPT_LEN + 128)
@@ -76,6 +78,7 @@ void dispatch(const char *user_in);
 void handle_ollama_interaction() {
     char user_prompt[MAX_PROMPT_LEN];
     char ollama_full_command[MAX_OLLAMA_CMD_LEN];
+    char combined_prompt[MAX_PROMPT_LEN * 2];
     char ollama_output_line[OLLAMA_BUFFER_SIZE];
     FILE *ollama_pipe;
 
@@ -90,11 +93,19 @@ void handle_ollama_interaction() {
 
     user_prompt[strcspn(user_prompt, "\n")] = '\0';
 
+    log_action("User promp to 2B, user_prompt");
+
     if(user_prompt[0] == '\0') {
         printf("prompt vazion, nenhuma interação com o ollama");
         return;
     }
     
+    
+    //se houver, adiciona o ultimo resultado da calc para o prompt//
+    if(strlen(l_c_r) > 0) {
+	    snprintf(combined_prompt, sizeof(combined_prompt), 
+			    	"%s\n[Ultimo resultado da calculadora: %s]", user_prompt, l_c_r);
+	    snprintf(ollama_full_command, sizeof(ollama_full_command),
     snprintf(ollama_full_command, sizeof(ollama_full_command),
             "ollama run %s \"%s\"", OLLAMA_MODEL, user_prompt);
 
@@ -196,7 +207,7 @@ void dispatch(const char *user_in) {
 }
 
 int main(void) {
-    char buf[128];
+    char buf[512];
 
     // Prompt mais genérico ou atualizado
     printf("Digite um comando. Use 'help' para ver as opções ou 'sair' para terminar.\n");
@@ -268,10 +279,28 @@ void h_c_i(const char *args) {
 	printf("--------- Saída da Calculadora ----------\n");
 	while(fgets(calc_o, sizeof(calc_o), calc_pipe) != NULL) {
 		printf("%s", calc_o);
-		//Acumula a saida no l_c_r
-		//
+		//Acumula a saida no l_c_r (last calc result)
 
+		strncat(l_c_r, calc_o, sizeof(l_c_r) - strlen(l_c_r) - 1);
+		log_action("Calculadora Output", calc_output);
 
+	}
+	printf("--------- Fim Da Saída ---------\n");
 
+	int status = pclose(calc_pipe);
+	if (status == -1) {
+        perror("pclose falhou para o pipe da calculadora");
 
+   	} else {
+
+        	if (WIFEXITED(status)) {
+
+            	printf("Calculadora terminou com status: %d\n", WEXITSTATUS(status));
+
+        		}
+
+    		}
+
+}
+	
 
