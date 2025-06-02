@@ -115,9 +115,9 @@ void handle_ollama_interaction() {
 
     ollama_pipe = popen(ollama_full_command, "r");
     if(ollama_pipe == NULL) {
-        perror("falha ao executar o comando ollama com popen");
-        fprintf(stderr, "verifique se ollama está no path e se a 2B está disponivel\n");
-        return;
+    perror("falha ao executar o comando ollama com popen");
+    fprintf(stderr, "verifique se ollama está no path e se a 2B está disponivel\n");
+    return;
     }
 
     while(fgets(ollama_output_line, sizeof(ollama_output_line), ollama_pipe) != NULL) {
