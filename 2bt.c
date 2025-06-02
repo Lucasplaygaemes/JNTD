@@ -4,16 +4,15 @@
 #include <sys/wait.h>
 #include <time.h>
 
-
 #define MAX_PROMPT_LEN 256
-#define MAX_OLLAMA_CMD_LEN (MAX_PROMPT_LEN + 128)
+#define MAX_OLLAMA_CMD_LEN 4096 // Aumentado para acomodar o pior caso de prompt longo + prefixos
 #define OLLAMA_BUFFER_SIZE 1024
 #define OLLAMA_MODEL "llama2"
 #define MAX_HISTORY 50
+#define COMBINED_PROMPT_LEN 2048 // Já estava adequado, mas mantido para clareza
 
 char *command_history[MAX_HISTORY];
 int history_count = 0;
-
 static char ult_calc_resu[1024] = "";
 
 // Estrutura de comando
@@ -23,62 +22,130 @@ typedef struct {
     const char *descri;
 } CmdEntry;
 
+// Definição dos comandos (declarado antes das funções que o utilizam)
+static const CmdEntry cmds[] = {
+    { "ls", "pwd && ls -l", "Diretorio atual e lista arquivos detalhadamente." },
+    { ":q", "exit", "Outro forma de sair do JNTD, criado pelo atalho do VIM" },
+    { "lsa", "pwd && ls -la", "Igual o listar, mas todos os arquivos (incluindo ocultos)." },
+    { "data", "date", "Data e hora atual." },
+    { "quem", "whoami", "Nome do usuário atual." },
+    { "esp", "df -h .", "Espaço livre do sistema de arquivos atual." },
+    { "sysatt?", "pop-upgrade release check", "Verifica se há atualizações do sistema disponíveis (Pop!_OS)." },
+    { "sudo", "sudo su", "Entra no modo super usuário (USE COM CUIDADO!)." },
+    { "help", NULL, "Lista todos os comandos disponíveis e suas descrições." },
+    { "criador", "echo lucasplayagemes é o criador deste codigo.", "Diz o nome do criador do JNTD e 2B." },
+    { "2b", NULL, "Inicia uma conversa com a 2B, e processa sua saida." },
+    { "log", NULL, "O codigo sempre salva um arquivo log para eventuais casualidades," },
+    { "calc", NULL, "Usa a calculadora avançada. Exemplo: calc soma 5 3 ou calc deriv_poly 3 2 2 1 -1 0." },
+    { "his", NULL, "Exibe o histórico de comandos digitados." },
+    { "cl", "clear", "Limpa o terminal" },
+    { "git", NULL, "Mostra o Github do repositorio" }
+};
 
-int i_s_c(const char *cmd) {
-	for(size_t = 0; i < sizeof(cmds) / sizeof(cmds[0]); ++i) {
-		if(strcasecmp(cmd, cmd[i].key) == 0) {
-			return 1;
-		}
-
-	}
-	return 0; //comando não reconhecido
-}
-
-
-if(i_s_c(ollama_output_line)) {
-	printf("/// Processando comando seguro da 2B: '%s'\n", ollama_output_line);
-	dispatch(ollama_output_line);
-	} else {
-		printf("/// Aviso: Comando '%s' da 2B não é reconhecido como seguro. Ignorando.\n", ollama_output_line);
-		printf("	Digite 'help' para ver os comandos permitidos.\n");
-	}
-
-///Historico de comandos///
-
-void adth(const char *cmd) {
-	if(history_count < MAX_HISTORY) {
-		command_history[history_count] = strdup(cmd);
-		history_count++;
-
-	} else {
-		free(command_history[0]);
-		for(int i = 1; i < MAX_HISTORY; i++) {
-			command_history[i - 1] = command_history[i];
-		}
-		command_history[MAX_HISTORY - 1] = strdup(cmd);
-	}
-}
-
-void d_h() {
-	printf("Historico de comandos:\n");
-	for(int i = 0; i < history_count; i++) {
-		printf("  %d : $s\n", i +1, command_history[i]);
-	}
-}
-
-
-
-
-
-
-// Declaração antecipada da função dispatch
+// Declaração antecipada das funções
 void dispatch(const char *user_in);
+void handle_ollama_interaction();
+void handle_calc_interaction(const char *args);
+void display_help();
+void log_action(const char *action, const char *details);
+int is_safe_command(const char *cmd);
+void add_to_history(const char *cmd);
+void display_history();
 
-// Código não finalizado do JTND + 2B
+// Função para verificar segurança de comandos
+int is_safe_command(const char *cmd) {
+    for (size_t i = 0; i < sizeof(cmds) / sizeof(cmds[0]); ++i) {
+        if (strcasecmp(cmd, cmds[i].key) == 0) {
+            return 1; // Comando está na lista de permitidos
+        }
+    }
+    return 0; // Comando não reconhecido, não é seguro
+}
+
+// Funções para histórico de comandos
+void add_to_history(const char *cmd) {
+    if (history_count < MAX_HISTORY) {
+        command_history[history_count] = strdup(cmd);
+        history_count++;
+    } else {
+        free(command_history[0]);
+        for (int i = 1; i < MAX_HISTORY; i++) {
+            command_history[i - 1] = command_history[i];
+        }
+        command_history[MAX_HISTORY - 1] = strdup(cmd);
+    }
+}
+
+void display_history() {
+    printf("Historico de comandos:\n");
+    for (int i = 0; i < history_count; i++) {
+        printf("  %d: %s\n", i + 1, command_history[i]);
+    }
+}
+
+// Função para logging de ações
+void log_action(const char *action, const char *details) {
+    FILE *log_file = fopen("jntd_log.txt", "a");
+    if (log_file == NULL) {
+        perror("Erro ao abrir arquivo de log");
+        return;
+    }
+    time_t now = time(NULL);
+    char time_str[26];
+    ctime_r(&now, time_str);
+    time_str[24] = '\0'; // Remove newline
+    fprintf(log_file, "[%s] %s: %s\n", time_str, action, details);
+    fclose(log_file);
+}
+
+// Função para interagir com a calculadora
+void handle_calc_interaction(const char *args) {
+    char calc_command[256];
+    char calc_output[1024];
+    FILE *calc_pipe;
+
+    ult_calc_resu[0] = '\0'; // Limpa o resultado anterior da calculadora
+
+    // Constrói o comando com argumentos (se houver)
+    if (args && strlen(args) > 0) {
+        snprintf(calc_command, sizeof(calc_command), "./calc %s", args);
+    } else {
+        snprintf(calc_command, sizeof(calc_command), "./calc");
+    }
+
+    printf("Executando calculadora: %s\n", calc_command);
+    calc_pipe = popen(calc_command, "r");
+    if (calc_pipe == NULL) {
+        perror("Falha ao executar a calculadora com popen");
+        fprintf(stderr, "Verifique se ./calc está no diretório atual.\n");
+        return;
+    }
+
+    printf("-------------- Saída da Calculadora --------------\n");
+    while (fgets(calc_output, sizeof(calc_output), calc_pipe) != NULL) {
+        printf("%s", calc_output);
+        fflush(stdout);
+        // Acumula a saída no ult_calc_resu
+        strncat(ult_calc_resu, calc_output, sizeof(ult_calc_resu) - strlen(ult_calc_resu) - 1);
+        log_action("Calculadora Output", calc_output);
+    }
+    printf("---------------- Fim da Saída --------------\n");
+
+    int status = pclose(calc_pipe);
+    if (status == -1) {
+        perror("pclose falhou para o pipe da calculadora");
+    } else {
+        if (WIFEXITED(status)) {
+            printf("Calculadora terminou com status: %d\n", WEXITSTATUS(status));
+        }
+    }
+}
+
+// Função para interação com Ollama/2B
 void handle_ollama_interaction() {
     char user_prompt[MAX_PROMPT_LEN];
+    char combined_prompt[COMBINED_PROMPT_LEN];
     char ollama_full_command[MAX_OLLAMA_CMD_LEN];
-    char combined_prompt[MAX_PROMPT_LEN * 2];
     char ollama_output_line[OLLAMA_BUFFER_SIZE];
     FILE *ollama_pipe;
 
@@ -86,81 +153,77 @@ void handle_ollama_interaction() {
     printf("IA prompt> ");
     fflush(stdout);
 
-    if(fgets(user_prompt, sizeof(user_prompt), stdin) == NULL) {
-        perror("falha ao ler o promp do usuario para a 2B");
+    if (fgets(user_prompt, sizeof(user_prompt), stdin) == NULL) {
+        perror("falha ao ler o prompt do usuario para a 2B");
         return;
     }
 
     user_prompt[strcspn(user_prompt, "\n")] = '\0';
+    log_action("User Prompt to 2B", user_prompt);
 
-    log_action("User promp to 2B, user_prompt");
-
-    if(user_prompt[0] == '\0') {
-        printf("prompt vazion, nenhuma interação com o ollama");
+    if (user_prompt[0] == '\0') {
+        printf("prompt vazio, nenhuma interação com o ollama\n");
         return;
     }
     
-    
-    //se houver, adiciona o ultimo resultado da calc para o prompt//
-    if(strlen(l_c_r) > 0) {
-	    snprintf(combined_prompt, sizeof(combined_prompt), 
-			    	"%s\n[Ultimo resultado da calculadora: %s]", user_prompt, l_c_r);
-	    snprintf(ollama_full_command, sizeof(ollama_full_command),
-    snprintf(ollama_full_command, sizeof(ollama_full_command),
-            "ollama run %s \"%s\"", OLLAMA_MODEL, user_prompt);
+    // Adiciona o ultimo resultado da calculadora ao prompt, se houver
+    if (strlen(ult_calc_resu) > 0) {
+        snprintf(combined_prompt, sizeof(combined_prompt),
+                 "%s\n[Ultimo resultado da calculadora: %s]", user_prompt, ult_calc_resu);
+        snprintf(ollama_full_command, sizeof(ollama_full_command),
+                 "ollama run %s \"%s\"", OLLAMA_MODEL, combined_prompt);
+    } else {
+        snprintf(ollama_full_command, sizeof(ollama_full_command),
+                 "ollama run %s \"%s\"", OLLAMA_MODEL, user_prompt);
+    }
 
     printf("executando ollama com: %s\n", ollama_full_command);
     printf("aguardando resposta da 2B...\n");
     printf("-------------- 2B output --------------\n");
 
     ollama_pipe = popen(ollama_full_command, "r");
-    if(ollama_pipe == NULL) {
-    perror("falha ao executar o comando ollama com popen");
-    fprintf(stderr, "verifique se ollama está no path e se a 2B está disponivel\n");
-    return;
+    if (ollama_pipe == NULL) {
+        perror("falha ao executar o comando ollama com popen");
+        fprintf(stderr, "verifique se ollama está no path e se a 2B está disponivel\n");
+        return;
     }
 
-    while(fgets(ollama_output_line, sizeof(ollama_output_line), ollama_pipe) != NULL) {
+    while (fgets(ollama_output_line, sizeof(ollama_output_line), ollama_pipe) != NULL) {
         printf("%s", ollama_output_line);
         fflush(stdout);
+        log_action("2B Output", ollama_output_line);
 
         ollama_output_line[strcspn(ollama_output_line, "\n")] = '\0';
-        if(ollama_output_line[0] != '\0') {
-            printf(">>> processando da 2B como comando: '%s'\n", ollama_output_line);
-            dispatch(ollama_output_line);
-            printf("<<< Fim do processamento da 2B.\n");
+        if (ollama_output_line[0] != '\0') {
+            if (strncmp(ollama_output_line, "CMD:", 4) == 0) {
+                const char *cmd = ollama_output_line + 4;
+                if (is_safe_command(cmd)) {
+                    printf(">>> Executando comando seguro da 2B: '%s'\n", cmd);
+                    dispatch(cmd);
+                } else {
+                    printf(">>> AVISO: Comando '%s' da 2B não é seguro. Ignorado.\n", cmd);
+                    printf("    Digite 'help' para ver comandos permitidos.\n");
+                }
+            } else {
+                printf(">>> Texto da 2B (não comando): '%s'\n", ollama_output_line);
+            }
         }
     }
     printf("---------------- Fim da fala da 2B --------------\n");
 
     int status = pclose(ollama_pipe);
-    if(status == -1) {
+    if (status == -1) {
         perror("pclose falhou para o pipe do ollama");
     } else {
-        if(WIFEXITED(status)) {
+        if (WIFEXITED(status)) {
             printf("processo do ollama terminou com o status: %d\n", WEXITSTATUS(status));
-        } else if(WIFSIGNALED(status)) {
+        } else if (WIFSIGNALED(status)) {
             printf("Processo ollama terminou com %d\n", WTERMSIG(status));
         }
     }
 }
 
-// Corrigindo typos nas descrições
-static const CmdEntry cmds[] = {
-    { "ls", "pwd && ls -l", "Diretorio atual e lista arquivos detalhadamente." },
-    { "lsa", "pwd && ls -la", "Igual o listar, mas todos os arquivos (incluindo ocultos)." },
-    { "data", "date", "Data e hora atual." },
-    { "quem", "whoami", "Nome do usuário atual." },
-    { "esp", "df -h .", "Espaço livre do sistema de arquivos atual." },
-    { "sysatt?", "pop-upgrade release check", "Verifica se há atualizações do sistema disponíveis (Pop!_OS)." },
-    { "sudo", "sudo su", "Entra no modo super usuário (USE COM CUIDADO!)." }, // Adicionando aviso
-    { "help", NULL, "Lista todos os comandos disponíveis e suas descrições." },
-    { "criador", "echo lucasplayagemes é o criador deste codigo.", "lucasplayagemes é o criador deste codigo." },
-    { "2b", NULL, "inicia uma conversa com a 2B, e processa sua saida." },
-    { "calc",  "./calc", "Codigo de uma calculadora." }
-};
-
-void display_help() { // Renomeando para consistência com chamadas anteriores
+void display_help() {
     printf("Comandos disponíveis:\n");
     for (size_t i = 0; i < sizeof(cmds) / sizeof(cmds[0]); ++i) {
         printf("  %-15s: %s\n", cmds[i].key, cmds[i].descri);
@@ -168,20 +231,36 @@ void display_help() { // Renomeando para consistência com chamadas anteriores
 }
 
 void dispatch(const char *user_in) {
+    char input_copy[128];
+    strncpy(input_copy, user_in, sizeof(input_copy) - 1);
+    input_copy[sizeof(input_copy) - 1] = '\0';
+
+    char *token = strtok(input_copy, " ");
+    if (token == NULL) return;
+
+    char *args = strtok(NULL, ""); // Pega o resto da string como argumentos
+
+    // Adiciona ao histórico e log
+    add_to_history(user_in);
+    log_action("User Input", user_in);
+
     for (size_t i = 0; i < sizeof(cmds) / sizeof(cmds[0]); ++i) {
-        if (strcasecmp(user_in, cmds[i].key) == 0) { // Usando strcasecmp para ignorar maiúsculas/minúsculas
+        if (strcasecmp(token, cmds[i].key) == 0) {
             if (strcmp(cmds[i].key, "help") == 0) {
                 display_help();
-            } else if (strcasecmp(cmds[i].key, "2b") == 0) { // Usando strcasecmp para compatibilidade
+            } else if (strcasecmp(cmds[i].key, "2b") == 0) {
                 handle_ollama_interaction();
+            } else if (strcasecmp(cmds[i].key, "calc") == 0) {
+                handle_calc_interaction(args);
+	    } else if (strcasecmp(cmds[i].key, "git") == 0) {
+		printf("O Github do criador e do projeto é 'https://github.com/Lucasplaygaemes/JNTD\n");
+	    } else if (strcasecmp(cmds[i].key, "historico") == 0) {
+                display_history();
             } else if (cmds[i].shell_command != NULL && cmds[i].shell_command[0] != '\0') {
                 printf("Executando comando para '%s': %s\n", cmds[i].key, cmds[i].shell_command);
                 printf("--------------------------------------------------\n");
-
                 int status = system(cmds[i].shell_command);
-
                 printf("--------------------------------------------------\n");
-
                 if (status == -1) {
                     perror("system() falhou ao tentar criar um processo");
                 } else {
@@ -189,118 +268,32 @@ void dispatch(const char *user_in) {
                         printf("Comando '%s' terminou com codigo de saida %d\n", cmds[i].key, WEXITSTATUS(status));
                     } else if (WIFSIGNALED(status)) {
                         printf("Comando '%s' terminou por sinal: %d\n", cmds[i].key, WTERMSIG(status));
-                    } else {
-                        printf("Comando '%s' terminou com status desconhecido: %d\n", cmds[i].key, status);
                     }
                 }
             } else {
-                // Comando reconhecido mas sem shell_command (e não é 'help')
                 printf("Comando '%s' é reconhecido mas não tem uma ação de shell definida.\n", cmds[i].key);
             }
-
-            return; // Sair da função dispatch após encontrar e processar o comando
+            return;
         }
     }
-
-    // Se o loop terminar, nenhum comando foi encontrado
     printf("Comando invalido: %s. Digite 'help' para ver a lista.\n", user_in);
 }
 
 int main(void) {
     char buf[512];
-
-    // Prompt mais genérico ou atualizado
     printf("Digite um comando. Use 'help' para ver as opções ou 'sair' para terminar.\n");
-
     while (printf("> "), fgets(buf, sizeof(buf), stdin) != NULL) {
         buf[strcspn(buf, "\n")] = '\0'; // Remove newline
-
         if (strcmp(buf, "sair") == 0) {
             break;
-        }
-
+        } else if(strcmp(buf, ":q") == 0) {
+		break;
+	}
         if (buf[0] == '\0') { // Usuário apenas apertou Enter
             continue;
         }
-
-        // Removida a verificação específica de "apt update" daqui.
-        // Se precisar de tratamento especial para "apt update",
-        // adicione-o como um CmdEntry e trate em dispatch().
-
         dispatch(buf);
     }
-
     printf("Saindo....\n");
     return 0;
 }
-
-/// Um Log do codigo, salvo em jntdlog ///
-
-void log_action(const char *action, const char *details) {
-	FILE *log = fopen("jntd_log.txt", "a");
-	if(log == NULL) {
-		perror("Erro ao abrir arquivo de log");
-		return;
-	}
-
-	time_t now = time(NULL);
-	char time_str[26];
-	ctime_r(&now, time_str);
-	time_str[24] = '\0';
-	fprint(log, "[%s] %s: %s\n", time_str, action, details);
-	fclose(log_file);
-
-}
-/// Intermediador entre 2b e calculadora ///
-//
-void h_c_i(const char *args) {
-	char calc_c[256];
-	char calc_o[1024];
-	FILE *calc_pipe;
-
-
-	l_c_r[0] = '\0'; /// Limpa o resultado anterior (se houver)///
-	if(args && strlen(args) > 0) {
-		snprintf(calc_c, sizeof(calc_c), "./calc %s", args);
-	} else {
-		snprintf(calc_c, sizeof(calc_c), "./calc");
-	}
-
-	printf("executando calculadora: %s\n", calc_c);
-
-	calc_pipe = popen(calc_c, "r");
-
-	if(calc_pipe == NULL) {
-		perror("Falha ao executar a calculadora com popen");
-		fprint(stderr, "Verifque se ./calc está no diretorio atual.\n");
-		return;
-	}
-
-	printf("--------- Saída da Calculadora ----------\n");
-	while(fgets(calc_o, sizeof(calc_o), calc_pipe) != NULL) {
-		printf("%s", calc_o);
-		//Acumula a saida no l_c_r (last calc result)
-
-		strncat(l_c_r, calc_o, sizeof(l_c_r) - strlen(l_c_r) - 1);
-		log_action("Calculadora Output", calc_output);
-
-	}
-	printf("--------- Fim Da Saída ---------\n");
-
-	int status = pclose(calc_pipe);
-	if (status == -1) {
-        perror("pclose falhou para o pipe da calculadora");
-
-   	} else {
-
-        	if (WIFEXITED(status)) {
-
-            	printf("Calculadora terminou com status: %d\n", WEXITSTATUS(status));
-
-        		}
-
-    		}
-
-}
-	
-
