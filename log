@@ -42,7 +42,12 @@ Don't be too much excited, remeber i will firts try to make 2b work? That can ta
 I will let you guys updated about it. Wish me luck.
 
 Forgot to metion, 2B(JNTD) is getting a Log feature!!!
-Beause if you want simply search for errors or something the log will be avaible to you, isn't the best, but it will do it's job.
+Beause if you want simply search for errors or something the log will be avaible to you, isn't the best, but it will do it's job.log
+
+
+# 02/06/2025
+Today i have debugged my code so it's now everything working, 2bt.c and calc.c are 100% working.
+Even tought the code has it help settings in Brazilian Portugese, you may recognize the functions by the code it will executed.
 
 
 
