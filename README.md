@@ -25,5 +25,5 @@ I have maked a file named, log, it's self explanatory what it does, but it will 
 There is not much to talk about it.
 
 # Don't confuse with Log.
-Log will be the Log output of 2b(JNTD), log is my personal annotations.
+Log will be the Log output of 2b(JNTD), log is my annotations about what i have done and what i gonna do.
 Log ≠ log.
