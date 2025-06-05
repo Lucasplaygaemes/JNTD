@@ -46,3 +46,12 @@
 [Thu Jun  5 16:50:48 2025] User Input: help
 [Thu Jun  5 16:51:10 2025] User Input: :Q
 [Thu Jun  5 17:08:49 2025] User Input: mkdir slk
+[Thu Jun  5 17:42:17 2025] User Input: help
+[Thu Jun  5 18:05:21 2025] User Input: mkdir 
+[Thu Jun  5 18:05:27 2025] User Input: mkdir pasta
+[Thu Jun  5 19:27:05 2025] User Input: mkdir teste
+[Thu Jun  5 19:27:09 2025] User Input: ls
+[Thu Jun  5 19:29:29 2025] User Input: mkdir foi?
+[Thu Jun  5 19:29:31 2025] User Input: ls
+[Thu Jun  5 19:29:34 2025] User Input: clear
+[Thu Jun  5 19:29:35 2025] User Input: cl

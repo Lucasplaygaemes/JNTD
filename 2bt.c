@@ -4,6 +4,18 @@
 #include <sys/wait.h>
 #include <time.h>
 
+#include <sys/stat.h> // Para stat (Linux/macOS)
+
+#ifdef _WIN32
+
+#include <direct.h> // Para _getcwd no Windows
+
+#else
+
+#include <unistd.h> // Para getcwd no Linux/macOS
+
+#endif
+
 #define MAX_PROMPT_LEN 256
 #define MAX_OLLAMA_CMD_LEN 4096 // Aumentado para acomodar o pior caso de prompt longo + prefixos
 #define OLLAMA_BUFFER_SIZE 1024
@@ -41,7 +53,8 @@ static const CmdEntry cmds[] = {
     { "cl", "clear", "Limpa o terminal" },
     { "git", NULL, "Mostra o Github do repositorio" },
     { "mkdir", NULL, "Cria um novo diretorio sem nome, nomea-lo será adicionado" },
-    { "rscript", NULL, "Roda um script pré definido, coloque cada comando em uma linha" }
+    { "rscript", NULL, "Roda um script pré definido, coloque cada comando em uma linha" },
+    { "sl", "sl", "Easter Egg." }
 };
 
 // Declaração antecipada das funções
@@ -252,21 +265,45 @@ void dispatch(const char *user_in) {
                 display_help();
 	    } else if (strcasecmp(cmds[i].key, "mkdir") == 0) {
 		    if(args && strlen(args) > 0) {
-			    char mkdir_command[0];
-			    snprintf(mkdir_command, sizeof(mkdir_command),  "mkdir \%s\"", args);
-			    printf("Criando Diretorio: %s\n", args);
-			    int status = system(mkdir_command);
-			    if(status == -1) {
-				    perror("Erro ao criar o diretorio");
-			    } else {
-				    if(WIFEXITED(status)) {
-					    printf("Comando mkdir terminou com codigo de saida: %d\n", WEXITSTATUS(status));
-				    }
-			    }
-		    } else {
-			    printf("Erro, nome do diretorio não fornecido.\n");
-		    }
-	    
+			    	char current_dir[256];
+			    	char mkdir_command[256];
+		    		char full_path[512];
+				
+				if(getcwd(current_dir, sizeof(current_dir)) == NULL) {
+					perror("Erro obter o diretorio atual");
+					current_dir[0] = '\0';
+					snprintf(full_path, sizeof(full_path), "%s", args);
+				} else {
+					snprintf(full_path, sizeof(full_path), current_dir, args);
+				}
+				struct stat st = {0};
+				if(stat(args, &st) == 0) {
+					printf("Erro: O diretorio '%s' já existe em '%s'.\n", args, current_dir[0] ? current_dir : "diretorio atual desconhecido");
+				} else {
+					snprintf(mkdir_command, sizeof(mkdir_command), "mkdir \"%s\"", args);
+					printf("Criando diretorio '%s' em '%s'...\n", args, current_dir[0] ? current_dir : "Diretorio atual conhecido");
+					int status = system(mkdir_command);
+					if(status == -1) {
+						perror("Erro ao executar o comando mkdir");
+					} else {
+						if(WIFEXITED(status)) {
+								int exit_code = WEXITSTATUS(status);
+								printf("Comando mkdir terminou com o status '%d'.\n", exit_code);
+								if(exit_code == 0) {
+									//verifica novamente se o diretorio foi criado//
+									if(stat(args, &st) == 0) {
+										printf("Diretorio Criado com sucesso em '%s'.\n", full_path);
+									} else {
+										printf("Erro: Diretorio não foi criado, mesmo com codigo de saida 0\n");
+									}
+								}
+						}
+					}
+			}
+		    }				
+
+
+						
 	    } else if (strcasecmp(cmds[i].key, "2b") == 0) {
                 handle_ollama_interaction();
             } else if (strcasecmp(cmds[i].key, "calc") == 0) {
@@ -275,6 +312,7 @@ void dispatch(const char *user_in) {
 		printf("O Github do criador e do projeto é 'https://github.com/Lucasplaygaemes/JNTD\n");
 	    } else if (strcasecmp(cmds[i].key, "historico") == 0) {
                 display_history();
+	    
 	    } else if (strcasecmp(cmds[i].key, "rscript") == 0) {
 		    if(args && strlen(args) > 0) {
 			    FILE *script_file = fopen(args, "r");
