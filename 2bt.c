@@ -40,7 +40,8 @@ static const CmdEntry cmds[] = {
     { "his", NULL, "Exibe o histórico de comandos digitados." },
     { "cl", "clear", "Limpa o terminal" },
     { "git", NULL, "Mostra o Github do repositorio" },
-    { "mkdir", NULL, "Cria um novo diretorio sem nome, nomea-lo será adicionado" }
+    { "mkdir", NULL, "Cria um novo diretorio sem nome, nomea-lo será adicionado" },
+    { "rscript", NULL, "Roda um script pré definido, coloque cada comando em uma linha" }
 };
 
 // Declaração antecipada das funções
@@ -274,6 +275,28 @@ void dispatch(const char *user_in) {
 		printf("O Github do criador e do projeto é 'https://github.com/Lucasplaygaemes/JNTD\n");
 	    } else if (strcasecmp(cmds[i].key, "historico") == 0) {
                 display_history();
+	    } else if (strcasecmp(cmds[i].key, "rscript") == 0) {
+		    if(args && strlen(args) > 0) {
+			    FILE *script_file = fopen(args, "r");
+			    if(script_file == NULL) {
+				    perror("Erro ao abrir o arquivo de script");
+				    printf("Verifique se o arquivo: '%s' se econtra no diretorio, e se você tem permissão para le-lo\n", args);
+			    } else {
+				    char script_line[128];
+				    printf("Executando comandos do script '%s':\n", args);
+				    printf("-----------------------------------------------\n");
+				    while(fgets(script_line, sizeof(script_line), script_file) != NULL) {
+					    script_line[strcspn(script_line, "\n")] = '\0';
+					    if(script_line[0] != '\0' && script_line[0] != '#') {
+						    printf("Executando %s\n", script_line);
+						    dispatch(script_line);
+					    }
+				    }
+				    printf("------------------------------------------------\n");
+				    printf("Fim da execução do script '%s'.\n", args);
+				    fclose(script_file);
+				}
+		    }
             } else if (cmds[i].shell_command != NULL && cmds[i].shell_command[0] != '\0') {
                 printf("Executando comando para '%s': %s\n", cmds[i].key, cmds[i].shell_command);
                 printf("--------------------------------------------------\n");

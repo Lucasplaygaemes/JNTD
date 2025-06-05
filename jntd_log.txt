@@ -24,3 +24,25 @@
 [Mon Jun  2 17:51:15 2025] User Input: :q
 [Wed Jun  4 21:52:49 2025] User Input: mkdir teste
 [Wed Jun  4 21:53:14 2025] User Input: mkdir slk
+[Thu Jun  5 16:32:07 2025] User Input: ls
+[Thu Jun  5 16:32:10 2025] User Input: help
+[Thu Jun  5 16:32:18 2025] User Input: scrpr
+[Thu Jun  5 16:41:42 2025] User Input: help
+[Thu Jun  5 16:41:44 2025] User Input: rscript
+[Thu Jun  5 16:42:15 2025] User Input: ls
+[Thu Jun  5 16:42:16 2025] User Input: cl
+[Thu Jun  5 16:42:24 2025] User Input: help
+[Thu Jun  5 16:42:33 2025] User Input: rscript teste.txt
+[Thu Jun  5 16:42:33 2025] User Input: ls
+[Thu Jun  5 16:42:33 2025] User Input: pwd
+[Thu Jun  5 16:42:33 2025] User Input: help
+[Thu Jun  5 16:42:56 2025] User Input: sudo
+[Thu Jun  5 16:47:52 2025] User Input: cl
+[Thu Jun  5 16:47:55 2025] User Input: help
+[Thu Jun  5 16:48:16 2025] User Input: esp
+[Thu Jun  5 16:48:27 2025] User Input: calc
+[Thu Jun  5 16:48:29 2025] User Input: ;Q
+[Thu Jun  5 16:48:30 2025] User Input: :Q
+[Thu Jun  5 16:50:48 2025] User Input: help
+[Thu Jun  5 16:51:10 2025] User Input: :Q
+[Thu Jun  5 17:08:49 2025] User Input: mkdir slk
