@@ -39,7 +39,8 @@ static const CmdEntry cmds[] = {
     { "calc", NULL, "Usa a calculadora avançada. Exemplo: calc soma 5 3 ou calc deriv_poly 3 2 2 1 -1 0." },
     { "his", NULL, "Exibe o histórico de comandos digitados." },
     { "cl", "clear", "Limpa o terminal" },
-    { "git", NULL, "Mostra o Github do repositorio" }
+    { "git", NULL, "Mostra o Github do repositorio" },
+    { "mkdir", NULL, "Cria um novo diretorio sem nome, nomea-lo será adicionado" }
 };
 
 // Declaração antecipada das funções
@@ -248,7 +249,24 @@ void dispatch(const char *user_in) {
         if (strcasecmp(token, cmds[i].key) == 0) {
             if (strcmp(cmds[i].key, "help") == 0) {
                 display_help();
-            } else if (strcasecmp(cmds[i].key, "2b") == 0) {
+	    } else if (strcasecmp(cmds[i].key, "mkdir") == 0) {
+		    if(args && strlen(args) > 0) {
+			    char mkdir_command[0];
+			    snprintf(mkdir_command, sizeof(mkdir_command),  "mkdir \%s\"", args);
+			    printf("Criando Diretorio: %s\n", args);
+			    int status = system(mkdir_command);
+			    if(status == -1) {
+				    perror("Erro ao criar o diretorio");
+			    } else {
+				    if(WIFEXITED(status)) {
+					    printf("Comando mkdir terminou com codigo de saida: %d\n", WEXITSTATUS(status));
+				    }
+			    }
+		    } else {
+			    printf("Erro, nome do diretorio não fornecido.\n");
+		    }
+	    
+	    } else if (strcasecmp(cmds[i].key, "2b") == 0) {
                 handle_ollama_interaction();
             } else if (strcasecmp(cmds[i].key, "calc") == 0) {
                 handle_calc_interaction(args);
@@ -297,3 +315,5 @@ int main(void) {
     printf("Saindo....\n");
     return 0;
 }
+
+
