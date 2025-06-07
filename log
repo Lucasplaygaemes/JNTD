@@ -52,3 +52,5 @@ Even tought the code has it help settings in Brazilian Portugese, you may recogn
 I have added the function to run a script, a predefined list of commands, you need to put one by line, and be in the same directory as the code, have added to the mkdir function, but still making the preparations to make it 100%, it already make the folder, but i don't know where, so.
 Still thinking about what to add in it, there are some trivial functions but is already thing that existed.
 
+# 07/05/2025
+I have added the cd function, and it works just like in the terminal itself, the mkdir command is now woriking 100%, 
