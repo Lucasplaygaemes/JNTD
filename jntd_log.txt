@@ -55,3 +55,56 @@
 [Thu Jun  5 19:29:31 2025] User Input: ls
 [Thu Jun  5 19:29:34 2025] User Input: clear
 [Thu Jun  5 19:29:35 2025] User Input: cl
+[Thu Jun  5 20:29:11 2025] User Input: calc
+[Thu Jun  5 20:29:37 2025] User Input: calc
+[Thu Jun  5 20:29:37 2025] Calculadora Output: Uso: ./calc <operacao> <parametros>
+
+[Thu Jun  5 20:29:37 2025] Calculadora Output: Operacoes disponiveis:
+
+[Thu Jun  5 20:29:37 2025] Calculadora Output:   soma <num1> <num2> - Soma dois números
+
+[Thu Jun  5 20:29:37 2025] Calculadora Output:   sub <num1> <num2> - Subtrai dois números
+
+[Thu Jun  5 20:29:37 2025] Calculadora Output:   mult <num1> <num2> - Multiplica dois números
+
+[Thu Jun  5 20:29:37 2025] Calculadora Output:   div <num1> <num2> - Divide dois números
+
+[Thu Jun  5 20:29:37 2025] Calculadora Output:   deriv_poly <coef1> <exp1> <coef2> <exp2> ... - Derivada de polinômio (até 5 termos)
+
+[Thu Jun  5 20:29:37 2025] Calculadora Output:   deriv_trig <coef> <tipo> - Derivada de função trigonométrica (tipo: sin, cos, tan)
+
+[Thu Jun  5 20:29:37 2025] Calculadora Output:   limit <a> <coef1> <exp1> ... / <coef> <tipo> - Limite em x=a (polinômio ou trigonométrica)
+
+[Thu Jun  5 20:29:37 2025] Calculadora Output:   integ <a> <b> <coef1> <exp1> ... / <coef> <tipo> - Integral de a a b (polinômio ou trigonométrica)
+
+[Thu Jun  5 20:31:46 2025] User Input: help
+[Thu Jun  5 20:33:28 2025] User Input: ls
+[Thu Jun  5 20:33:45 2025] User Input: cl
+[Thu Jun  5 20:33:49 2025] User Input: help
+[Thu Jun  5 20:33:50 2025] User Input: cacl
+[Thu Jun  5 20:33:52 2025] User Input: cacl
+[Thu Jun  5 20:33:53 2025] User Input: calc
+[Thu Jun  5 20:33:53 2025] Calculadora Output: Uso: ./calc <operacao> <parametros>
+
+[Thu Jun  5 20:33:53 2025] Calculadora Output: Operacoes disponiveis:
+
+[Thu Jun  5 20:33:53 2025] Calculadora Output:   soma <num1> <num2> - Soma dois números
+
+[Thu Jun  5 20:33:53 2025] Calculadora Output:   sub <num1> <num2> - Subtrai dois números
+
+[Thu Jun  5 20:33:53 2025] Calculadora Output:   mult <num1> <num2> - Multiplica dois números
+
+[Thu Jun  5 20:33:53 2025] Calculadora Output:   div <num1> <num2> - Divide dois números
+
+[Thu Jun  5 20:33:53 2025] Calculadora Output:   deriv_poly <coef1> <exp1> <coef2> <exp2> ... - Derivada de polinômio (até 5 termos)
+
+[Thu Jun  5 20:33:53 2025] Calculadora Output:   deriv_trig <coef> <tipo> - Derivada de função trigonométrica (tipo: sin, cos, tan)
+
+[Thu Jun  5 20:33:53 2025] Calculadora Output:   limit <a> <coef1> <exp1> ... / <coef> <tipo> - Limite em x=a (polinômio ou trigonométrica)
+
+[Thu Jun  5 20:33:53 2025] Calculadora Output:   integ <a> <b> <coef1> <exp1> ... / <coef> <tipo> - Integral de a a b (polinômio ou trigonométrica)
+
+[Thu Jun  5 20:33:58 2025] User Input: cl
+[Thu Jun  5 20:34:03 2025] User Input: sl
+[Thu Jun  5 20:34:21 2025] User Input: sl
+[Thu Jun  5 20:34:31 2025] User Input: cl
