@@ -108,3 +108,28 @@
 [Thu Jun  5 20:34:03 2025] User Input: sl
 [Thu Jun  5 20:34:21 2025] User Input: sl
 [Thu Jun  5 20:34:31 2025] User Input: cl
+[Fri Jun  6 21:27:40 2025] User Input: cd ..
+[Fri Jun  6 21:27:44 2025] User Input: cd ..
+[Fri Jun  6 21:27:46 2025] User Input: ls
+[Fri Jun  6 21:27:48 2025] User Input: cd ..
+[Fri Jun  6 21:27:50 2025] User Input: help
+[Fri Jun  6 21:27:52 2025] User Input: cd..
+[Fri Jun  6 21:27:53 2025] User Input: cd ..
+[Fri Jun  6 21:27:57 2025] User Input: cd ..
+[Fri Jun  6 21:28:46 2025] User Input: cd ..
+[Fri Jun  6 21:28:47 2025] User Input: ls
+[Fri Jun  6 21:28:48 2025] User Input: help
+[Fri Jun  6 21:28:54 2025] User Input: cd.
+[Fri Jun  6 21:29:30 2025] User Input: help
+[Fri Jun  6 21:29:32 2025] User Input: cd.
+[Fri Jun  6 21:29:43 2025] User Input: dir
+[Fri Jun  6 21:29:45 2025] User Input: pwd
+[Fri Jun  6 21:30:41 2025] User Input: pwd
+[Fri Jun  6 21:33:53 2025] User Input: help
+[Fri Jun  6 21:33:54 2025] User Input: pwd
+[Fri Jun  6 21:33:57 2025] User Input: cd ..
+[Fri Jun  6 21:33:59 2025] User Input: cd.
+[Fri Jun  6 21:33:59 2025] User Input: pwd
+[Fri Jun  6 21:34:02 2025] User Input: cd.
+[Fri Jun  6 21:34:02 2025] User Input: pwd
+[Fri Jun  6 21:34:03 2025] User Input: cl

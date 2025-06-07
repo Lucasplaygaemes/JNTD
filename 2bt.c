@@ -54,7 +54,9 @@ static const CmdEntry cmds[] = {
     { "git", NULL, "Mostra o Github do repositorio" },
     { "mkdir", NULL, "Cria um novo diretorio sem nome, nomea-lo será adicionado" },
     { "rscript", NULL, "Roda um script pré definido, coloque cada comando em uma linha" },
-    { "sl", "sl", "Easter Egg." }
+    { "sl", "sl", "Easter Egg." },
+    { "cd.", "cd ..", "Volta um diretorio." },
+    { "pwd", "pwd", "Fala o diretorio atual" }
 };
 
 // Declaração antecipada das funções
