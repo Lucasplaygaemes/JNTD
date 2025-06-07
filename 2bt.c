@@ -1,4 +1,4 @@
-	#include <stdio.h>
+#include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <sys/wait.h>
@@ -6,21 +6,23 @@
 #include <sys/stat.h> // Para stat (Linux/macOS)
 
 #ifdef _WIN32
-
 #include <direct.h> // Para _getcwd no Windows
-
 #else
-
 #include <unistd.h> // Para getcwd no Linux/macOS
-
 #endif
-
+//Define o tamanho maximo para o buffer de entrada de prompts do usuario
 #define MAX_PROMPT_LEN 256
+//Define o tamanho maximo do input do ollama + extras
 #define MAX_OLLAMA_CMD_LEN 4096 // Aumentado para acomodar o pior caso de prompt longo + prefixos
+//Define o tamanho maximo da saida do ollama
 #define OLLAMA_BUFFER_SIZE 1024
+//define o modelo
 #define OLLAMA_MODEL "llama2"
+//define o tamanho maximo do historico de comando
 #define MAX_HISTORY 50
+//define o tamanho maximo do input do usario + extras como calc
 #define COMBINED_PROMPT_LEN 2048 // Já estava adequado, mas mantido para clareza
+
 
 char dir_novo[100];
 char *path[100];
