@@ -27,3 +27,6 @@ There is not much to talk about it.
 # Don't confuse with Log.
 Log will be the Log output of 2b(JNTD), log is my annotations about what i have done and what i gonna do.
 Log ≠ log.
+
+# TODO!
+Now we have the TODO funcionality, where you can define things, and be remembered when the defined times comes, as you can set it to 0, it's saved in todos.txt. and you can check if one is gone to expire today, and list everyone.
