@@ -114,6 +114,7 @@ void display_history() {
         printf("  %d: %s\n", i + 1, command_history[i]);
     }
 }
+// lista todos os TODOs//
 void list_todo() {
     printf("Lista de TODOs:\n");
     printf("------------------------------------------------\n");
@@ -137,7 +138,7 @@ void list_todo() {
     }
     printf("------------------------------------------------\n");
 }
-
+//Aqui é onde todo o processo de criação dos TODOs acontece.
 void TODO(const char *input) {
     char input_copy[1024] = {0};
     char tarefa[512] = {0};
@@ -212,7 +213,7 @@ time_t parse_date(const char *date_str) {
     tm.tm_sec = 59;
     return mktime(&tm);
 }
-
+// Checa se o prazo de algum espirou, ou vai espirar hoje.
 void check_todos() {
     FILE *todo_file = fopen("todo.txt", "r");
     if (todo_file == NULL) {
