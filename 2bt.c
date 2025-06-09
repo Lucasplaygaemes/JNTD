@@ -60,7 +60,8 @@ static const CmdEntry cmds[] = {
     { "rscript", NULL, "Roda um script pré definido, coloque cada comando em uma linha" },
     { "sl", "sl", "Easter Egg." },
     { "cd", NULL, "O comando cd, você troca de diretorio, use cd <destino>." },
-    { "pwd", "pwd", "Fala o diretorio atual" }
+    { "pwd", "pwd", "Fala o diretorio atual" },
+    { "vim", "vim", "O editor no qual fiz todo esse codigo." }
 };
 
 // Declaração antecipada das funções
