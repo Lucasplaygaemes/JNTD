@@ -139,79 +139,40 @@ void list_todo() {
 }
 
 void TODO(const char *input) {
-    char input_copy[1024] = {0};
+    char temp_input[1024] = {0};
     char tarefa[512] = {0};
     char usuario[128] = "Desconhecido";
     char prazo[32] = "Sem prazo";
 
-    if(input && strlen(input) > 0) {
-        strncpy(input_copy, input, sizeof(input_copy) - 1);
-        input_copy[sizeof(input_copy) - 1] = '\0';
-        
-        char *token = strtok(input_copy, "|");
-        if(token) {
-            char *ptr = token;
-            while(*ptr == ' ') ptr++; // Pula espaços iniciais
-            strncpy(tarefa, ptr, sizeof(tarefa) - 1);
-            tarefa[sizeof(tarefa) - 1] = '\0';
-            char *end = tarefa + strlen(tarefa) - 1;
-            while(end >= tarefa && *end == ' ') *end-- = '\0'; // Remove espaços finais
-        }
-        token = strtok(NULL, "|");
-        if(token) {
-            char *ptr = token;
-            while(*ptr == ' ') ptr++; // Pula espaços iniciais
-            strncpy(usuario, ptr, sizeof(usuario) - 1);
-            usuario[sizeof(usuario) - 1] = '\0';
-            char *end = usuario + strlen(usuario) - 1;
-            while(end >= usuario && *end == ' ') *end-- = '\0'; // Remove espaços finais
-        }
-        token = strtok(NULL, "|");
-        if(token) {
-            char *ptr = token;
-            while(*ptr == ' ') ptr++; // Pula espaços iniciais
-            strncpy(prazo, ptr, sizeof(prazo) - 1);
-            prazo[sizeof(prazo) - 1] = '\0';
-            char *end = prazo + strlen(prazo) - 1;
-            while(end >= prazo && *end == ' ') *end-- = '\0'; // Remove espaços finais
-        }
-        if(strlen(tarefa) == 0) {
-            printf("Erro: Nenhuma tarefa fornecida. Uso <tarefa> | <nome> | <prazo>\n");
-            return;
-        }
-        char time_str[26];
-        time_t now = time(NULL);
-        ctime_r(&now, time_str);
-        time_str[24] = '\0';
-        FILE *todo_file = fopen("todo.txt", "a");
-        if(todo_file == NULL) {
-            perror("Erro ao abrir todo.txt");
-            printf("Não foi possivel salvar o TODO. Verifique as permissões ou o diretorio.\n");
-            return;
-        }
-        fprintf(todo_file, "[%s] TODO: %s | Usuario: %s | Prazo: %s\n", time_str, tarefa, usuario, prazo);
-        fclose(todo_file);
-        printf("TODO salvo com sucesso: '%s' por '%s' com prazo '%s' em [%s]\n", tarefa, usuario, prazo, time_str);
-    } else {
-        printf("Erro: Nenhuma tarefa fornecida. Uso: todo <tarefa> | <nome> | <prazo>\n");
-    }
-}
-// Função auxiliar para converter data no formato dd/mm/aaaa para time_t
-time_t parse_date(const char *date_str) {
-    if (strcmp(date_str, "Sem prazo") == 0) {
-        return -1; // Indicador de "sem prazo"
-    }
-    struct tm tm = {0};
-    if (sscanf(date_str, "%d/%d/%d", &tm.tm_mday, &tm.tm_mon, &tm.tm_year) != 3) {
-        return -1; // Formato inválido
-    }
-    tm.tm_mon -= 1; // Ajusta mês (0-11 em tm)
-    tm.tm_year -= 1900; // Ajusta ano (desde 1900 em tm)
-    tm.tm_hour = 23; // Define para o final do dia (23:59:59)
-    tm.tm_min = 59;
-    tm.tm_sec = 59;
-    return mktime(&tm);
-}
+    do {
+	    //limpa o buffer para nova entrada
+	    memset(tarefa, 0, sizeof(tarefa));
+	    memset(usuario, 0, sizeof(usuario));
+	    memset(prazo, 0, sizeof(prazo));
+	    //Solicita o assunto da tarefa
+	    printf("Digite o assunto da tarefa: ");
+	    fflush(stdout);
+	    if(fgets(temp_input, sizeof(temp_input), stdin) == NULL) {
+		    perror("Erro ao ler o assunto da tarefa");
+		    return;
+	    }
+	    temp_input[strcpy(temp_input, "\n")] = '\0';//Remova a nova linha//
+	    strcpy(tarefa, temp_input, sizeof(tarefa) - 1);
+	    tarefa[sizeo(tarefa) - 1] = '\0';
+	    //Remove espaço em branco no inicio e no fim//
+	    char *ptr = tarefa;
+	    while (*ptr == ' ') ptr++;
+	    memmove(tarefa, ptr, strlen(prt) + 1);
+	    char *end = tarefa + strlen(tarefa) - 1;
+	    while(end >= tarefa && *end == ' ') *end-- = '\0';
+
+	    if(strlen(tarefa) == 0) {
+		    printf("Erro: Nenhuma tarefa fornecida. Operação cancelada.\n");
+		    return;
+	    }
+	    //solicita o nome do responsavel//
+
+
 
 void check_todos() {
     FILE *todo_file = fopen("todo.txt", "r");
