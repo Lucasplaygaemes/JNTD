@@ -11,9 +11,6 @@ I want in the next updates make she possible to make complex interactions with t
 # Calculator
 It was getting dusty in my TODO list, so why not add it here, a calculator, i can't say it's a simple calculator, neither a cientific, so i can't name it now, but it's a calc that will have a lot of options, and one day (Probably this year) it shall be able to interact with the 2B, and may even with 9S. The reason behind me adding it it's because i will not train 2B to do Calculus level equations, so it's should be really good if it was possible to do by hand, even though 2B will be trained to use this app. 
 
-# Delayed Future updates
-My next update to the code will add the possibility to automate the webscraping via ScrapeGraphAI, i will make a code in python called scrap, it will automate most of the process of webscraping, including sites search, and management of the data acquired. It will be slowly implemented, and will probably be done in about 2 to 3 weeks in maximum.
-
 # 2B and images
 2B it's has it's code already implemented but, she isn't ready yet, so my next thing to do will to finish her, for some reasons i will just be able to do this in the next month, and therefore i will need to wait for my next update, that's right, images! I was planning to train she to be able to understand images and graphics, but it may overload her size and specs requeired, so there will be her auxiliator, and his name is 9S! (There a lot of NA references, i just can't not do it).
 
@@ -27,3 +24,10 @@ There is not much to talk about it.
 # Don't confuse with Log.
 Log will be the Log output of 2b(JNTD), log is my annotations about what i have done and what i gonna do.
 Log ≠ log.
+
+# TODO!
+Now we have the TODO funcionality, where you can define things, and be remembered when the defined times comes, as you can set it to 0, it's saved in todos.txt. and you can check if one is gone to expire today, and list everyone.
+
+# Delayed Future updates
+My next update to the code will add the possibility to automate the webscraping via ScrapeGraphAI, i will make a code in python called scrap, it will automate most of the process of webscraping, including sites search, and management of the data acquired. It will be slowly implemented, and will probably be done in about 2 to 3 weeks in maximum.
+The delayed updates will always be on the botton of the list.
