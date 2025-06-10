@@ -145,7 +145,6 @@ void TODO(const char *input) {
     char usuario[128] = "Desconhecido";
     char prazo[32] = "Sem prazo";
 
-<<<<<<< HEAD
     do {
 	    //limpa o buffer para nova entrada
 	    memset(tarefa, 0, sizeof(tarefa));
@@ -176,7 +175,6 @@ void TODO(const char *input) {
 
 
 
-=======
     if(input && strlen(input) > 0) {
         strncpy(input_copy, input, sizeof(input_copy) - 1);
         input_copy[sizeof(input_copy) - 1] = '\0';
@@ -246,7 +244,7 @@ time_t parse_date(const char *date_str) {
     return mktime(&tm);
 }
 // Checa se o prazo de algum espirou, ou vai espirar hoje.
->>>>>>> f293a4c79ed6e061606328f72c0a32b198a48df6
+
 void check_todos() {
     FILE *todo_file = fopen("todo.txt", "r");
     if (todo_file == NULL) {
