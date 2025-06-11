@@ -114,7 +114,6 @@ void display_history() {
         printf("  %d: %s\n", i + 1, command_history[i]);
     }
 }
-// lista todos os TODOs//
 void list_todo() {
     printf("Lista de TODOs:\n");
     printf("------------------------------------------------\n");
@@ -138,7 +137,7 @@ void list_todo() {
     }
     printf("------------------------------------------------\n");
 }
-//Aqui é onde todo o processo de criação dos TODOs acontece.
+
 void TODO(const char *input) {
     char temp_input[1024] = {0};
     char tarefa[512] = {0};
@@ -157,13 +156,13 @@ void TODO(const char *input) {
 		    perror("Erro ao ler o assunto da tarefa");
 		    return;
 	    }
-	    temp_input[strcpy(temp_input, "\n")] = '\0';//Remova a nova linha//
-	    strcpy(tarefa, temp_input, sizeof(tarefa) - 1);
-	    tarefa[sizeo(tarefa) - 1] = '\0';
+	    temp_input[strcspn(temp_input, "\n")] = '\0';//Remova a nova linha//
+	    strncpy(tarefa, temp_input, sizeof(tarefa) - 1);
+	    tarefa[sizeof(tarefa) - 1] = '\0';
 	    //Remove espaço em branco no inicio e no fim//
 	    char *ptr = tarefa;
 	    while (*ptr == ' ') ptr++;
-	    memmove(tarefa, ptr, strlen(prt) + 1);
+	    memmove(tarefa, ptr, strlen(ptr) + 1);
 	    char *end = tarefa + strlen(tarefa) - 1;
 	    while(end >= tarefa && *end == ' ') *end-- = '\0';
 
@@ -172,78 +171,102 @@ void TODO(const char *input) {
 		    return;
 	    }
 	    //solicita o nome do responsavel//
+	    printf("Digite o nome do responsavel ( Ou deixe vazio para desconhecido): ");
+	    fflush(stdout);
+	    if(fgets(temp_input, sizeof(temp_input), stdin) == NULL) {
+		    perror("Erro ao ler o nome do responsavel");
+		    return;
 
-
-
-    if(input && strlen(input) > 0) {
-        strncpy(input_copy, input, sizeof(input_copy) - 1);
-        input_copy[sizeof(input_copy) - 1] = '\0';
-        
-        char *token = strtok(input_copy, "|");
-        if(token) {
-            char *ptr = token;
-            while(*ptr == ' ') ptr++; // Pula espaços iniciais
-            strncpy(tarefa, ptr, sizeof(tarefa) - 1);
-            tarefa[sizeof(tarefa) - 1] = '\0';
-            char *end = tarefa + strlen(tarefa) - 1;
-            while(end >= tarefa && *end == ' ') *end-- = '\0'; // Remove espaços finais
-        }
-        token = strtok(NULL, "|");
-        if(token) {
-            char *ptr = token;
-            while(*ptr == ' ') ptr++; // Pula espaços iniciais
-            strncpy(usuario, ptr, sizeof(usuario) - 1);
-            usuario[sizeof(usuario) - 1] = '\0';
-            char *end = usuario + strlen(usuario) - 1;
-            while(end >= usuario && *end == ' ') *end-- = '\0'; // Remove espaços finais
-        }
-        token = strtok(NULL, "|");
-        if(token) {
-            char *ptr = token;
-            while(*ptr == ' ') ptr++; // Pula espaços iniciais
-            strncpy(prazo, ptr, sizeof(prazo) - 1);
-            prazo[sizeof(prazo) - 1] = '\0';
-            char *end = prazo + strlen(prazo) - 1;
-            while(end >= prazo && *end == ' ') *end-- = '\0'; // Remove espaços finais
-        }
-        if(strlen(tarefa) == 0) {
-            printf("Erro: Nenhuma tarefa fornecida. Uso <tarefa> | <nome> | <prazo>\n");
-            return;
-        }
-        char time_str[26];
-        time_t now = time(NULL);
-        ctime_r(&now, time_str);
-        time_str[24] = '\0';
-        FILE *todo_file = fopen("todo.txt", "a");
-        if(todo_file == NULL) {
-            perror("Erro ao abrir todo.txt");
-            printf("Não foi possivel salvar o TODO. Verifique as permissões ou o diretorio.\n");
-            return;
-        }
-        fprintf(todo_file, "[%s] TODO: %s | Usuario: %s | Prazo: %s\n", time_str, tarefa, usuario, prazo);
-        fclose(todo_file);
-        printf("TODO salvo com sucesso: '%s' por '%s' com prazo '%s' em [%s]\n", tarefa, usuario, prazo, time_str);
-    } else {
-        printf("Erro: Nenhuma tarefa fornecida. Uso: todo <tarefa> | <nome> | <prazo>\n");
-    }
+	    }
+	    temp_input[strcspn(temp_input, "\n")] = '\0';
+	    if(strlen(temp_input) > 0) {
+		    strncpy(usuario, temp_input, sizeof(usuario) - 1);
+		    usuario[sizeof(usuario) - 1] = '\0';
+		    ptr = usuario;
+		    while(*ptr == ' ') ptr++;
+		    memmove(usuario, ptr, strlen(ptr) + 1);
+		    end = usuario + strlen(usuario) - 1;
+		    while(end >= usuario && *end == ' ') *end-- = '\0';
+	    } else {
+		    strcpy(usuario, "Desconhecido");
+	    }
+	    //Solicita a data de vencimento
+	    printf("Digite a data de vencimento (dd/mm/aaaa/ ou deixe vazio para 'sem prazo'): ");
+	    fflush(stdout);
+	    if(fgets(temp_input, sizeof(temp_input), stdin) == NULL) {
+		    perror("Erro ao ler a data de vencimento");
+		    return;
+	    }
+	    temp_input[strcspn(temp_input, "\n")] = '\0'; // Remove o nova
+	    if(strlen(temp_input) > 0) {
+		    strncpy(prazo, temp_input, sizeof(prazo) - 1);
+		    prazo[sizeof(prazo) - 1] = '\0';
+		    ptr = prazo;
+		    while(*ptr == ' ') ptr++;
+		    memmove(prazo, ptr, strlen(ptr) + 1);
+		    end = prazo + strlen(prazo) - 1;
+		    while(end >= prazo && *end == ' ') *end-- = '\0';
+	    } else {
+		    strcpy(prazo, "Sem prazo");
+	    }
+	    char time_str[26];
+	    time_t now = time(NULL);
+	    ctime_r(&now, time_str);
+	    time_str[24] = '\0'; //remove new line do final da string do tempo
+	    //salva no arquivo
+	    FILE *todo_file = fopen("todo.txt", "a");
+	    if(todo_file == NULL) {
+		    perror("Erro ao abrir o todo.txt");
+		    printf("Não foi possivel salvar o TODO. Verifique as permissões ou o diretorio\n");
+		    return;
+	    }
+	    fprintf(todo_file, "[%s] TODO: %s | Usuario: %s | Prazo %s\n", time_str, tarefa, usuario, prazo);
+	    fclose(todo_file);
+	    printf("TODO salvo com sucesso: '%s' por '%s' com prazo '%s' em [%s]\n", tarefa, usuario, prazo, time_str);
+	    //pergunta se o usuario deseja adicionar outro TODO//
+	    printf("Deseja adicionar outro TODO? (s/n): ");
+	    fflush(stdout);
+	    if(fgets(temp_input, sizeof(temp_input), stdin) == NULL) {
+		    perror("Erro ao ler a resposta");
+		    return;
+	    }
+	    temp_input[strcspn(temp_input, "\n")] = '\0';
+    } while(temp_input[0] == 's' || temp_input[0] == 'S');
 }
+
 // Função auxiliar para converter data no formato dd/mm/aaaa para time_t
+
 time_t parse_date(const char *date_str) {
+
     if (strcmp(date_str, "Sem prazo") == 0) {
+
         return -1; // Indicador de "sem prazo"
+
     }
+
+
     struct tm tm = {0};
+
     if (sscanf(date_str, "%d/%d/%d", &tm.tm_mday, &tm.tm_mon, &tm.tm_year) != 3) {
+
         return -1; // Formato inválido
+
     }
+
     tm.tm_mon -= 1; // Ajusta mês (0-11 em tm)
+
     tm.tm_year -= 1900; // Ajusta ano (desde 1900 em tm)
+
     tm.tm_hour = 23; // Define para o final do dia (23:59:59)
+
     tm.tm_min = 59;
+
     tm.tm_sec = 59;
+
     return mktime(&tm);
+
 }
-// Checa se o prazo de algum espirou, ou vai espirar hoje.
+
 
 void check_todos() {
     FILE *todo_file = fopen("todo.txt", "r");
