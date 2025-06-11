@@ -64,9 +64,12 @@ static const CmdEntry cmds[] = {
     { "cd", NULL, "O comando cd, você troca de diretorio, use cd <destino>." },
     { "pwd", "pwd", "Fala o diretorio atual" },
     { "vim", "vim", "O editor no qual fiz todo esse codigo." },
-    { "todo", NULL, "Adiciona uma tarefa TODO a ser salva no arquivo todo.txt. Uso: todo <tarefa> | <nome> | <prazo>" },
-    { "ct", NULL, "Verifica se há TODOs vencidos ou a vencer hoje." },
-    { "tlist", NULL, "List things on TODO.txt." }
+    { "todo", NULL, "Adiciona uma ou mais tarefas TODO ao arquivo todo.txt." },
+    { "check_todo", NULL, "Verifica se há TODOs vencidos ou a vencer hoje." },
+    { "list_todo", NULL, "Lista todas as tarefas TODO salvas no arquivo todo.txt." },
+    { "remove_todo", NULL, "Remove uma tarefa TODO do arquivo pelo número." },
+    { "edit_todo", NULL, "Edita uma tarefa TODO existente pelo número." },
+    { "edit_vim", NULL, "Abre o arquivo todo.txt no vim para edição direta." }
 };
 
 // Declaração antecipada das funções
@@ -137,7 +140,6 @@ void list_todo() {
     }
     printf("------------------------------------------------\n");
 }
-
 
 void remove_todo() {
     list_todo(); // Mostra a lista de TODOs para o usuário escolher
@@ -468,40 +470,24 @@ void TODO(const char *input) {
         }
         temp_input[strcspn(temp_input, "\n")] = '\0';
     } while (temp_input[0] == 's' || temp_input[0] == 'S');
-}
+}	
 // Função auxiliar para converter data no formato dd/mm/aaaa para time_t
 
 time_t parse_date(const char *date_str) {
-
     if (strcmp(date_str, "Sem prazo") == 0) {
-
         return -1; // Indicador de "sem prazo"
-
     }
-
-
     struct tm tm = {0};
-
     if (sscanf(date_str, "%d/%d/%d", &tm.tm_mday, &tm.tm_mon, &tm.tm_year) != 3) {
-
         return -1; // Formato inválido
-
     }
-
     tm.tm_mon -= 1; // Ajusta mês (0-11 em tm)
-
     tm.tm_year -= 1900; // Ajusta ano (desde 1900 em tm)
-
     tm.tm_hour = 23; // Define para o final do dia (23:59:59)
-
     tm.tm_min = 59;
-
     tm.tm_sec = 59;
-
     return mktime(&tm);
-
 }
-
 
 void check_todos() {
     FILE *todo_file = fopen("todo.txt", "r");
@@ -841,7 +827,15 @@ void dispatch(const char *user_in) {
 		list_todo();
 	    } else if (strcasecmp(cmds[i].key, "rscript") == 0) {
                 rscript(args); // Passa os argumentos para rscript
-            } else if (cmds[i].shell_command != NULL) {
+            } else if (strcasecmp(cmds[i].key, "todo") == 0) {
+		TODO(args);
+            } else if (strcasecmp(cmds[i].key, "check_todo") == 0) {
+		check_todos();
+            } else if (strcasecmp(cmds[i].key, "list_todo") == 0) {
+		list_todo();
+	    } else if (strcasecmp(cmds[i].key, "remove_todo") == 0) {
+		remove_todo(args);
+	    }else if (cmds[i].shell_command != NULL) {
                 // Executa comandos shell definidos na tabela
                 system(cmds[i].shell_command);
             }
