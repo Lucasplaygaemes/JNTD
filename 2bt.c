@@ -352,6 +352,22 @@ void edit_todo() {
     printf("TODO número %d editado com sucesso.\n", index);
 }
 
+void edit_with_vim() {
+    printf("Abrindo todo.txt no editor vim para edição...\n");
+    int status = system("vim todo.txt");
+    if (status == -1) {
+        perror("Erro ao executar o comando vim");
+        printf("Não foi possível abrir o editor. Verifique se 'vim' está instalado.\n");
+    } else if (WIFEXITED(status)) {
+        int exit_code = WEXITSTATUS(status);
+        if (exit_code == 0) {
+            printf("Edição concluída com sucesso.\n");
+        } else {
+            printf("Editor fechado com status %d.\n", exit_code);
+        }
+    }
+}
+
 void TODO(const char *input) {
     char temp_input[1024] = {0};
     char tarefa[512] = {0};
