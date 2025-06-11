@@ -369,101 +369,106 @@ void edit_with_vim() {
 }
 
 void TODO(const char *input) {
-    char temp_input[1024] = {0};
     char tarefa[512] = {0};
-    char usuario[128] = "Desconhecido";
-    char prazo[32] = "Sem prazo";
+    char usuario[128] = {0};
+    char prazo[32] = {0};
+    char temp_input[256] = {0};
 
     do {
-	    //limpa o buffer para nova entrada
-	    memset(tarefa, 0, sizeof(tarefa));
-	    memset(usuario, 0, sizeof(usuario));
-	    memset(prazo, 0, sizeof(prazo));
-	    //Solicita o assunto da tarefa
-	    printf("Digite o assunto da tarefa: ");
-	    fflush(stdout);
-	    if(fgets(temp_input, sizeof(temp_input), stdin) == NULL) {
-		    perror("Erro ao ler o assunto da tarefa");
-		    return;
-	    }
-	    temp_input[strcspn(temp_input, "\n")] = '\0';//Remova a nova linha//
-	    strncpy(tarefa, temp_input, sizeof(tarefa) - 1);
-	    tarefa[sizeof(tarefa) - 1] = '\0';
-	    //Remove espaço em branco no inicio e no fim//
-	    char *ptr = tarefa;
-	    while (*ptr == ' ') ptr++;
-	    memmove(tarefa, ptr, strlen(ptr) + 1);
-	    char *end = tarefa + strlen(tarefa) - 1;
-	    while(end >= tarefa && *end == ' ') *end-- = '\0';
+        // Limpa os buffers para nova entrada
+        memset(tarefa, 0, sizeof(tarefa));
+        memset(usuario, 0, sizeof(usuario));
+        memset(prazo, 0, sizeof(prazo));
 
-	    if(strlen(tarefa) == 0) {
-		    printf("Erro: Nenhuma tarefa fornecida. Operação cancelada.\n");
-		    return;
-	    }
-	    //solicita o nome do responsavel//
-	    printf("Digite o nome do responsavel ( Ou deixe vazio para desconhecido): ");
-	    fflush(stdout);
-	    if(fgets(temp_input, sizeof(temp_input), stdin) == NULL) {
-		    perror("Erro ao ler o nome do responsavel");
-		    return;
+        // Solicita o assunto da tarefa
+        printf("Digite o assunto da tarefa: ");
+        fflush(stdout);
+        if (fgets(temp_input, sizeof(temp_input), stdin) == NULL) {
+            perror("Erro ao ler o assunto da tarefa");
+            return;
+        }
+        temp_input[strcspn(temp_input, "\n")] = '\0'; // Remove nova linha
+        strncpy(tarefa, temp_input, sizeof(tarefa) - 1);
+        tarefa[sizeof(tarefa) - 1] = '\0';
+        // Remove espaços em branco do início e fim
+        char *ptr = tarefa;
+        while (*ptr == ' ') ptr++;
+        memmove(tarefa, ptr, strlen(ptr) + 1);
+        char *end = tarefa + strlen(tarefa) - 1;
+        while (end >= tarefa && *end == ' ') *end-- = '\0';
 
-	    }
-	    temp_input[strcspn(temp_input, "\n")] = '\0';
-	    if(strlen(temp_input) > 0) {
-		    strncpy(usuario, temp_input, sizeof(usuario) - 1);
-		    usuario[sizeof(usuario) - 1] = '\0';
-		    ptr = usuario;
-		    while(*ptr == ' ') ptr++;
-		    memmove(usuario, ptr, strlen(ptr) + 1);
-		    end = usuario + strlen(usuario) - 1;
-		    while(end >= usuario && *end == ' ') *end-- = '\0';
-	    } else {
-		    strcpy(usuario, "Desconhecido");
-	    }
-	    //Solicita a data de vencimento
-	    printf("Digite a data de vencimento (dd/mm/aaaa/ ou deixe vazio para 'sem prazo'): ");
-	    fflush(stdout);
-	    if(fgets(temp_input, sizeof(temp_input), stdin) == NULL) {
-		    perror("Erro ao ler a data de vencimento");
-		    return;
-	    }
-	    temp_input[strcspn(temp_input, "\n")] = '\0'; // Remove o nova
-	    if(strlen(temp_input) > 0) {
-		    strncpy(prazo, temp_input, sizeof(prazo) - 1);
-		    prazo[sizeof(prazo) - 1] = '\0';
-		    ptr = prazo;
-		    while(*ptr == ' ') ptr++;
-		    memmove(prazo, ptr, strlen(ptr) + 1);
-		    end = prazo + strlen(prazo) - 1;
-		    while(end >= prazo && *end == ' ') *end-- = '\0';
-	    } else {
-		    strcpy(prazo, "Sem prazo");
-	    }
-	    char time_str[26];
-	    time_t now = time(NULL);
-	    ctime_r(&now, time_str);
-	    time_str[24] = '\0'; //remove new line do final da string do tempo
-	    //salva no arquivo
-	    FILE *todo_file = fopen("todo.txt", "a");
-	    if(todo_file == NULL) {
-		    perror("Erro ao abrir o todo.txt");
-		    printf("Não foi possivel salvar o TODO. Verifique as permissões ou o diretorio\n");
-		    return;
-	    }
-	    fprintf(todo_file, "[%s] TODO: %s | Usuario: %s | Prazo %s\n", time_str, tarefa, usuario, prazo);
-	    fclose(todo_file);
-	    printf("TODO salvo com sucesso: '%s' por '%s' com prazo '%s' em [%s]\n", tarefa, usuario, prazo, time_str);
-	    //pergunta se o usuario deseja adicionar outro TODO//
-	    printf("Deseja adicionar outro TODO? (s/n): ");
-	    fflush(stdout);
-	    if(fgets(temp_input, sizeof(temp_input), stdin) == NULL) {
-		    perror("Erro ao ler a resposta");
-		    return;
-	    }
-	    temp_input[strcspn(temp_input, "\n")] = '\0';
-    } while(temp_input[0] == 's' || temp_input[0] == 'S');
+        if (strlen(tarefa) == 0) {
+            printf("Erro: Nenhuma tarefa fornecida. Operação cancelada.\n");
+            return;
+        }
+
+        // Solicita o nome do responsável
+        printf("Digite o nome do responsável (ou deixe vazio para 'Desconhecido'): ");
+        fflush(stdout);
+        if (fgets(temp_input, sizeof(temp_input), stdin) == NULL) {
+            perror("Erro ao ler o nome do responsável");
+            return;
+        }
+        temp_input[strcspn(temp_input, "\n")] = '\0'; // Remove nova linha
+        if (strlen(temp_input) > 0) {
+            strncpy(usuario, temp_input, sizeof(usuario) - 1);
+            usuario[sizeof(usuario) - 1] = '\0';
+            ptr = usuario;
+            while (*ptr == ' ') ptr++;
+            memmove(usuario, ptr, strlen(ptr) + 1);
+            end = usuario + strlen(usuario) - 1;
+            while (end >= usuario && *end == ' ') *end-- = '\0';
+        } else {
+            strcpy(usuario, "Desconhecido");
+        }
+
+        // Solicita a data de vencimento
+        printf("Digite a data de vencimento (dd/mm/aaaa ou deixe vazio para 'Sem prazo'): ");
+        fflush(stdout);
+        if (fgets(temp_input, sizeof(temp_input), stdin) == NULL) {
+            perror("Erro ao ler a data de vencimento");
+            return;
+        }
+        temp_input[strcspn(temp_input, "\n")] = '\0'; // Remove nova linha
+        if (strlen(temp_input) > 0) {
+            strncpy(prazo, temp_input, sizeof(prazo) - 1);
+            prazo[sizeof(prazo) - 1] = '\0';
+            ptr = prazo;
+            while (*ptr == ' ') ptr++;
+            memmove(prazo, ptr, strlen(ptr) + 1);
+            end = prazo + strlen(prazo) - 1;
+            while (end >= prazo && *end == ' ') *end-- = '\0';
+        } else {
+            strcpy(prazo, "Sem prazo");
+        }
+
+        // Obtém o tempo atual para o carimbo de criação
+        char time_str[26];
+        time_t now = time(NULL);
+        ctime_r(&now, time_str);
+        time_str[24] = '\0'; // Remove newline do final da string de tempo
+
+        // Salva no arquivo
+        FILE *todo_file = fopen("todo.txt", "a");
+        if (todo_file == NULL) {
+            perror("Erro ao abrir todo.txt");
+            printf("Não foi possível salvar o TODO. Verifique as permissões ou o diretório.\n");
+            return;
+        }
+        fprintf(todo_file, "[%s] TODO: %s | Usuário: %s | Prazo: %s\n", time_str, tarefa, usuario, prazo);
+        fclose(todo_file);
+        printf("TODO salvo com sucesso: '%s' por '%s' com prazo '%s' em [%s]\n", tarefa, usuario, prazo, time_str);
+
+        // Pergunta se o usuário deseja adicionar outro TODO
+        printf("Deseja adicionar outro TODO? (s/n): ");
+        fflush(stdout);
+        if (fgets(temp_input, sizeof(temp_input), stdin) == NULL) {
+            perror("Erro ao ler resposta");
+            return;
+        }
+        temp_input[strcspn(temp_input, "\n")] = '\0';
+    } while (temp_input[0] == 's' || temp_input[0] == 'S');
 }
-
 // Função auxiliar para converter data no formato dd/mm/aaaa para time_t
 
 time_t parse_date(const char *date_str) {
