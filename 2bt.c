@@ -138,6 +138,69 @@ void list_todo() {
     printf("------------------------------------------------\n");
 }
 
+
+void remove_todo() {
+    list_todo(); // Mostra a lista de TODOs para o usuário escolher
+    FILE *todo_file = fopen("todo.txt", "r");
+    if (todo_file == NULL) {
+        perror("Erro ao abrir o arquivo todo.txt");
+        printf("Não foi possível remover TODOs. Arquivo não encontrado ou sem permissão.\n");
+        return;
+    }
+
+    // Lê todas as linhas para um buffer temporário
+    char lines[100][1024]; // Limite de 100 TODOs para simplificar
+    int count = 0;
+    while (fgets(lines[count], sizeof(lines[count]), todo_file) != NULL && count < 100) {
+        lines[count][strcspn(lines[count], "\n")] = '\0';
+        count++;
+    }
+    fclose(todo_file);
+
+    if (count == 0) {
+        printf("Nenhum TODO para remover.\n");
+        return;
+    }
+
+    // Solicita o número do TODO a ser removido
+    char temp_input[256];
+    printf("Digite o número do TODO a ser removido (1-%d, ou 0 para cancelar): ", count);
+    fflush(stdout);
+    if (fgets(temp_input, sizeof(temp_input), stdin) == NULL) {
+        perror("Erro ao ler entrada");
+        return;
+    }
+    temp_input[strcspn(temp_input, "\n")] = '\0';
+    int index = atoi(temp_input);
+    if (index <= 0 || index > count) {
+        printf("Operação cancelada ou número inválido.\n");
+        return;
+    }
+
+    // Escreve todas as linhas, exceto a escolhida, de volta ao arquivo
+    FILE *temp_file = fopen("todo_temp.txt", "w");
+    if (temp_file == NULL) {
+        perror("Erro ao criar arquivo temporário");
+        printf("Não foi possível remover o TODO.\n");
+        return;
+    }
+    for (int i = 0; i < count; i++) {
+        if (i != index - 1) { // Ignora a linha a ser removida
+            fprintf(temp_file, "%s\n", lines[i]);
+        }
+    }
+    fclose(temp_file);
+
+    // Substitui o arquivo original pelo temporário
+    if (remove("todo.txt") != 0 || rename("todo_temp.txt", "todo.txt") != 0) {
+        perror("Erro ao atualizar o arquivo todo.txt");
+        printf("Não foi possível completar a remoção.\n");
+        return;
+    }
+    printf("TODO número %d removido com sucesso.\n", index);
+}
+
+
 void TODO(const char *input) {
     char temp_input[1024] = {0};
     char tarefa[512] = {0};
