@@ -200,6 +200,157 @@ void remove_todo() {
     printf("TODO número %d removido com sucesso.\n", index);
 }
 
+void edit_todo() {
+    list_todo(); // Mostra a lista de TODOs para o usuário escolher
+    FILE *todo_file = fopen("todo.txt", "r");
+    if (todo_file == NULL) {
+        perror("Erro ao abrir o arquivo todo.txt");
+        printf("Não foi possível editar TODOs. Arquivo não encontrado ou sem permissão.\n");
+        return;
+    }
+
+    // Lê todas as linhas para um buffer temporário
+    char lines[100][1024]; // Limite de 100 TODOs para simplificar
+    int count = 0;
+    while (fgets(lines[count], sizeof(lines[count]), todo_file) != NULL && count < 100) {
+        lines[count][strcspn(lines[count], "\n")] = '\0';
+        count++;
+    }
+    fclose(todo_file);
+
+    if (count == 0) {
+        printf("Nenhum TODO para editar.\n");
+        return;
+    }
+
+    // Solicita o número do TODO a ser editado
+    char temp_input[256];
+    printf("Digite o número do TODO a ser editado (1-%d, ou 0 para cancelar): ", count);
+    fflush(stdout);
+    if (fgets(temp_input, sizeof(temp_input), stdin) == NULL) {
+        perror("Erro ao ler entrada");
+        return;
+    }
+    temp_input[strcspn(temp_input, "\n")] = '\0';
+    int index = atoi(temp_input);
+    if (index <= 0 || index > count) {
+        printf("Operação cancelada ou número inválido.\n");
+        return;
+    }
+
+    // Solicita novos valores para o TODO
+    char nova_tarefa[512] = {0};
+    char novo_usuario[128] = {0};
+    char novo_prazo[32] = {0};
+
+    printf("Digite o novo assunto da tarefa (deixe vazio para manter '%s'): ", lines[index-1]);
+    fflush(stdout);
+    if (fgets(temp_input, sizeof(temp_input), stdin) == NULL) {
+        perror("Erro ao ler novo assunto");
+        return;
+    }
+    temp_input[strcspn(temp_input, "\n")] = '\0';
+    if (strlen(temp_input) > 0) {
+        strncpy(nova_tarefa, temp_input, sizeof(nova_tarefa) - 1);
+        nova_tarefa[sizeof(nova_tarefa) - 1] = '\0';
+        char *ptr = nova_tarefa;
+        while (*ptr == ' ') ptr++;
+        memmove(nova_tarefa, ptr, strlen(ptr) + 1);
+        char *end = nova_tarefa + strlen(nova_tarefa) - 1;
+        while (end >= nova_tarefa && *end == ' ') *end-- = '\0';
+    } else {
+        // Extrai o valor atual (simplificado, pode ser melhorado)
+        char *start = strstr(lines[index-1], "TODO: ") + 6;
+        char *end = strstr(start, " | Usuário: ");
+        if (end) *end = '\0';
+        strncpy(nova_tarefa, start, sizeof(nova_tarefa) - 1);
+        nova_tarefa[sizeof(nova_tarefa) - 1] = '\0';
+    }
+
+    // Solicita novo usuário
+    printf("Digite o novo responsável (deixe vazio para manter atual): ");
+    fflush(stdout);
+    if (fgets(temp_input, sizeof(temp_input), stdin) == NULL) {
+        perror("Erro ao ler novo responsável");
+        return;
+    }
+    temp_input[strcspn(temp_input, "\n")] = '\0';
+    if (strlen(temp_input) > 0) {
+        strncpy(novo_usuario, temp_input, sizeof(novo_usuario) - 1);
+        novo_usuario[sizeof(novo_usuario) - 1] = '\0';
+        char *ptr = novo_usuario;
+        while (*ptr == ' ') ptr++;
+        memmove(novo_usuario, ptr, strlen(ptr) + 1);
+        char *end = novo_usuario + strlen(novo_usuario) - 1;
+        while (end >= novo_usuario && *end == ' ') *end-- = '\0';
+    } else {
+        // Extrai o valor atual (simplificado)
+        char *start = strstr(lines[index-1], "Usuário: ") + 9;
+        char *end = strstr(start, " | Prazo: ");
+        if (end) *end = '\0';
+        strncpy(novo_usuario, start, sizeof(novo_usuario) - 1);
+        novo_usuario[sizeof(novo_usuario) - 1] = '\0';
+    }
+
+    // Solicita nova data
+    printf("Digite a nova data de vencimento (dd/mm/aaaa, deixe vazio para manter atual): ");
+    fflush(stdout);
+    if (fgets(temp_input, sizeof(temp_input), stdin) == NULL) {
+        perror("Erro ao ler nova data");
+        return;
+    }
+    temp_input[strcspn(temp_input, "\n")] = '\0';
+    if (strlen(temp_input) > 0) {
+        strncpy(novo_prazo, temp_input, sizeof(novo_prazo) - 1);
+        novo_prazo[sizeof(novo_prazo) - 1] = '\0';
+        char *ptr = novo_prazo;
+        while (*ptr == ' ') ptr++;
+        memmove(novo_prazo, ptr, strlen(ptr) + 1);
+        char *end = novo_prazo + strlen(novo_prazo) - 1;
+        while (end >= novo_prazo && *end == ' ') *end-- = '\0';
+    } else {
+        // Extrai o valor atual (simplificado)
+        char *start = strstr(lines[index-1], "Prazo: ") + 7;
+        strncpy(novo_prazo, start, sizeof(novo_prazo) - 1);
+        novo_prazo[sizeof(novo_prazo) - 1] = '\0';
+    }
+
+    // Obtém a data de criação original
+    char time_str[26] = {0};
+    char *start_time = strstr(lines[index-1], "[");
+    if (start_time) {
+        strncpy(time_str, start_time + 1, 24);
+        time_str[24] = '\0';
+    } else {
+        time_t now = time(NULL);
+        ctime_r(&now, time_str);
+        time_str[24] = '\0';
+    }
+
+    // Escreve todas as linhas, atualizando a escolhida
+    FILE *temp_file = fopen("todo_temp.txt", "w");
+    if (temp_file == NULL) {
+        perror("Erro ao criar arquivo temporário");
+        printf("Não foi possível editar o TODO.\n");
+        return;
+    }
+    for (int i = 0; i < count; i++) {
+        if (i == index - 1) {
+            fprintf(temp_file, "[%s] TODO: %s | Usuário: %s | Prazo: %s\n", time_str, nova_tarefa, novo_usuario, novo_prazo);
+        } else {
+            fprintf(temp_file, "%s\n", lines[i]);
+        }
+    }
+    fclose(temp_file);
+
+    // Substitui o arquivo original pelo temporário
+    if (remove("todo.txt") != 0 || rename("todo_temp.txt", "todo.txt") != 0) {
+        perror("Erro ao atualizar o arquivo todo.txt");
+        printf("Não foi possível completar a edição.\n");
+        return;
+    }
+    printf("TODO número %d editado com sucesso.\n", index);
+}
 
 void TODO(const char *input) {
     char temp_input[1024] = {0};
