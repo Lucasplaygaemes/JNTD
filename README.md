@@ -4,7 +4,7 @@ This is a simple code where you can automate commands and other tasks in your sy
 The objective of this code is let me integrate my own LLM with my system, i haven't finished it yet, but i'm already making the preaparations when i finished her.
 
 # How to use
-There's no such thing as "right way to use". Because you can automate things when and how you want, but you should make changes on it according to your needings. There are pre defined commands that you can see on the help part, you can change the code by yourself, have a good idea, want it on the code? make a subimit and if it's good, i merge it.
+There's no such thing as "right way to use". Because you can automate things when and how you want, but you should make changes on it according to your needings. There are pre defined commands that you can see on the help part, you can change the code by yourself, have a good idea, want it on the code? make a submission and if it's good, i merge it.
 # How it work's?
 
 The code access the Ollama via bash, the 2B it's trained to know how and what to respond when it's questioned within the terminal, it's has been trained in a personalized dataset, that's has previous commands and interactions between she and the user and the terminal. Ex: make an .txt file that has the firts 50 firts numbers from fibonacci sequence.
@@ -23,6 +23,3 @@ One day i may have the specs to use the most heavy LLM that i can put my hands o
 # TODO!
 Now we have the TODO funcionality, where you can define things, and be remembered when the defined times comes, as you can set it to 0, it's saved in todos.txt. and you can check if one is gone to expire today, and list everyone.
 
-# Delayed Future updates
-My next update to the code will add the possibility to automate the webscraping via ScrapeGraphAI, i will make a code in python called scrap, it will automate most of the process of webscraping, including sites search, and management of the data acquired. It will be slowly implemented, and will probably be done in about 2 to 3 weeks in maximum.
-The delayed updates will always be on the botton of the list.
