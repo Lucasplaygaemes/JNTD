@@ -832,7 +832,7 @@ void dispatch(const char *user_in) {
             } else if (strcasecmp(cmds[i].key, "checkt") == 0) {
 		check_todos();
             } else if (strcasecmp(cmds[i].key, "editt") == 0) {
-            	edit_todo(args);
+            	edit_todo();
             } else if (strcasecmp(cmds[i].key, "listt") == 0) {
 		list_todo();
 	    } else if (strcasecmp(cmds[i].key, "remt") == 0) {
