@@ -65,10 +65,10 @@ static const CmdEntry cmds[] = {
     { "pwd", "pwd", "Fala o diretorio atual" },
     { "vim", "vim", "O editor no qual fiz todo esse codigo." },
     { "todo", NULL, "Adiciona uma ou mais tarefas TODO ao arquivo todo.txt." },
-    { "check_todo", NULL, "Verifica se há TODOs vencidos ou a vencer hoje." },
-    { "list_todo", NULL, "Lista todas as tarefas TODO salvas no arquivo todo.txt." },
-    { "remove_todo", NULL, "Remove uma tarefa TODO do arquivo pelo número." },
-    { "edit_todo", NULL, "Edita uma tarefa TODO existente pelo número." },
+    { "checkt", NULL, "Verifica se há TODOs vencidos ou a vencer hoje." },
+    { "listt", NULL, "Lista todas as tarefas TODO salvas no arquivo todo.txt." },
+    { "remt", NULL, "Remove uma tarefa TODO do arquivo pelo número." },
+    { "editt", NULL, "Edita uma tarefa TODO existente pelo número." },
     { "edit_vim", NULL, "Abre o arquivo todo.txt no vim para edição direta." }
 };
 
@@ -829,11 +829,13 @@ void dispatch(const char *user_in) {
                 rscript(args); // Passa os argumentos para rscript
             } else if (strcasecmp(cmds[i].key, "todo") == 0) {
 		TODO(args);
-            } else if (strcasecmp(cmds[i].key, "check_todo") == 0) {
+            } else if (strcasecmp(cmds[i].key, "checkt") == 0) {
 		check_todos();
-            } else if (strcasecmp(cmds[i].key, "list_todo") == 0) {
+            } else if (strcasecmp(cmds[i].key, "editt") == 0) {
+            	edit_todo(args);
+            } else if (strcasecmp(cmds[i].key, "listt") == 0) {
 		list_todo();
-	    } else if (strcasecmp(cmds[i].key, "remove_todo") == 0) {
+	    } else if (strcasecmp(cmds[i].key, "remt") == 0) {
 		remove_todo(args);
 	    }else if (cmds[i].shell_command != NULL) {
                 // Executa comandos shell definidos na tabela
