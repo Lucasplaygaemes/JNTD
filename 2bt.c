@@ -823,7 +823,7 @@ void dispatch(const char *user_in) {
                 TODO(args);
             } else if (strcasecmp(cmds[i].key, "ct") == 0) {
                 check_todos();
-	    } else if (strcasecmp(cmds[i].key, "tlist") == 0) {
+	    } else if (strcasecmp(cmds[i].key, "listt") == 0) {
 		list_todo();
 	    } else if (strcasecmp(cmds[i].key, "rscript") == 0) {
                 rscript(args); // Passa os argumentos para rscript
