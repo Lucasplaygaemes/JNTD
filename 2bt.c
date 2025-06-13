@@ -22,6 +22,7 @@
 #define MAX_HISTORY 50
 //define o tamanho maximo do input do usario + extras como calc
 #define COMBINED_PROMPT_LEN 2048 // Já estava adequado, mas mantido para clareza
+int max_todo = 100;
 char tarefa[512] = {0};
 char usuario[128] = "Desconhecido";
 char prazo[32] = "Sem prazo";
@@ -100,7 +101,7 @@ int is_safe_command(const char *cmd) {
 // Funções para histórico de comandos
 void add_to_history(const char *cmd) {
     if (history_count < MAX_HISTORY) {
-        command_history[history_count] = strdup(cmd);
+        command_history[history_count] = strdup(cmd); // Aloca memoria
         history_count++;
     } else {
         free(command_history[0]);
@@ -163,6 +164,10 @@ void remove_todo() {
         printf("Nenhum TODO para remover.\n");
         return;
     }
+    if (count >= max_todo) {
+	    printf("Limite de TODOs atingido!\n");
+            return ;
+    }
 
     // Solicita o número do TODO a ser removido
     char temp_input[256];
@@ -224,7 +229,10 @@ void edit_todo() {
         printf("Nenhum TODO para editar.\n");
         return;
     }
-
+    if (count >= max_todo) {
+	    printf("Limite de TODOs atingido!\n");
+	    break;
+    }
     // Solicita o número do TODO a ser editado
     char temp_input[256];
     printf("Digite o número do TODO a ser editado (1-%d, ou 0 para cancelar): ", count);
@@ -851,6 +859,14 @@ int main(void) {
     printf("Iniciando o JNTD...\n");
     check_todos();
     char buf[512];
+    if(strlen(buf) > 0) {
+	    for (size_t i = 0; i < sizeof(cmds)/sizeof(cmds[0]); i++) {
+		    if (strncmp(buf, cmds[i].key, strlen(buf)) == 0) {
+			    printf("\nSugestaão: %s\n %s", cmds[i].key, buf);//Mostra a sugestão
+                            fflush(stdout);
+                    }
+            }
+    }
     printf("Digite um comando. Use 'help' para ver as opções ou 'sair' para terminar.\n");
     while (printf("> "), fgets(buf, sizeof(buf), stdin) != NULL) {
         buf[strcspn(buf, "\n")] = '\0'; // Remove newline
@@ -864,6 +880,8 @@ int main(void) {
         }
         dispatch(buf);
     }
+    for (int i = 0; i < history_count; i++) {
+	    free(command_history[i]);
     printf("Saindo....\n");
     return 0;
 }
