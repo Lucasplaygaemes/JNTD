@@ -33,7 +33,7 @@ char dir_ant[100];
 char *command_history[MAX_HISTORY];
 int history_count = 0;
 static char ult_calc_resu[1024] = "";
-
+char buf[512];
 // Estrutura de comando
 typedef struct {
     const char *key;
@@ -806,7 +806,14 @@ void dispatch(const char *user_in) {
     if (token == NULL) return;
 
     char *args = strtok(NULL, ""); // Pega o resto da string como argumentos
-
+	if(strlen(buf) > 0) {
+		for (size_t i = 0; i < sizeof(cmds)/sizeof(cmds[0]); i++) {
+			if (strncmp(buf, cmds[i].key, strlen(buf)) == 0) {
+				printf("Sugestão: %s\n %s", cmds[i].key, buf);//Mostra a sugestão
+				fflush(stdout);
+            }
+        }
+    }
     // Adiciona ao histórico e log
     add_to_history(user_in);
     log_action("User Input", user_in);
@@ -824,7 +831,10 @@ void dispatch(const char *user_in) {
             } else if (strcasecmp(cmds[i].key, "cd") == 0) {
                 cd(args); // Passa os argumentos para cd
             } else if (strcasecmp(cmds[i].key, "git") == 0) {
-                printf("O Github do criador e do projeto é 'https://github.com/Lucasplaygaemes/JNTD'\n");
+                printf("O repostorio é: https://github.com/Lucasplaygaemes/JNTD\n");
+		printf("Ultimo commit: ");
+		fflush(stdout);
+		system("git log -1 --pretty=%B | head -n1");
             } else if (strcasecmp(cmds[i].key, "his") == 0) { // Corrige de "historico" para "his" conforme cmds
                 display_history();
             } else if (strcasecmp(cmds[i].key, "todo") == 0) {
@@ -858,19 +868,6 @@ void dispatch(const char *user_in) {
 int main(void) {
     printf("Iniciando o JNTD...\n");
     check_todos();
-    char buf[512];
-    if(strlen(buf) > 0) {
-	    for (size_t i = 0; i < sizeof(cmds)/sizeof(cmds[0]); i++) {
-		    if (strncmp(buf, cmds[i].key, strlen(buf)) == 0) {
-			    printf("\nSugestaão: %s\n %s", cmds[i].key, buf);//Mostra a sugestão
-                            fflush(stdout);
-            } else {
-                printf("Comando '%s' não reconhecido. Use 'help' para ver os comandos disponíveis.\n", buf);
-            }
-        }
-    }
-
-
     printf("Digite um comando. Use 'help' para ver as opções ou 'sair' para terminar.\n");
     while (printf("> "), fgets(buf, sizeof(buf), stdin) != NULL) {
         buf[strcspn(buf, "\n")] = '\0'; // Remove newline
