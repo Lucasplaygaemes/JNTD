@@ -166,7 +166,7 @@ void remove_todo() {
     }
     if (count >= max_todo) {
 	    printf("Limite de TODOs atingido!\n");
-            return ;
+            return;
     }
 
     // Solicita o número do TODO a ser removido
@@ -231,7 +231,7 @@ void edit_todo() {
     }
     if (count >= max_todo) {
 	    printf("Limite de TODOs atingido!\n");
-	    break;
+	    return;
     }
     // Solicita o número do TODO a ser editado
     char temp_input[256];
