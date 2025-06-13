@@ -27,5 +27,8 @@ It's simple, it will have an explanation of everything in eachline, so you can k
 I have maked a file named, log, it's self explanatory what it does, but it will be also my changes and thoughts about the code, what to change, in this journey.
 There is not much to talk about it.
 
+# Git!
+The git function show you the link to JNTD repository, but the last commit feature, probably just work in my pc, thats because my git is setted to JNTD, but your may not, and that's a problem that i will handle in the future.
+
 # TODO!
 Now we have the TODO funcionality, where you can define things, and be remembered when the defined times comes, as you can set it to 0, it's saved in todos.txt. and you can check if one is gone to expire today, and list everyone.
