@@ -58,7 +58,7 @@ static const CmdEntry cmds[] = {
     { "calc", NULL, "Usa a calculadora avançada. Exemplo: calc soma 5 3 ou calc deriv_poly 3 2 2 1 -1 0." },
     { "his", NULL, "Exibe o histórico de comandos digitados." },
     { "cl", "clear", "Limpa o terminal" },
-    { "git", NULL, "Mostra o Github do repositorio" },
+    { "git", NULL, "Mostra o link para Github do repositorio, além da ultima commit, mas a commit não funciona sempre. Pois depende do git do sistema, que pode estar ligado a outro repo." },
     { "mkdir", NULL, "Cria um novo diretorio sem nome, nomea-lo será adicionado" },
     { "rscript", NULL, "Roda um script pré definido, coloque cada comando em uma linha" },
     { "sl", "sl", "Easter Egg." },
