@@ -864,9 +864,13 @@ int main(void) {
 		    if (strncmp(buf, cmds[i].key, strlen(buf)) == 0) {
 			    printf("\nSugestaão: %s\n %s", cmds[i].key, buf);//Mostra a sugestão
                             fflush(stdout);
-                    }
+            } else {
+                printf("Comando '%s' não reconhecido. Use 'help' para ver os comandos disponíveis.\n", buf);
             }
+        }
     }
+
+
     printf("Digite um comando. Use 'help' para ver as opções ou 'sair' para terminar.\n");
     while (printf("> "), fgets(buf, sizeof(buf), stdin) != NULL) {
         buf[strcspn(buf, "\n")] = '\0'; // Remove newline
@@ -884,4 +888,6 @@ int main(void) {
 	    free(command_history[i]);
     printf("Saindo....\n");
     return 0;
+    }
+
 }
