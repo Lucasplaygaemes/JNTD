@@ -527,7 +527,7 @@ void check_todos() {
             if (prazo_time != -1) { // Data válida
                 if (difftime(now, prazo_time) >= 0) { // Data atual >= prazo
                     has_overdue = 1;
-                    printf("TODO VENCIDO OU HOJE: %s\n", line);
+                    printf("TODO VENCIDO OU VENCE HOJE: %s\n", line);
                 }
             }
         }
