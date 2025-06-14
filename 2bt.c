@@ -43,9 +43,7 @@ char quiz[1024];
 int countar = 0;
 int line_number;
 int count = 0;
-
-void func_quiz();
-
+const char* quiz_file = "quiz.txt";
 // Estrutura de comando
 typedef struct {
     const char *key;
@@ -102,6 +100,8 @@ void check_todos();
 void cd(const char *args);
 int jntd_mkdir(const char *args);
 void rscript(const char *args);
+void func_quiz();
+char* read_random_line(const char* quiz_file);
 
 // Função para verificar segurança de comandos
 int is_safe_command(const char *cmd) {
@@ -222,24 +222,19 @@ void remove_todo() {
 }
 
 void quiz_aleatorio() {
-	printf("Você deseja jogar o QUIZ? (s/n)\n");
-	char respostas[256];
-	if (fgets(respostas, sizeof(respostas) - 1, stdin) != NULL) {
-		respostas[strcspn(respostas, "\n")] = '\0';
-		if(strcasecmp("respostas", "s") == 0) {
-			func_quiz();
-		} else if(strcasecmp("respostas", "sim") == 0) {
-			func_quiz();
-		} else if(strcasecmp("respostas", "S") == 0) {
-			func_quiz();
-		} else {
-			printf("Não foi possivel identificar a resposta\n");
-			}
-			
-		}
-	}
-
-
+    printf("Você deseja jogar o QUIZ? (s/n)\n");
+    char respostas[256];
+    if (fgets(respostas, sizeof(respostas), stdin) != NULL) {
+        respostas[strcspn(respostas, "\n")] = '\0'; // Remove newline character
+        if (strcasecmp(respostas, "s") == 0 || strcasecmp(respostas, "sim") == 0) {
+            read_random_line(respostas);
+        } else {
+            printf("Não foi possível identificar a resposta\n");
+        }
+    } else {
+        printf("Erro ao ler a resposta\n");
+    }
+}
 void quiz_timer() {
     printf("Qual o intervalo de tempo entre os QUIZES em Segundos? (Aperte enter para o padrão, 10[600s] min)");
     int seconds;
@@ -293,31 +288,39 @@ int contar_linhas(const char* quiz_file) {
 	return linhaslin;
 }
 char* read_speci_line(const char* quiz_file, int line_number) {
-	FILE *quiz_f = fopen("quiz.txt", "r");
-	if (quiz_f == NULL) {
-		perror("Não foi possivel abrir o arquivo quiz.txt\n");
-		return NULL;
-	}
-	char buffer[1024];
-	char *result = NULL;
-	int linha_atual = 0;
+    FILE *quiz_f = fopen(quiz_file, "r");
+    if (quiz_f == NULL) {
+        perror("Erro ao abrir o arquivo");
+        return NULL;
+    }
 
-	while (fgets(buffer, sizeof(buffer), quiz_f) != NULL) {
-		linha_atual++;
-		if (linha_atual == line_number) {
-			buffer[strcspn(buffer, "\n")] = '\0';
-			result = strdup(buffer);
-			break;
-		}
-	}
-	fclose(quiz_f);
-	if (linha_atual < line_number || result == NULL) {
-		printf("Linha: '%d' não encontrada, Total de linhas: '%d'\n", line_number, linha_atual);
-		return NULL;
-	}
-	return result;
+    char buffer[1024];
+    char *result = NULL;
+    int linha_atual = 0;
+
+    while (fgets(buffer, sizeof(buffer), quiz_f) != NULL) {
+        linha_atual++;
+        if (linha_atual == line_number) {
+            buffer[strcspn(buffer, "\n")] = '\0'; // Remove o '\n' se presente
+            result = strdup(buffer);
+            if (result == NULL) {
+                fprintf(stderr, "Erro ao alocar memória para a linha\n");
+                fclose(quiz_f);
+                return NULL;
+            }
+            break; // Sai do loop após encontrar a linha
+        }
+    }
+
+    fclose(quiz_f);
+
+    if (result == NULL) {
+        fprintf(stderr, "Linha %d não encontrada. Total de linhas no arquivo: %d\n", line_number, linha_atual);
+        return NULL;
+    }
+
+    return result;
 }
-
 //Função para ler uma linha aleatoria
 char* read_random_line(const char* quiz_file) {
 	int total_lines = contar_linhas(quiz_file);
@@ -993,7 +996,6 @@ void dispatch(const char *user_in) {
 int main(void) {
     printf("Iniciando o JNTD...\n");
     check_todos();
-    const char* quiz_file = "quiz.txt";
     printf("Digite um comando. Use 'help' para ver as opções ou 'sair' para terminar.\n");
     while (printf("> "), fgets(buf, sizeof(buf), stdin) != NULL) {
         buf[strcspn(buf, "\n")] = '\0'; // Remove newline
