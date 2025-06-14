@@ -26,6 +26,9 @@ It's simple, it will have an explanation of everything in eachline, so you can k
 # Log!
 It's self explanatory, it's a log of the commands send by you, it will be stored in a file called "log.txt", it has the time, and the day the commands was executed, as well theres a history log, but in the code itself, so you can see the last commands, it's redoundant, so i will change it in the future.
 
+# QUIZ!
+Now we have a quiz! it's a simple quiz where you answer questions of a varity of themes, and you can edit the questions! All of them are in the quiz.txt file.
+
 # Git!
 The git function show you the link to JNTD repository, but the last commit feature, probably just work in my pc, thats because my git is setted to JNTD, but your may not, and that's a problem that i will handle in the future.
 
