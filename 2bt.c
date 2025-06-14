@@ -118,6 +118,7 @@ void display_history() {
         printf("  %d: %s\n", i + 1, command_history[i]);
     }
 }
+
 void list_todo() {
     printf("Lista de TODOs:\n");
     printf("------------------------------------------------\n");
