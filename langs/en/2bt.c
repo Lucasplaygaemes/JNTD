@@ -27,8 +27,8 @@
 #define COMBINED_PROMPT_LEN 2048 // Já estava adequado, mas mantido para clareza
 int max_todo = 100;
 char tarefa[512] = {0};
-char usuario[128] = "Desconhecido";
-char prazo[32] = "Sem prazo";
+char usuario[128] = "Unknow";
+char prazo[32] = "Without deadline";
 char input_copy[1024];
 char dir_novo[100];
 char *path[100];
@@ -44,23 +44,23 @@ int countar = 0;
 int line_number;
 int count = 0;
 const char* quiz_file = "quiz.txt";
-// Estrutura de comando
+// Commands structure
 typedef struct {
     const char *key;
     const char *shell_command;
     const char *descri;
 } CmdEntry;
 
-// Definição dos comandos (declarado antes das funções que o utilizam)
+// Commands definitions (declared before the function is used.)
 static const CmdEntry cmds[] = {
-    { "ls", "pwd && ls -l", "Diretorio atual e lista arquivos detalhadamente." },
-    { ":q", "exit", "Outro forma de sair do JNTD, criado pelo atalho do VIM" },
-    { "lsa", "pwd && ls -la", "Igual o listar, mas todos os arquivos (incluindo ocultos)." },
-    { "data", "date", "Data e hora atual." },
-    { "quem", "whoami", "Nome do usuário atual." },
-    { "esp", "df -h .", "Espaço livre do sistema de arquivos atual." },
-    { "sysatt?", "pop-upgrade release check", "Verifica se há atualizações do sistema disponíveis (Pop!_OS)." },
-    { "sudo", "sudo su", "Entra no modo super usuário (USE COM CUIDADO!)." },
+    { "ls", "pwd && ls -l", "Print the actual directory and the files." },
+    { ":q", "exit", "Another way to exit JNTD, inspired by  VIM" },
+    { "lsa", "pwd && ls -la", "Same as before but show all files(including the hiddens)." },
+    { "data", "date", "Date and time now" },
+    { "quem", "whoami", "Name of the user (Just work in linux)." },
+    { "esp", "df -h .", "Show the storage free (linux only)" },
+    { "sysatt?", "pop-upgrade release check", "Verify it theres any update avaible (Pop!_OS)." },
+    { "sudo", "sudo su", "Enter in sudo mode.(USE CAREFULLY)." },
     { "help", NULL, "Lista todos os comandos disponíveis e suas descrições." },
     { "criador", "echo lucasplayagemes é o criador deste codigo.", "Diz o nome do criador do JNTD e 2B." },
     { "2b", NULL, "Inicia uma conversa com a 2B, e processa sua saida." },
