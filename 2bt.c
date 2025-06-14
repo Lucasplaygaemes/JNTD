@@ -4,7 +4,10 @@
 #include <sys/wait.h>
 #include <time.h>
 #include <sys/stat.h> // Para stat (Linux/macOS)
-
+#include <unistd.h>  // Para sleep()
+#ifdef _WIN32
+#include <windows.h> // Para Sleep()
+#endif
 #ifdef _WIN32
 #include <direct.h> // Para _getcwd no Windows
 #else
@@ -34,6 +37,15 @@ char *command_history[MAX_HISTORY];
 int history_count = 0;
 static char ult_calc_resu[1024] = "";
 char buf[512];
+char lines[100][1024];
+int linhazinhas[100];
+char quiz[1024];
+int countar = 0;
+int line_number;
+int count = 0;
+
+void func_quiz();
+
 // Estrutura de comando
 typedef struct {
     const char *key;
@@ -70,7 +82,10 @@ static const CmdEntry cmds[] = {
     { "listt", NULL, "Lista todas as tarefas TODO salvas no arquivo todo.txt." },
     { "remt", NULL, "Remove uma tarefa TODO do arquivo pelo número." },
     { "editt", NULL, "Edita uma tarefa TODO existente pelo número." },
-    { "edit_vim", NULL, "Abre o arquivo todo.txt no vim para edição direta." }
+    { "edit_vim", NULL, "Abre o arquivo todo.txt no vim para edição direta." },
+    { "quiz", NULL, "Mostra todas as perguntas do quiz do integrado." },
+    { "quizt", NULL, "Define o intervalo de tempo entre os QUIZ'es." },
+    { "quizale", NULL, "Uma pergunta aleatoria do QUIZ é feita." }
 };
 
 // Declaração antecipada das funções
@@ -120,6 +135,7 @@ void display_history() {
 }
 
 void list_todo() {
+    count = 0; // Reinicia o contador global
     printf("Lista de TODOs:\n");
     printf("------------------------------------------------\n");
     FILE *todo_file = fopen("todo.txt", "r");
@@ -128,15 +144,12 @@ void list_todo() {
         printf("Não foi possível listar os TODOs. Arquivo não encontrado ou sem permissão.\n");
         return;
     }
-
-    char line[1024];
-    int count = 0;
+    char line[1024]; // Buffer temporário para cada linha
     while (fgets(line, sizeof(line), todo_file) != NULL) {
         line[strcspn(line, "\n")] = '\0'; // Remove nova linha do final
         printf("%d: %s\n", ++count, line);
     }
     fclose(todo_file);
-
     if (count == 0) {
         printf("Nenhum TODO encontrado no arquivo.\n");
     }
@@ -152,22 +165,22 @@ void remove_todo() {
         return;
     }
 
+    if (count >= max_todo) {
+	    printf("Limite de TODOs atingido!\n");
+            return;
+    }
+
     // Lê todas as linhas para um buffer temporário
-    char lines[100][1024]; // Limite de 100 TODOs para simplificar
+    // Limite de 100 TODOs para simplificar
     int count = 0;
     while (fgets(lines[count], sizeof(lines[count]), todo_file) != NULL && count < 100) {
         lines[count][strcspn(lines[count], "\n")] = '\0';
         count++;
     }
     fclose(todo_file);
-
     if (count == 0) {
         printf("Nenhum TODO para remover.\n");
         return;
-    }
-    if (count >= max_todo) {
-	    printf("Limite de TODOs atingido!\n");
-            return;
     }
 
     // Solicita o número do TODO a ser removido
@@ -208,6 +221,118 @@ void remove_todo() {
     printf("TODO número %d removido com sucesso.\n", index);
 }
 
+void quiz_aleatorio() {
+	printf("Você deseja jogar o QUIZ? (s/n)\n");
+	char respostas[256];
+	if (fgets(respostas, sizeof(respostas) - 1, stdin) != NULL) {
+		respostas[strcspn(respostas, "\n")] = '\0';
+		if(strcasecmp("respostas", "s") == 0) {
+			func_quiz();
+		} else if(strcasecmp("respostas", "sim") == 0) {
+			func_quiz();
+		} else if(strcasecmp("respostas", "S") == 0) {
+			func_quiz();
+		} else {
+			printf("Não foi possivel identificar a resposta\n");
+			}
+			
+		}
+	}
+
+
+void quiz_timer() {
+    printf("Qual o intervalo de tempo entre os QUIZES em Segundos? (Aperte enter para o padrão, 10[600s] min)");
+    int seconds;
+    if (scanf("%d", &seconds) != 1) { // Remover \n do scanf
+        seconds = 600; // Valor padrão
+    }
+    
+    // Limpar buffer de entrada
+    int c;
+    while ((c = getchar()) != '\n' && c != EOF);
+    // Usar sleep para melhor desempenho
+    sleep(seconds);// Para Linux/macOS
+    #ifdef _WIN32
+    Sleep(seconds * 1000); // Para Windows
+    #endif
+}
+
+void func_quiz() {
+    printf("Lista de QUIZ's:\n");
+    printf("------------------------------------------------\n");
+    FILE *quiz_f = fopen("quiz.txt", "r");
+    if (quiz_f == NULL) {
+        perror("Erro ao abrir o arquivo quiz.txt");
+        printf("Não foi possível listar os QUIZ's. Arquivo não encontrado ou sem permissão.\n");
+        return;
+    }
+    while (fgets(quiz, sizeof(quiz), quiz_f) != NULL) {
+        quiz[strcspn(quiz, "\n")] = '\0'; // Remove nova linha do final
+        printf("%d: %s\n", ++countar, quiz);
+    }
+    fclose(quiz_f);
+    if (countar == 0) {
+	   printf("Nenhum QUIZ encontrado no arquivo.\n");
+    }
+    printf("------------------------------------------------\n");
+}
+
+int contar_linhas(const char* quiz_file) {
+	FILE *quizlin = fopen("quiz.txt", "r");
+	if (quizlin == NULL) {
+		perror("Erro ao abrir o arquivo quiz.txt");
+		printf("Não foi possível listar os QUIZ's. Arquivo não encontrado ou sem permissão.\n");
+		return 0;
+	}
+	int linhaslin = 0;
+	char buffin1[1024];
+	while (fgets(buffin1, sizeof(buffin1), quizlin) != NULL) {
+		linhaslin++;
+	}
+	fclose(quizlin);
+	return linhaslin;
+}
+char* read_speci_line(const char* quiz_file, int line_number) {
+	FILE *quiz_f = fopen("quiz.txt", "r");
+	if (quiz_f == NULL) {
+		perror("Não foi possivel abrir o arquivo quiz.txt\n");
+		return NULL;
+	}
+	char buffer[1024];
+	char *result = NULL;
+	int linha_atual = 0;
+
+	while (fgets(buffer, sizeof(buffer), quiz_f) != NULL) {
+		linha_atual++;
+		if (linha_atual == line_number) {
+			buffer[strcspn(buffer, "\n")] = '\0';
+			result = strdup(buffer);
+			break;
+		}
+	}
+	fclose(quiz_f);
+	if (linha_atual < line_number || result == NULL) {
+		printf("Linha: '%d' não encontrada, Total de linhas: '%d'\n", line_number, linha_atual);
+		return NULL;
+	}
+	return result;
+}
+
+//Função para ler uma linha aleatoria
+char* read_random_line(const char* quiz_file) {
+	int total_lines = contar_linhas(quiz_file);
+	if (total_lines == 0) {
+		printf("Nenhum arquivo econtrado, ou vazio\n");
+		return NULL;
+	}
+	//Gera um numero aleatorio entre 1 e total_lines//
+	srand(time(NULL));//Inicializa a seed do gerador
+	int random_line = (rand() % total_lines) + 1;//Gere entre 1 e total_lines
+	
+	//le a linhas correspondente ao numero;
+	return read_speci_line(quiz_file, random_line);
+}
+
 void edit_todo() {
     list_todo(); // Mostra a lista de TODOs para o usuário escolher
     FILE *todo_file = fopen("todo.txt", "r");
@@ -218,7 +343,7 @@ void edit_todo() {
     }
 
     // Lê todas as linhas para um buffer temporário
-    char lines[100][1024]; // Limite de 100 TODOs para simplificar
+     // Limite de 100 TODOs para simplificar
     int count = 0;
     while (fgets(lines[count], sizeof(lines[count]), todo_file) != NULL && count < 100) {
         lines[count][strcspn(lines[count], "\n")] = '\0';
@@ -384,7 +509,6 @@ void TODO(const char *input) {
     char usuario[128] = {0};
     char prazo[32] = {0};
     char temp_input[256] = {0};
-
     do {
         // Limpa os buffers para nova entrada
         memset(tarefa, 0, sizeof(tarefa));
@@ -412,7 +536,6 @@ void TODO(const char *input) {
             printf("Erro: Nenhuma tarefa fornecida. Operação cancelada.\n");
             return;
         }
-
         // Solicita o nome do responsável
         printf("Digite o nome do responsável (ou deixe vazio para 'Desconhecido'): ");
         fflush(stdout);
@@ -432,7 +555,6 @@ void TODO(const char *input) {
         } else {
             strcpy(usuario, "Desconhecido");
         }
-
         // Solicita a data de vencimento
         printf("Digite a data de vencimento (dd/mm/aaaa ou deixe vazio para 'Sem prazo'): ");
         fflush(stdout);
@@ -452,7 +574,6 @@ void TODO(const char *input) {
         } else {
             strcpy(prazo, "Sem prazo");
         }
-
         // Obtém o tempo atual para o carimbo de criação
         char time_str[26];
         time_t now = time(NULL);
@@ -511,8 +632,8 @@ void check_todos() {
     snprintf(current_date, sizeof(current_date), "%02d/%02d/%04d",
              tm_now->tm_mday, tm_now->tm_mon + 1, tm_now->tm_year + 1900);
     printf("Verificando TODOs vencidos ou a vencer hoje (%s)...\n", current_date);
-    char line[1024];
     int has_overdue = 0;
+    char line[1024]; // Buffer temporário para cada linha
     while (fgets(line, sizeof(line), todo_file) != NULL) {
         line[strcspn(line, "\n")] = '\0'; // Remove nova linha
         // Extrai os campos da linha
@@ -527,7 +648,7 @@ void check_todos() {
             if (prazo_time != -1) { // Data válida
                 if (difftime(now, prazo_time) >= 0) { // Data atual >= prazo
                     has_overdue = 1;
-                    printf("TODO VENCIDO OU VENCE HOJE: %s\n", line);
+                    printf("TODO VENCIDO OU HOJE: %s\n", line);
                 }
             }
         }
@@ -537,7 +658,6 @@ void check_todos() {
         printf("Nenhum TODO vencido ou a vencer hoje.\n");
     }
 }
-
 // Função para logging de ações
 void log_action(const char *action, const char *details) {
     FILE *log_file = fopen("jntd_log.txt", "a");
@@ -810,7 +930,7 @@ void dispatch(const char *user_in) {
 	if(strlen(buf) > 0) {
 		for (size_t i = 0; i < sizeof(cmds)/sizeof(cmds[0]); i++) {
 			if (strncmp(buf, cmds[i].key, strlen(buf)) == 0) {
-				printf("Sugestão: %s\n %s", cmds[i].key, buf);//Mostra a sugestão
+				printf("Sugestão: %s\n", cmds[i].key);//Mostra a sugestão
 				fflush(stdout);
             }
         }
@@ -836,16 +956,20 @@ void dispatch(const char *user_in) {
 		printf("Ultimo commit: ");
 		fflush(stdout);
 		system("git log -1 --pretty=%B | head -n1");
-            } else if (strcasecmp(cmds[i].key, "his") == 0) { // Corrige de "historico" para "his" conforme cmds
+            } else if (strcasecmp(cmds[i].key, "his") == 0) {
                 display_history();
-            } else if (strcasecmp(cmds[i].key, "todo") == 0) {
-                TODO(args);
             } else if (strcasecmp(cmds[i].key, "ct") == 0) {
                 check_todos();
 	    } else if (strcasecmp(cmds[i].key, "listt") == 0) {
 		list_todo();
+	    } else if (strcasecmp(cmds[i].key, "quiz") == 0) {
+		 func_quiz();
+	    } else if (strcasecmp(cmds[i].key, "quizale") == 0) {
+		 quiz_aleatorio();
+	    } else if (strcasecmp(cmds[i].key, "quizt") == 0) {
+		quiz_timer();
 	    } else if (strcasecmp(cmds[i].key, "rscript") == 0) {
-                rscript(args); // Passa os argumentos para rscript
+                rscript(args);
             } else if (strcasecmp(cmds[i].key, "todo") == 0) {
 		TODO(args);
             } else if (strcasecmp(cmds[i].key, "checkt") == 0) {
@@ -869,6 +993,7 @@ void dispatch(const char *user_in) {
 int main(void) {
     printf("Iniciando o JNTD...\n");
     check_todos();
+    const char* quiz_file = "quiz.txt";
     printf("Digite um comando. Use 'help' para ver as opções ou 'sair' para terminar.\n");
     while (printf("> "), fgets(buf, sizeof(buf), stdin) != NULL) {
         buf[strcspn(buf, "\n")] = '\0'; // Remove newline
@@ -882,10 +1007,12 @@ int main(void) {
         }
         dispatch(buf);
     }
+    // Libera memória do histórico antes de sair
     for (int i = 0; i < history_count; i++) {
-	    free(command_history[i]);
-    printf("Saindo....\n");
-    return 0;
+        free(command_history[i]);
     }
-
+    printf("Saindo....\n");
+    // Adiciona uma pausa para evitar fechamento imediato do terminal
+    return 0;
 }
+
