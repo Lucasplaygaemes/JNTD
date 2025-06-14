@@ -34,3 +34,6 @@ The git function show you the link to JNTD repository, but the last commit featu
 
 # TODO!
 Now we have the TODO funcionality, where you can define things, and be remembered when the defined times comes, as you can set it to 0, it's saved in todos.txt. and you can check if one is gone to expire today, and list everyone.
+
+# Languages?
+As you may noticed, all the README is in english, the commits are in english and Portuguese, and the functions are in portuguese as well.
