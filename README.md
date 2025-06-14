@@ -17,9 +17,6 @@ It was getting dusty in my TODO list, so why not add it here, a calculator, i ca
 # 2B and images
 2B it's has it's code already implemented but, she isn't ready yet, so my next thing to do will to finish her, for some reasons i will just be able to do this in the next month, and therefore i will need to wait for my next update, that's right, images! I was planning to train she to be able to understand images and graphics, but it may overload her size and specs requeired, so there will be her auxiliator, and his name is 9S! (There a lot of NA references, i just can't not do it).
 
-# 9S!
-One day i may have the specs to use the most heavy LLM that i can put my hands on, until there i will need to change my mind to one that i can afford, i was already wating to train more than one AI, and i was't going to need a LLM, because of 2B, so i figured out that i can make 9S too, so i can use both of them. 9S will not have the ability to chat like 2B, it's obvius he will be able to speak with the user, but his function is to read a image text, graphs and figures, and transcribe that to text, or a understandable data tha 2B will be able to use. He is not designed to understand every image, personally, i just wanted him to function like a translator, from him to 2B. 
-
 # Jntd_descri!
 It's simple, it will have an explanation of everything in eachline, so you can know what it do, i ain't writting all that by hand, so ai will be used. will be at least close to the newest version. Because of that, it will be big, a lot more, than usual, and theres not to much i can do about it.
 
@@ -37,3 +34,7 @@ Now we have the TODO funcionality, where you can define things, and be remembere
 
 # Languages?
 As you may noticed, all the README is in english, the commits are in english and Portuguese, and the functions are in portuguese as well. And i need to decide in which one i will make the whole code, i'm thinking in making a copy of it, and just changing the words from pt to en, and let it in a folder apart, if you want to add it in a another language just commit it in a new folder with that language. I will add only the languages that i know, that will be 3, maybe 4, Portuguese, English, Espanish and Japanese.
+
+# 9S!
+One day i may have the specs to use the most heavy LLM that i can put my hands on, until there i will need to change my mind to one that i can afford, i was already wating to train more than one AI, and i was't going to need a LLM, because of 2B, so i figured out that i can make 9S too, so i can use both of them. 9S will not have the ability to chat like 2B, it's obvius he will be able to speak with the user, but his function is to read a image text, graphs and figures, and transcribe that to text, or a understandable data tha 2B will be able to use. He is not designed to understand every image, personally, i just wanted him to function like a translator, from him to 2B. 
+
