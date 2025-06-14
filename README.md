@@ -23,9 +23,8 @@ One day i may have the specs to use the most heavy LLM that i can put my hands o
 # Jntd_descri!
 It's simple, it will have an explanation of everything in eachline, so you can know what it do, i ain't writting all that by hand, so ai will be used. will be at least close to the newest version. Because of that, it will be big, a lot more, than usual, and theres not to much i can do about it.
 
-# log!
-I have maked a file named, log, it's self explanatory what it does, but it will be also my changes and thoughts about the code, what to change, in this journey.
-There is not much to talk about it.
+# Log!
+It's self explanatory, it's a log of the commands send by you, it will be stored in a file called "log.txt", it has the time, and the day the commands was executed, as well theres a history log, but in the code itself, so you can see the last commands, it's redoundant, so i will change it in the future.
 
 # Git!
 The git function show you the link to JNTD repository, but the last commit feature, probably just work in my pc, thats because my git is setted to JNTD, but your may not, and that's a problem that i will handle in the future.
