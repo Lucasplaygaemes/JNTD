@@ -103,7 +103,6 @@ int jntd_mkdir(const char *args);
 void rscript(const char *args);
 void func_quiz();
 char* read_random_line(const char* quiz_file);
-srand(time(NULL));
 
 // Função para verificar segurança de comandos
 int is_safe_command(const char *cmd) {
@@ -229,7 +228,14 @@ void quiz_aleatorio() {
     if (fgets(respostas, sizeof(respostas), stdin) != NULL) {
         respostas[strcspn(respostas, "\n")] = '\0'; // Remove newline character
         if (strcasecmp(respostas, "s") == 0 || strcasecmp(respostas, "sim") == 0) {
-            read_random_line(respostas);
+            const char* arquivo_quiz = "quiz.txt"; // Define o nome do arquivo do quiz
+            char* linha_aleatoria = read_random_line(arquivo_quiz);
+            if (linha_aleatoria != NULL) {
+                printf("Pergunta aleatória: %s\n", linha_aleatoria);
+                free(linha_aleatoria); // Libera a memória alocada por read_random_line
+            } else {
+                printf("Erro ao obter uma pergunta aleatória.\n");
+            }
         } else {
             printf("Não foi possível identificar a resposta\n");
         }
@@ -237,6 +243,7 @@ void quiz_aleatorio() {
         printf("Erro ao ler a resposta\n");
     }
 }
+
 void quiz_timer() {
     printf("Qual o intervalo de tempo entre os QUIZES em Segundos? (Aperte enter para o padrão, 10[600s] min)");
     int seconds;
@@ -334,6 +341,7 @@ char* read_random_line(const char* quiz_file) {
     // Gera um número aleatório entre 1 e total_lines
     int random_line = (rand() % total_lines) + 1;
 
+    srand(time(NULL)); 
     // Lê a linha correspondente ao número aleatório
     char* result = read_speci_line(quiz_file, random_line);
     if (result == NULL) {
