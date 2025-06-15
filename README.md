@@ -35,6 +35,11 @@ Now we have the TODO funcionality, where you can define things, and be remembere
 # Languages?
 As you may noticed, all the README is in english, the commits are in english and Portuguese, and the functions are in portuguese as well. And i need to decide in which one i will make the whole code, i'm thinking in making a copy of it, and just changing the words from pt to en, and let it in a folder apart, if you want to add it in a another language just commit it in a new folder with that language. I will add only the languages that i know, that will be 3, maybe 4, Portuguese, English, Espanish and Japanese.
 
+# Multithread
+The multithread it's a complex (To me for now) thing, that you can make process happen in parallen, and that's really code and optimal, i want to add to it. 
+
+
+
 # 9S!
 One day i may have the specs to use the most heavy LLM that i can put my hands on, until there i will need to change my mind to one that i can afford, i was already wating to train more than one AI, and i was't going to need a LLM, because of 2B, so i figured out that i can make 9S too, so i can use both of them. 9S will not have the ability to chat like 2B, it's obvius he will be able to speak with the user, but his function is to read a image text, graphs and figures, and transcribe that to text, or a understandable data tha 2B will be able to use. He is not designed to understand every image, personally, i just wanted him to function like a translator, from him to 2B. 
 
