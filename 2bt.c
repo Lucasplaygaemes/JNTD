@@ -44,6 +44,7 @@ int countar = 0;
 int line_number;
 int count = 0;
 const char* quiz_file = "quiz.txt";
+char time_str[26] = {0};
 // Estrutura de comando
 typedef struct {
     const char *key;
@@ -102,6 +103,7 @@ int jntd_mkdir(const char *args);
 void rscript(const char *args);
 void func_quiz();
 char* read_random_line(const char* quiz_file);
+srand(time(NULL));
 
 // Função para verificar segurança de comandos
 int is_safe_command(const char *cmd) {
@@ -288,7 +290,7 @@ int contar_linhas(const char* quiz_file) {
 	return linhaslin;
 }
 char* read_speci_line(const char* quiz_file, int line_number) {
-    FILE *quiz_f = fopen(quiz_file, "r");
+    FILE *quiz_f = fopen("quiz.txt", "r");
     if (quiz_f == NULL) {
         perror("Erro ao abrir o arquivo");
         return NULL;
@@ -323,19 +325,24 @@ char* read_speci_line(const char* quiz_file, int line_number) {
 }
 //Função para ler uma linha aleatoria
 char* read_random_line(const char* quiz_file) {
-	int total_lines = contar_linhas(quiz_file);
-	if (total_lines == 0) {
-		printf("Nenhum arquivo econtrado, ou vazio\n");
-		return NULL;
-	}
-	//Gera um numero aleatorio entre 1 e total_lines//
-	srand(time(NULL));//Inicializa a seed do gerador
-	int random_line = (rand() % total_lines) + 1;//Gere entre 1 e total_lines
-	
-	//le a linhas correspondente ao numero;
-	return read_speci_line(quiz_file, random_line);
-}
+    int total_lines = contar_linhas(quiz_file);
+    if (total_lines <= 0) {
+        fprintf(stderr, "Erro: Arquivo vazio ou falha ao contar linhas em '%s'\n", quiz_file);
+        return NULL;
+    }
 
+    // Gera um número aleatório entre 1 e total_lines
+    int random_line = (rand() % total_lines) + 1;
+
+    // Lê a linha correspondente ao número aleatório
+    char* result = read_speci_line(quiz_file, random_line);
+    if (result == NULL) {
+        fprintf(stderr, "Erro: Falha ao ler a linha %d do arquivo '%s'\n", random_line, quiz_file);
+        return NULL;
+    }
+
+    return result;
+}
 void edit_todo() {
     list_todo(); // Mostra a lista de TODOs para o usuário escolher
     FILE *todo_file = fopen("todo.txt", "r");
