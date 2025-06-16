@@ -75,7 +75,7 @@ static const CmdEntry cmds[] = {
     { "sl", "sl", "Easter Egg." },
     { "cd", NULL, "O comando cd, você troca de diretorio, use cd <destino>." },
     { "pwd", "pwd", "Fala o diretorio atual" },
-    { "vim", "vim", "O editor no qual fiz todo esse codigo." },
+    { "vim", "vim", "Abre o editor, aceita nome para editar um arquivo." },
     { "todo", NULL, "Adiciona uma ou mais tarefas TODO ao arquivo todo.txt." },
     { "checkt", NULL, "Verifica se há TODOs vencidos ou a vencer hoje." },
     { "listt", NULL, "Lista todas as tarefas TODO salvas no arquivo todo.txt." },
@@ -330,6 +330,24 @@ char* read_speci_line(const char* quiz_file, int line_number) {
 
     return result;
 }
+//Função para sugerir comandos com base em um texto parcial
+void suggest_commands(const char *partial) {
+	int found = 0;
+	printf("\nSugestão de Comandos:\n");
+	for (size_t i = 0; i < sizeof(cmds) / sizeof(cmds[0]); i++) {
+		if (strncmp(partial, cmds[i].key, strlen(partial)) == 0) {
+			printf("  -%s:  %s\n", cmds[i].key, cmds[i].descri);
+			found++;
+		}
+		
+	}
+	if (!found) {
+		printf("  Nenhum comando encontrado com '%s'. Use 'help' para ver todos os comandos.\n", partial);
+	}
+	printf("> %s", partial); //reexibe oque o usuario já digitou
+	fflush(stdout);
+}
+
 //Função para ler uma linha aleatoria
 char* read_random_line(const char* quiz_file) {
     int total_lines = contar_linhas(quiz_file);
@@ -943,20 +961,20 @@ void dispatch(const char *user_in) {
 
     char *token = strtok(input_copy, " ");
     if (token == NULL) return;
-
+    
     char *args = strtok(NULL, ""); // Pega o resto da string como argumentos
-	if(strlen(buf) > 0) {
+/*	if(strlen(buf) > 0) {
 		for (size_t i = 0; i < sizeof(cmds)/sizeof(cmds[0]); i++) {
 			if (strncmp(buf, cmds[i].key, strlen(buf)) == 0) {
 				printf("Sugestão: %s\n", cmds[i].key);//Mostra a sugestão
 				fflush(stdout);
             }
         }
-    }
+    }*/
     // Adiciona ao histórico e log
     add_to_history(user_in);
     log_action("User Input", user_in);
-
+    int command_found = 0;
     for (size_t i = 0; i < sizeof(cmds) / sizeof(cmds[0]); ++i) {
         if (strcasecmp(token, cmds[i].key) == 0) {
             if (strcmp(cmds[i].key, "help") == 0) {
@@ -1006,6 +1024,12 @@ void dispatch(const char *user_in) {
         }
     }
     printf("Comando '%s' não reconhecido. Use 'help' para ver os comandos disponíveis.\n", token);
+    if (!command_found) {
+	    suggest_commands(token);
+	    //se o comando não foi encontrado oferece sugestões.//
+       } 	
+    
+    //printf("Comando '%s' não reconhecido. Use 'help' para ver os comandos disponíveis.\n", token);
 }
 
 int main(void) {
@@ -1032,4 +1056,3 @@ int main(void) {
     // Adiciona uma pausa para evitar fechamento imediato do terminal
     return 0;
 }
-
