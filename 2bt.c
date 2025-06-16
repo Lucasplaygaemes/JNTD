@@ -45,6 +45,7 @@ int line_number;
 int count = 0;
 const char* quiz_file = "quiz.txt";
 char time_str[26] = {0};
+int seconds;
 // Estrutura de comando
 typedef struct {
     const char *key;
@@ -84,7 +85,8 @@ static const CmdEntry cmds[] = {
     { "edit_vim", NULL, "Abre o arquivo todo.txt no vim para edição direta." },
     { "quiz", NULL, "Mostra todas as perguntas do quiz do integrado." },
     { "quizt", NULL, "Define o intervalo de tempo entre os QUIZ'es." },
-    { "quizale", NULL, "Uma pergunta aleatoria do QUIZ é feita." }
+    { "quizale", NULL, "Uma pergunta aleatoria do QUIZ é feita." },
+    { "timer", NULL, "Um simples timer, inutiliza o terminal durante o tempo definido." }
 };
 
 // Declaração antecipada das funções
@@ -103,7 +105,7 @@ int jntd_mkdir(const char *args);
 void rscript(const char *args);
 void func_quiz();
 char* read_random_line(const char* quiz_file);
-
+int main(void);
 // Função para verificar segurança de comandos
 int is_safe_command(const char *cmd) {
     for (size_t i = 0; i < sizeof(cmds) / sizeof(cmds[0]); ++i) {
@@ -244,9 +246,31 @@ void quiz_aleatorio() {
     }
 }
 
+void timer() {
+	printf("Um simples timer, que quando acionado inutiliza o JNTD. Qual a duração dele? (0 para cancelar)\n");
+	scanf("%d", &seconds);
+       	if (seconds <= 0){
+		printf("O timer foi cancelado.\n");
+		return;
+	} else {
+		while (seconds > 0) {
+			int horas = seconds / 3600;
+			int minutos = (seconds % 3600) / 60;
+			int segundos = seconds % 60;
+			printf("\r%02d:%02d:%02d", horas, minutos, segundos);
+			fflush(stdout);
+			clock_t stop = clock() + CLOCKS_PER_SEC;
+			while (clock() < stop) {}
+			seconds--;
+			}
+		}
+
+		printf("\rO Tempo acabou!\n");
+	}
+
+
 void quiz_timer() {
     printf("Qual o intervalo de tempo entre os QUIZES em Segundos? (Aperte enter para o padrão, 10[600s] min)");
-    int seconds;
     if (scanf("%d", &seconds) != 1) { // Remover \n do scanf
         seconds = 600; // Valor padrão
     }
@@ -320,14 +344,11 @@ char* read_speci_line(const char* quiz_file, int line_number) {
             break; // Sai do loop após encontrar a linha
         }
     }
-
     fclose(quiz_f);
-
     if (result == NULL) {
         fprintf(stderr, "Linha %d não encontrada. Total de linhas no arquivo: %d\n", line_number, linha_atual);
         return NULL;
     }
-
     return result;
 }
 //Função para sugerir comandos com base em um texto parcial
@@ -339,7 +360,6 @@ void suggest_commands(const char *partial) {
 			printf("  -%s:  %s\n", cmds[i].key, cmds[i].descri);
 			found++;
 		}
-		
 	}
 	if (!found) {
 		printf("  Nenhum comando encontrado com '%s'. Use 'help' para ver todos os comandos.\n", partial);
@@ -1008,7 +1028,9 @@ void dispatch(const char *user_in) {
                 rscript(args);
             } else if (strcasecmp(cmds[i].key, "todo") == 0) {
 		TODO(args);
-            } else if (strcasecmp(cmds[i].key, "checkt") == 0) {
+	    } else if (strcasecmp(cmds[i].key, "timer") == 0) {
+		timer();
+	    } else if (strcasecmp(cmds[i].key, "checkt") == 0) {
 		check_todos();
             } else if (strcasecmp(cmds[i].key, "editt") == 0) {
             	edit_todo();
