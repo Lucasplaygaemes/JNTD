@@ -41,7 +41,6 @@ The multithread it's a complex (To me for now) thing, that you can make process 
 The VIM is integrated, you can edit a file, create, do everything you normally do with vim inside of it, and the when you exit you will be back in JNTD.
 
 # Timer
-Theres a simple function where you can define a time of the timer. But when it's been using you can't do nothing more while.
-
+Theres a simple function where you can define a time of the timer. But when it's been using you can't do nothing more while. When multithread is implemented, it will happen in the background, but until there, it's just a bad timer.
 # 9S!
 One day i may have the specs to use the most heavy LLM that i can put my hands on, until there i will need to change my mind to one that i can afford, i was already wating to train more than one AI, and i was't going to need a LLM, because of 2B, so i figured out that i can make 9S too, so i can use both of them. 9S will not have the ability to chat like 2B, it's obvius he will be able to speak with the user, but his function is to read a image text, graphs and figures, and transcribe that to text, or a understandable data tha 2B will be able to use. He is not designed to understand every image, personally, i just wanted him to function like a translator, from him to 2B.
