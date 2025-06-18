@@ -114,6 +114,9 @@ int jntd_mkdir(const char *args);
 void rscript(const char *args);
 void func_quiz();
 char* read_random_line(const char* quiz_file);
+void *timer_background(void *arg);
+void *quiz_timer_background(void *arg);
+
 int main(void);
 // Função para verificar segurança de comandos
 int is_safe_command(const char *cmd) {
@@ -254,46 +257,129 @@ void quiz_aleatorio() {
         printf("Erro ao ler a resposta\n");
     }
 }
-/*
-void timer() {
-	printf("Um simples timer, que quando acionado inutiliza o JNTD. Qual a duração dele? (0 para cancelar)\n");
-	scanf("%d", &seconds);
-       	if (seconds <= 0){
-		printf("O timer foi cancelado.\n");
-		return;
-	} else {
-		while (seconds > 0) {
-			int horas = seconds / 3600;
-			int minutos = (seconds % 3600) / 60;
-			int segundos = seconds % 60;
-			printf("\r%02d:%02d:%02d", horas, minutos, segundos);
-			fflush(stdout);
-			clock_t stop = clock() + CLOCKS_PER_SEC;
-			while (clock() < stop) {}
-			seconds--;
-			}
-		}
 
-		printf("\rO Tempo acabou!\n");
+void timer() {
+	if (timer_running) {
+		printf("Um timer já está em execução! Cancele-o primeiro com 'timer cancel'.\n");
+		return;
 	}
 
+	printf("Um simples timer, que agora roda em segundo plano, qual a duração dele? (0 para cancelar)\n");
+	scanf("%d", &seconds);
+	if (seconds <= 0) {
+		printf("O Timer foi cancelado.\n");
+		return;
+	}
+	//Cria a thread para o timer//
+	#ifdef _WIN32
+	//No windows, criar thread com o CreateThread (precisa ser implementado se necessario)
+	printf("Thread no windows não implementado ainda, usando modo bloquante temporariamente.\n");
+	timer_background(&seconds);
+	#else
+	if (pthread_create(&timer_thread, NULL, timer_background, &seconds) != 0) {
+		perror("Erro ao criar thread do timer\n");
+		return;
+	}
+	//Opcional: desanexar a thread para não precisa de join//
+	pthread_detach(timer_thread);
+	#endif
+}
 
 void quiz_timer() {
-    printf("Qual o intervalo de tempo entre os QUIZES em Segundos? (Aperte enter para o padrão, 10[600s] min)");
-    if (scanf("%d", &seconds) != 1) { // Remover \n do scanf
-        seconds = 600; // Valor padrão
-    }
-    
-    // Limpar buffer de entrada
-    int c;
-    while ((c = getchar()) != '\n' && c != EOF);
-    // Usar sleep para melhor desempenho
-    sleep(seconds);// Para Linux/macOS
-    #ifdef _WIN32
-    Sleep(seconds * 1000); // Para Windows
-    #endif
+	if (quiz_timer_running) {
+		printf("Um quiz timer já está em execução! Cancele-o primeiro com 'quizt cancel'.\n");
+		return;
+	}
+	printf("Qual o intervalo de tempo QUIZES em segundos? (Aperte enter para o padrão, 10[600s] min)\n");
+	char input[256];
+	if (fgets(input, sizeof(input), stdin) == NULL || input[0] == '\n') {
+		seconds == 600;
+	} else {
+		seconds = atoi(input);
+		if (seconds <= 0) seconds = 600;
+	}
+
+	#ifdef _WIN32
+	printf("Thread no windows não implementado ainda, usando o modo bloqueado temporariamente.\n");
+	quiz_timer_background(&seconds);//simulação roda na thread principal por agr
+	#else
+	if (pthread_create(&quiz_thread, NULL, quiz_timer_background, &seconds) != 0) {
+		perror("Erro ao criar thread do quiz_timer");
+		return;
+	}
+	pthread_detach(quiz_thread);
+	#endif
 }
-*/
+
+//função para cancelar timers
+
+void cancel_timer(const char *type) {
+	if (strcmp(type, "timer") == 0) {
+		if (timer_running) {
+			timer_running = 0;
+			printf("Timer cancelado.\n");
+		} else {
+			printf("Nenhum timer em execução.\n");
+		}
+	} else if (strcmp(type, "quizt") == 0) {
+		if (quiz_timer_running) {
+			quiz_timer_running = 0;
+			printf("Quiz timer cancelado.\n");
+			} else {
+				printf("Nenhum quiz timer em execução.\n");
+		}
+	}
+}
+
+void *timer_background(void *arg) {
+	int seconds = *(int*)arg;//Recebe o tempo em segundos
+	current_timer_seconds = seconds;
+	timer_running = 1;
+	printf("\rTimer iniciado em segundo plano: %d segundos\n", seconds);
+	while (current_timer_seconds > 0 && timer_running) {
+		int horas = current_timer_seconds / 3600;
+		int minutos = (current_timer_seconds % 3600) / 60;
+		int segundos = current_timer_seconds % 60;
+		printf("\rTimer: %02d:%02d:%02d\n", horas, minutos, segundos);
+		fflush(stdout);
+		#ifdef _WIN32
+		sleep(1000);// 1 segundo no windows//
+		#else
+		sleep(1);
+		#endif
+		current_timer_seconds--;
+	}
+	if (timer_running) {
+		printf("\rO Tempo acabou!\n");
+	} else {
+		printf("\rTimer cancelado!\n");
+	}
+	timer_running = 0;
+	return NULL;
+}
+
+void *quiz_timer_background(void *arg) {
+	int seconds = *(int*)arg; //Recebe o tempo em segudos//
+	quiz_timer_running = 1;
+	printf("Quiz Timer iniciado em segundo plano %d segundo\n", seconds);
+	while (quiz_timer_running) {
+		#ifdef _WIN32
+		Sleep(seconds * 1000);
+		#else
+		sleep(seconds);
+		#endif
+
+		if (quiz_timer_running) {
+			printf("\n[Quiz Timer] Tempo para uma pergunta!\n");
+			quiz_aleatorio();
+			printf("> "); //Reexibe o prompt para o usuario//
+			fflush(stdout);
+		}
+	}
+	printf("Quiz Timer encerrado.\n");
+	return NULL;
+}
+
 void func_quiz() {
     printf("Lista de QUIZ's:\n");
     printf("------------------------------------------------\n");
@@ -384,10 +470,8 @@ char* read_random_line(const char* quiz_file) {
         fprintf(stderr, "Erro: Arquivo vazio ou falha ao contar linhas em '%s'\n", quiz_file);
         return NULL;
     }
-
     // Gera um número aleatório entre 1 e total_lines
     int random_line = (rand() % total_lines) + 1;
-
     srand(time(NULL)); 
     // Lê a linha correspondente ao número aleatório
     char* result = read_speci_line(quiz_file, random_line);
@@ -395,7 +479,6 @@ char* read_random_line(const char* quiz_file) {
         fprintf(stderr, "Erro: Falha ao ler a linha %d do arquivo '%s'\n", random_line, quiz_file);
         return NULL;
     }
-
     return result;
 }
 void edit_todo() {
@@ -1037,6 +1120,18 @@ void dispatch(const char *user_in) {
                 rscript(args);
             } else if (strcasecmp(cmds[i].key, "todo") == 0) {
 		TODO(args);
+	    } else if (strcasecmp(cmds[i].key, "quizt") == 0) {
+		    if(args && strcasecmp(args, "cancel") == 0) {
+			    cancel_timer("quizt");
+		    } else {
+			    quiz_timer();
+		    }
+	    } else if (strcasecmp(cmds[i].key, "timer") == 0) {
+		    if (args && strcasecmp(args, "cancel") == 0) {
+			    cancel_timer("timer");
+		    } else {
+			    timer();
+		    }
 	    } else if (strcasecmp(cmds[i].key, "timer") == 0) {
 		timer();
 	    } else if (strcasecmp(cmds[i].key, "checkt") == 0) {
@@ -1058,9 +1153,7 @@ void dispatch(const char *user_in) {
     if (!command_found) {
 	    suggest_commands(token);
 	    //se o comando não foi encontrado oferece sugestões.//
-       } 	
-    
-    //printf("Comando '%s' não reconhecido. Use 'help' para ver os comandos disponíveis.\n", token);
+       } 	    
 }
 
 int main(void) {
