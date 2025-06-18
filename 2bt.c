@@ -340,8 +340,8 @@ void *timer_background(void *arg) {
 		int horas = current_timer_seconds / 3600;
 		int minutos = (current_timer_seconds % 3600) / 60;
 		int segundos = current_timer_seconds % 60;
-		printf("\rTimer: %02d:%02d:%02d\n", horas, minutos, segundos);
-		fflush(stdout);
+		//printf("\rTimer: %02d:%02d:%02d\n", horas, minutos, segundos);
+		//fflush(stdout);
 		#ifdef _WIN32
 		sleep(1000);// 1 segundo no windows//
 		#else
@@ -351,6 +351,8 @@ void *timer_background(void *arg) {
 	}
 	if (timer_running) {
 		printf("\rO Tempo acabou!\n");
+		printf("Aperte enter para continuar\n");
+		return NULL;
 	} else {
 		printf("\rTimer cancelado!\n");
 	}
