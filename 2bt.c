@@ -95,7 +95,7 @@ static const CmdEntry cmds[] = {
     { "quiz", NULL, "Mostra todas as perguntas do quiz do integrado." },
     { "quizt", NULL, "Define o intervalo de tempo entre os QUIZ'es." },
     { "quizale", NULL, "Uma pergunta aleatoria do QUIZ é feita." },
-    { "timer", NULL, "Um simples timer, inutiliza o terminal durante o tempo definido." }
+    { "timer", NULL, "Um simples timer." }
 };
 
 // Declaração antecipada das funções
