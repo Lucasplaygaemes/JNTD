@@ -4,6 +4,7 @@
 #include <sys/wait.h>
 #include <time.h>
 #include <sys/stat.h> // Para stat (Linux/macOS)
+#include <pthread.h>
 #include <unistd.h>  // Para sleep()
 #ifdef _WIN32
 #include <windows.h> // Para Sleep()
@@ -13,6 +14,8 @@
 #else
 #include <unistd.h> // Para getcwd no Linux/macOS
 #endif
+
+
 //Define o tamanho maximo para o buffer de entrada de prompts do usuario
 #define MAX_PROMPT_LEN 256
 //Define o tamanho maximo do input do ollama + extras
@@ -46,6 +49,12 @@ int count = 0;
 const char* quiz_file = "quiz.txt";
 char time_str[26] = {0};
 int seconds;
+volatile int timer_running = 0;//indica se o timer tá ativo, 0 = inativo, 1 = ativo//
+volatile int quiz_timer_running = 0;//indica se o quiz timer está ativo//
+volatile int current_timer_seconds = 0;//armazena o tempo restante do timer//
+pthread_t timer_thread;//id da thread do timer
+pthread_t quiz_thread;//id da thread do quiz
+
 // Estrutura de comando
 typedef struct {
     const char *key;
@@ -245,7 +254,7 @@ void quiz_aleatorio() {
         printf("Erro ao ler a resposta\n");
     }
 }
-
+/*
 void timer() {
 	printf("Um simples timer, que quando acionado inutiliza o JNTD. Qual a duração dele? (0 para cancelar)\n");
 	scanf("%d", &seconds);
@@ -284,7 +293,7 @@ void quiz_timer() {
     Sleep(seconds * 1000); // Para Windows
     #endif
 }
-
+*/
 void func_quiz() {
     printf("Lista de QUIZ's:\n");
     printf("------------------------------------------------\n");
