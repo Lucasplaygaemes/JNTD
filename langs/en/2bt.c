@@ -4,6 +4,7 @@
 #include <sys/wait.h>
 #include <time.h>
 #include <sys/stat.h> // For stat (Linux/macOS)
+#include <pthread.h>
 #include <unistd.h>  // For sleep()
 #ifdef _WIN32
 #include <windows.h> // For Sleep()
@@ -13,22 +14,24 @@
 #else
 #include <unistd.h> // For getcwd on Linux/macOS
 #endif
-// Defines the maximum size for the user prompt input buffer
+
+// Defines the maximum size for the user input buffer
 #define MAX_PROMPT_LEN 256
-// Defines the maximum size for the Ollama input + extras
+// Defines the maximum size of the ollama input plus extras
 #define MAX_OLLAMA_CMD_LEN 4096 // Increased to accommodate the worst case of long prompt + prefixes
-// Defines the maximum size of the Ollama output
+// Defines the maximum size of the ollama output
 #define OLLAMA_BUFFER_SIZE 1024
 // Defines the model
 #define OLLAMA_MODEL "llama2"
 // Defines the maximum size of the command history
 #define MAX_HISTORY 50
-// Defines the maximum size of the user input + extras like calc
-#define COMBINED_PROMPT_LEN 2048 // Already suitable, but kept for clarity
+// Defines the maximum size of the user input plus extras like calc
+#define COMBINED_PROMPT_LEN 2048 // Already adequate, but kept for clarity
+
 int max_todo = 100;
 char tarefa[512] = {0};
-char usuario[128] = "Unknow";
-char prazo[32] = "Without deadline";
+char usuario[128] = "Unknown";
+char prazo[32] = "No deadline";
 char input_copy[1024];
 char dir_novo[100];
 char *path[100];
@@ -44,46 +47,55 @@ int countar = 0;
 int line_number;
 int count = 0;
 const char* quiz_file = "quiz.txt";
-// Commands structure
+char time_str[26] = {0};
+int seconds;
+volatile int timer_running = 0; // indicates if the timer is active, 0 = inactive, 1 = active
+volatile int quiz_timer_running = 0; // indicates if the quiz timer is active
+volatile int current_timer_seconds = 0; // stores the remaining time of the timer
+pthread_t timer_thread; // id of the timer thread
+pthread_t quiz_thread; // id of the quiz thread
+
+// Command structure
 typedef struct {
     const char *key;
     const char *shell_command;
     const char *descri;
 } CmdEntry;
 
-// Commands definitions (declared before the function is used.)
+// Definition of commands (declared before the functions that use them)
 static const CmdEntry cmds[] = {
-    { "ls", "pwd && ls -l", "Print the current directory and its files." },
-    { ":q", "exit", "Another way to exit JNTD, inspired by VIM." },
-    { "lsa", "pwd && ls -la", "Same as 'ls' but shows all files, including hidden ones." },
-    { "data", "date", "Displays the current date and time." },
-    { "quem", "whoami", "Displays the name of the user (works only on Linux)." },
-    { "esp", "df -h .", "Shows the free storage space (Linux only)." },
-    { "sysatt?", "pop-upgrade release check", "Checks if there are any updates available (for Pop!_OS)." },
-    { "sudo", "sudo su", "Enters sudo mode. Use with caution." },
+    { "ls", "pwd && ls -l", "Current directory and lists files in detail." },
+    { ":q", "exit", "Another way to exit JNTD, created by the VIM shortcut" },
+    { "lsa", "pwd && ls -la", "Like list, but all files (including hidden)." },
+    { "data", "date", "Current date and time." },
+    { "quem", "whoami", "Current user name." },
+    { "esp", "df -h .", "Free space of the current file system." },
+    { "sysatt?", "pop-upgrade release check", "Checks if there are system updates available (Pop!_OS)." },
+    { "sudo", "sudo su", "Enters super user mode (USE WITH CAUTION!)." },
     { "help", NULL, "Lists all available commands and their descriptions." },
-    { "criador", "echo lucasplayagemes is the creator of this code.", "Displays the name of the creator of JNTD and 2B." },
-    { "2b", NULL, "Starts a conversation with 2B and processes its output." },
-    { "log", NULL, "The code always saves a log file for eventualities." },
+    { "criador", "echo lucasplayagemes is the creator of this code.", "Says the name of the creator of JNTD and 2B." },
+    { "2b", NULL, "Starts a conversation with 2B, and processes its output." },
+    { "log", NULL, "The code always saves a log file for eventualities," },
     { "calc", NULL, "Uses the advanced calculator. Example: calc sum 5 3 or calc deriv_poly 3 2 2 1 -1 0." },
     { "his", NULL, "Displays the history of typed commands." },
-    { "cl", "clear", "Clears the terminal." },
-    { "git", NULL, "Shows the GitHub link of the repository and the last commit, but the commit may not always work as it depends on the system's git, which might be linked to another repo." },
-    { "mkdir", NULL, "Creates a new unnamed directory; naming it will be added." },
-    { "rscript", NULL, "Runs a predefined script; place each command on a line." },
+    { "cl", "clear", "Clears the terminal" },
+    { "git", NULL, "Shows the link to the Github repository, plus the last commit, but the commit doesn't always work. Because it depends on the system's git, which may be linked to another repo." },
+    { "mkdir", NULL, "Creates a new directory without a name, naming it will be added" },
+    { "rscript", NULL, "Runs a predefined script, put each command on a line" },
     { "sl", "sl", "Easter Egg." },
-    { "cd", NULL, "The cd command; you change directory using cd <destination>." },
-    { "pwd", "pwd", "Displays the current directory." },
-    { "vim", "vim", "The editor in which I made all this code." },
+    { "cd", NULL, "The cd command, you change directory, use cd <destination>." },
+    { "pwd", "pwd", "Says the current directory" },
+    { "vim", "vim", "Opens the editor, accepts name to edit a file." },
     { "todo", NULL, "Adds one or more TODO tasks to the todo.txt file." },
-    { "checkt", NULL, "Checks if there are any overdue TODOs or those due today." },
+    { "checkt", NULL, "Checks if there are overdue TODOs or due today." },
     { "listt", NULL, "Lists all TODO tasks saved in the todo.txt file." },
-    { "remt", NULL, "Removes a TODO task from the file by its number." },
-    { "editt", NULL, "Edits an existing TODO task by its number." },
+    { "remt", NULL, "Removes a TODO task from the file by number." },
+    { "editt", NULL, "Edits an existing TODO task by number." },
     { "edit_vim", NULL, "Opens the todo.txt file in vim for direct editing." },
-    { "quiz", NULL, "Shows all questions from the integrated quiz." },
-    { "quizt", NULL, "Sets the time interval between quizzes." },
-    { "quizale", NULL, "Asks a random question from the quiz." }
+    { "quiz", NULL, "Shows all quiz questions from the integrated quiz." },
+    { "quizt", NULL, "Sets the time interval between QUIZ'es." },
+    { "quizale", NULL, "A random question from the QUIZ is asked." },
+    { "timer", NULL, "A simple timer." }
 };
 
 // Forward declarations of functions
@@ -102,6 +114,10 @@ int jntd_mkdir(const char *args);
 void rscript(const char *args);
 void func_quiz();
 char* read_random_line(const char* quiz_file);
+void *timer_background(void *arg);
+void *quiz_timer_background(void *arg);
+
+int main(void);
 
 // Function to check command safety
 int is_safe_command(const char *cmd) {
@@ -140,8 +156,8 @@ void list_todo() {
     printf("------------------------------------------------\n");
     FILE *todo_file = fopen("todo.txt", "r");
     if (todo_file == NULL) {
-        perror("Error opening todo.txt");
-        printf("Could not list TODOs. File not found or no permission.\n");
+        perror("Error opening todo.txt file");
+        printf("Unable to list TODOs. File not found or no permission.\n");
         return;
     }
     char line[1024]; // Temporary buffer for each line
@@ -160,8 +176,8 @@ void remove_todo() {
     list_todo(); // Shows the list of TODOs for the user to choose
     FILE *todo_file = fopen("todo.txt", "r");
     if (todo_file == NULL) {
-        perror("Error opening todo.txt");
-        printf("Could not remove TODOs. File not found or no permission.\n");
+        perror("Error opening todo.txt file");
+        printf("Unable to remove TODOs. File not found or no permission.\n");
         return;
     }
 
@@ -185,7 +201,7 @@ void remove_todo() {
 
     // Asks for the number of the TODO to be removed
     char temp_input[256];
-    printf("Enter the number of the TODO to remove (1-%d, or 0 to cancel): ", count);
+    printf("Enter the number of the TODO to be removed (1-%d, or 0 to cancel): ", count);
     fflush(stdout);
     if (fgets(temp_input, sizeof(temp_input), stdin) == NULL) {
         perror("Error reading input");
@@ -202,7 +218,7 @@ void remove_todo() {
     FILE *temp_file = fopen("todo_temp.txt", "w");
     if (temp_file == NULL) {
         perror("Error creating temporary file");
-        printf("Could not remove the TODO.\n");
+        printf("Unable to remove the TODO.\n");
         return;
     }
     for (int i = 0; i < count; i++) {
@@ -214,8 +230,8 @@ void remove_todo() {
 
     // Replaces the original file with the temporary one
     if (remove("todo.txt") != 0 || rename("todo_temp.txt", "todo.txt") != 0) {
-        perror("Error updating todo.txt");
-        printf("Could not complete the removal.\n");
+        perror("Error updating todo.txt file");
+        printf("Unable to complete the removal.\n");
         return;
     }
     printf("TODO number %d removed successfully.\n", index);
@@ -227,30 +243,143 @@ void quiz_aleatorio() {
     if (fgets(respostas, sizeof(respostas), stdin) != NULL) {
         respostas[strcspn(respostas, "\n")] = '\0'; // Removes newline character
         if (strcasecmp(respostas, "y") == 0 || strcasecmp(respostas, "yes") == 0) {
-            read_random_line(respostas);
+            const char* arquivo_quiz = "quiz.txt"; // Defines the quiz file name
+            char* linha_aleatoria = read_random_line(arquivo_quiz);
+            if (linha_aleatoria != NULL) {
+                printf("Random question: %s\n", linha_aleatoria);
+                free(linha_aleatoria); // Frees the memory allocated by read_random_line
+            } else {
+                printf("Error getting a random question.\n");
+            }
         } else {
-            printf("Could not identify the answer\n");
+            printf("Unable to identify the answer\n");
         }
     } else {
         printf("Error reading the answer\n");
     }
 }
 
-void quiz_timer() {
-    printf("What is the time interval between QUIZZES in seconds? (Press enter for default, 10 [600s] min)");
-    int seconds;
-    if (scanf("%d", &seconds) != 1) { // Remove \n from scanf
-        seconds = 600; // Default value
+void timer() {
+    if (timer_running) {
+        printf("A timer is already running! Cancel it first with 'timer cancel'.\n");
+        return;
     }
 
-    // Clear input buffer
-    int c;
-    while ((c = getchar()) != '\n' && c != EOF);
-    // Use sleep for better performance
-    sleep(seconds); // For Linux/macOS
+    printf("A simple timer that now runs in the background. What is its duration? (0 to cancel)\n");
+    scanf("%d", &seconds);
+    if (seconds <= 0) {
+        printf("The timer was canceled.\n");
+        return;
+    }
+    // Creates the thread for the timer
 #ifdef _WIN32
-    Sleep(seconds * 1000); // For Windows
+    // On Windows, create thread with CreateThread (needs to be implemented if necessary)
+    printf("Thread on Windows not implemented yet, using blocking mode temporarily.\n");
+    timer_background(&seconds);
+#else
+    if (pthread_create(&timer_thread, NULL, timer_background, &seconds) != 0) {
+        perror("Error creating timer thread\n");
+        return;
+    }
+    // Optional: detach the thread to not need join
+    pthread_detach(timer_thread);
 #endif
+}
+
+void quiz_timer() {
+    if (quiz_timer_running) {
+        printf("A quiz timer is already running! Cancel it first with 'quizt cancel'.\n");
+        return;
+    }
+    printf("What is the time interval for QUIZES in seconds? (Press enter for default, 10 [600s] min)\n");
+    char input[256];
+    if (fgets(input, sizeof(input), stdin) == NULL || input[0] == '\n') {
+        seconds = 600;
+    } else {
+        seconds = atoi(input);
+        if (seconds <= 0) seconds = 600;
+    }
+
+#ifdef _WIN32
+    printf("Thread on Windows not implemented yet, using blocking mode temporarily.\n");
+    quiz_timer_background(&seconds); // simulation runs on the main thread for now
+#else
+    if (pthread_create(&quiz_thread, NULL, quiz_timer_background, &seconds) != 0) {
+        perror("Error creating quiz_timer thread");
+        return;
+    }
+    pthread_detach(quiz_thread);
+#endif
+}
+
+// Function to cancel timers
+void cancel_timer(const char *type) {
+    if (strcmp(type, "timer") == 0) {
+        if (timer_running) {
+            timer_running = 0;
+            printf("Timer canceled.\n");
+        } else {
+            printf("No timer running.\n");
+        }
+    } else if (strcmp(type, "quizt") == 0) {
+        if (quiz_timer_running) {
+            quiz_timer_running = 0;
+            printf("Quiz timer canceled.\n");
+        } else {
+            printf("No quiz timer running.\n");
+        }
+    }
+}
+
+void *timer_background(void *arg) {
+    int seconds = *(int*)arg; // Receives the time in seconds
+    current_timer_seconds = seconds;
+    timer_running = 1;
+    printf("\rTimer started in background: %d seconds\n", seconds);
+    while (current_timer_seconds > 0 && timer_running) {
+        int horas = current_timer_seconds / 3600;
+        int minutos = (current_timer_seconds % 3600) / 60;
+        int segundos = current_timer_seconds % 60;
+        //printf("\rTimer: %02d:%02d:%02d\n", horas, minutos, segundos);
+        //fflush(stdout);
+#ifdef _WIN32
+        Sleep(1000); // 1 second on Windows
+#else
+        sleep(1);
+#endif
+        current_timer_seconds--;
+    }
+    if (timer_running) {
+        printf("\rTime's up!\n");
+        printf("Press enter to continue\n");
+        return NULL;
+    } else {
+        printf("\rTimer canceled!\n");
+    }
+    timer_running = 0;
+    return NULL;
+}
+
+void *quiz_timer_background(void *arg) {
+    int seconds = *(int*)arg; // Receives the time in seconds
+    quiz_timer_running = 1;
+    printf("Quiz Timer started in background %d seconds\n", seconds);
+    while (quiz_timer_running) {
+#ifdef _WIN32
+        Sleep(seconds * 1000);
+#else
+        sleep(seconds);
+#endif
+
+        if (quiz_timer_running) {
+            printf("\n[Quiz Timer] Time for a question!\n");
+            quiz_aleatorio();
+            printf("> "); // Re-displays the prompt for the user
+            fflush(stdout);
+        }
+    }
+    printf("Quiz Timer ended.\n");
+    return NULL;
 }
 
 void func_quiz() {
@@ -258,8 +387,8 @@ void func_quiz() {
     printf("------------------------------------------------\n");
     FILE *quiz_f = fopen("quiz.txt", "r");
     if (quiz_f == NULL) {
-        perror("Error opening quiz.txt");
-        printf("Could not list QUIZ's. File not found or no permission.\n");
+        perror("Error opening quiz.txt file");
+        printf("Unable to list QUIZ's. File not found or no permission.\n");
         return;
     }
     while (fgets(quiz, sizeof(quiz), quiz_f) != NULL) {
@@ -276,8 +405,8 @@ void func_quiz() {
 int contar_linhas(const char* quiz_file) {
     FILE *quizlin = fopen("quiz.txt", "r");
     if (quizlin == NULL) {
-        perror("Error opening quiz.txt");
-        printf("Could not list QUIZ's. File not found or no permission.\n");
+        perror("Error opening quiz.txt file");
+        printf("Unable to list QUIZ's. File not found or no permission.\n");
         return 0;
     }
     int linhaslin = 0;
@@ -290,7 +419,7 @@ int contar_linhas(const char* quiz_file) {
 }
 
 char* read_speci_line(const char* quiz_file, int line_number) {
-    FILE *quiz_f = fopen(quiz_file, "r");
+    FILE *quiz_f = fopen("quiz.txt", "r");
     if (quiz_f == NULL) {
         perror("Error opening file");
         return NULL;
@@ -313,38 +442,56 @@ char* read_speci_line(const char* quiz_file, int line_number) {
             break; // Exits the loop after finding the line
         }
     }
-
     fclose(quiz_f);
-
     if (result == NULL) {
         fprintf(stderr, "Line %d not found. Total lines in file: %d\n", line_number, linha_atual);
         return NULL;
     }
-
     return result;
+}
+
+// Function to suggest commands based on partial text
+void suggest_commands(const char *partial) {
+    int found = 0;
+    printf("\nCommand Suggestions:\n");
+    for (size_t i = 0; i < sizeof(cmds) / sizeof(cmds[0]); i++) {
+        if (strncmp(partial, cmds[i].key, strlen(partial)) == 0) {
+            printf("  -%s:  %s\n", cmds[i].key, cmds[i].descri);
+            found++;
+        }
+    }
+    if (!found) {
+        printf("  No command found with '%s'. Use 'help' to see all commands.\n", partial);
+    }
+    printf("> %s", partial); // Re-displays what the user has already typed
+    fflush(stdout);
 }
 
 // Function to read a random line
 char* read_random_line(const char* quiz_file) {
     int total_lines = contar_linhas(quiz_file);
-    if (total_lines == 0) {
-        printf("No file found or empty\n");
+    if (total_lines <= 0) {
+        fprintf(stderr, "Error: Empty file or failure to count lines in '%s'\n", quiz_file);
         return NULL;
     }
     // Generates a random number between 1 and total_lines
-    srand(time(NULL)); // Initializes the generator seed
-    int random_line = (rand() % total_lines) + 1; // Generates between 1 and total_lines
-
-    // Reads the line corresponding to the number
-    return read_speci_line(quiz_file, random_line);
+    int random_line = (rand() % total_lines) + 1;
+    srand(time(NULL));
+    // Reads the line corresponding to the random number
+    char* result = read_speci_line(quiz_file, random_line);
+    if (result == NULL) {
+        fprintf(stderr, "Error: Failed to read line %d from file '%s'\n", random_line, quiz_file);
+        return NULL;
+    }
+    return result;
 }
 
 void edit_todo() {
     list_todo(); // Shows the list of TODOs for the user to choose
     FILE *todo_file = fopen("todo.txt", "r");
     if (todo_file == NULL) {
-        perror("Error opening todo.txt");
-        printf("Could not edit TODOs. File not found or no permission.\n");
+        perror("Error opening todo.txt file");
+        printf("Unable to edit TODOs. File not found or no permission.\n");
         return;
     }
 
@@ -367,7 +514,7 @@ void edit_todo() {
     }
     // Asks for the number of the TODO to be edited
     char temp_input[256];
-    printf("Enter the number of the TODO to edit (1-%d, or 0 to cancel): ", count);
+    printf("Enter the number of the TODO to be edited (1-%d, or 0 to cancel): ", count);
     fflush(stdout);
     if (fgets(temp_input, sizeof(temp_input), stdin) == NULL) {
         perror("Error reading input");
@@ -385,7 +532,7 @@ void edit_todo() {
     char novo_usuario[128] = {0};
     char novo_prazo[32] = {0};
 
-    printf("Enter the new task subject (leave empty to keep '%s'): ", lines[index - 1]);
+    printf("Enter the new task subject (leave empty to keep '%s'): ", lines[index-1]);
     fflush(stdout);
     if (fgets(temp_input, sizeof(temp_input), stdin) == NULL) {
         perror("Error reading new subject");
@@ -402,7 +549,7 @@ void edit_todo() {
         while (end >= nova_tarefa && *end == ' ') *end-- = '\0';
     } else {
         // Extracts the current value (simplified, can be improved)
-        char *start = strstr(lines[index - 1], "TODO: ") + 6;
+        char *start = strstr(lines[index-1], "TODO: ") + 6;
         char *end = strstr(start, " | User: ");
         if (end) *end = '\0';
         strncpy(nova_tarefa, start, sizeof(nova_tarefa) - 1);
@@ -427,7 +574,7 @@ void edit_todo() {
         while (end >= novo_usuario && *end == ' ') *end-- = '\0';
     } else {
         // Extracts the current value (simplified)
-        char *start = strstr(lines[index - 1], "User: ") + 6;
+        char *start = strstr(lines[index-1], "User: ") + 6;
         char *end = strstr(start, " | Deadline: ");
         if (end) *end = '\0';
         strncpy(novo_usuario, start, sizeof(novo_usuario) - 1);
@@ -452,14 +599,14 @@ void edit_todo() {
         while (end >= novo_prazo && *end == ' ') *end-- = '\0';
     } else {
         // Extracts the current value (simplified)
-        char *start = strstr(lines[index - 1], "Deadline: ") + 10;
+        char *start = strstr(lines[index-1], "Deadline: ") + 10;
         strncpy(novo_prazo, start, sizeof(novo_prazo) - 1);
         novo_prazo[sizeof(novo_prazo) - 1] = '\0';
     }
 
     // Gets the original creation date
     char time_str[26] = {0};
-    char *start_time = strstr(lines[index - 1], "[");
+    char *start_time = strstr(lines[index-1], "[");
     if (start_time) {
         strncpy(time_str, start_time + 1, 24);
         time_str[24] = '\0';
@@ -473,7 +620,7 @@ void edit_todo() {
     FILE *temp_file = fopen("todo_temp.txt", "w");
     if (temp_file == NULL) {
         perror("Error creating temporary file");
-        printf("Could not edit the TODO.\n");
+        printf("Unable to edit the TODO.\n");
         return;
     }
     for (int i = 0; i < count; i++) {
@@ -487,8 +634,8 @@ void edit_todo() {
 
     // Replaces the original file with the temporary one
     if (remove("todo.txt") != 0 || rename("todo_temp.txt", "todo.txt") != 0) {
-        perror("Error updating todo.txt");
-        printf("Could not complete the edit.\n");
+        perror("Error updating todo.txt file");
+        printf("Unable to complete the edit.\n");
         return;
     }
     printf("TODO number %d edited successfully.\n", index);
@@ -499,7 +646,7 @@ void edit_with_vim() {
     int status = system("vim todo.txt");
     if (status == -1) {
         perror("Error executing vim command");
-        printf("Could not open the editor. Check if 'vim' is installed.\n");
+        printf("Unable to open the editor. Check if 'vim' is installed.\n");
     } else if (WIFEXITED(status)) {
         int exit_code = WEXITSTATUS(status);
         if (exit_code == 0) {
@@ -542,8 +689,8 @@ void TODO(const char *input) {
             printf("Error: No task provided. Operation canceled.\n");
             return;
         }
-        // Asks for the name of the responsible
-        printf("Enter the name of the responsible (or leave empty for 'Unknown'): ");
+        // Asks for the responsible name
+        printf("Enter the responsible name (or leave empty for 'Unknown'): ");
         fflush(stdout);
         if (fgets(temp_input, sizeof(temp_input), stdin) == NULL) {
             perror("Error reading responsible name");
@@ -580,7 +727,7 @@ void TODO(const char *input) {
         } else {
             strcpy(prazo, "No deadline");
         }
-        // Gets the current time for the creation stamp
+        // Gets the current time for the creation timestamp
         char time_str[26];
         time_t now = time(NULL);
         ctime_r(&now, time_str);
@@ -590,7 +737,7 @@ void TODO(const char *input) {
         FILE *todo_file = fopen("todo.txt", "a");
         if (todo_file == NULL) {
             perror("Error opening todo.txt");
-            printf("Could not save the TODO. Check permissions or directory.\n");
+            printf("Unable to save the TODO. Check permissions or directory.\n");
             return;
         }
         fprintf(todo_file, "[%s] TODO: %s | User: %s | Deadline: %s\n", time_str, tarefa, usuario, prazo);
@@ -628,8 +775,8 @@ time_t parse_date(const char *date_str) {
 void check_todos() {
     FILE *todo_file = fopen("todo.txt", "r");
     if (todo_file == NULL) {
-        perror("Error opening todo.txt for checking");
-        printf("Could not check TODOs. File not found or no permission.\n");
+        perror("Error opening todo.txt file for checking");
+        printf("Unable to check TODOs. File not found or no permission.\n");
         return;
     }
     time_t now = time(NULL);
@@ -637,7 +784,7 @@ void check_todos() {
     char current_date[11];
     snprintf(current_date, sizeof(current_date), "%02d/%02d/%04d",
              tm_now->tm_mday, tm_now->tm_mon + 1, tm_now->tm_year + 1900);
-    printf("Checking overdue TODOs or those due today (%s)...\n", current_date);
+    printf("Checking overdue TODOs or due today (%s)...\n", current_date);
     int has_overdue = 0;
     char line[1024]; // Temporary buffer for each line
     while (fgets(line, sizeof(line), todo_file) != NULL) {
@@ -717,7 +864,7 @@ void handle_calc_interaction(const char *args) {
         perror("pclose failed for calculator pipe");
     } else {
         if (WIFEXITED(status)) {
-            printf("Calculator finished with status: %d\n", WEXITSTATUS(status));
+            printf("Calculator ended with status: %d\n", WEXITSTATUS(status));
         }
     }
 }
@@ -743,7 +890,7 @@ void handle_ollama_interaction() {
     log_action("User Prompt to 2B", user_prompt);
 
     if (user_prompt[0] == '\0') {
-        printf("Empty prompt, no interaction with Ollama\n");
+        printf("Empty prompt, no interaction with ollama\n");
         return;
     }
 
@@ -758,14 +905,14 @@ void handle_ollama_interaction() {
                  "ollama run %s \"%s\"", OLLAMA_MODEL, user_prompt);
     }
 
-    printf("Running Ollama with: %s\n", ollama_full_command);
+    printf("Running ollama with: %s\n", ollama_full_command);
     printf("Waiting for 2B's response...\n");
     printf("-------------- 2B output --------------\n");
 
     ollama_pipe = popen(ollama_full_command, "r");
     if (ollama_pipe == NULL) {
-        perror("Failed to run Ollama command with popen");
-        fprintf(stderr, "Check if Ollama is in the path and if 2B is available\n");
+        perror("Failed to run ollama command with popen");
+        fprintf(stderr, "Check if ollama is in the path and if 2B is available\n");
         return;
     }
 
@@ -794,10 +941,10 @@ void handle_ollama_interaction() {
 
     int status = pclose(ollama_pipe);
     if (status == -1) {
-        perror("pclose failed for Ollama pipe");
+        perror("pclose failed for ollama pipe");
     } else {
         if (WIFEXITED(status)) {
-            printf("Ollama process finished with status: %d\n", WEXITSTATUS(status));
+            printf("Ollama process ended with status: %d\n", WEXITSTATUS(status));
         } else if (WIFSIGNALED(status)) {
             printf("Ollama process terminated with signal %d\n", WTERMSIG(status));
         }
@@ -819,7 +966,7 @@ void cd(const char *args) {
         char args_copy[256];
         // Gets the current directory before changing
         if (getcwd(old_dir, sizeof(old_dir)) == NULL) {
-            perror("Error getting current directory before change");
+            perror("Error getting current directory before changing");
             old_dir[0] = '\0';
         }
         // Makes a copy of the argument to avoid direct modification
@@ -830,7 +977,7 @@ void cd(const char *args) {
         // Tries to change directory
         int result = chdir(args_copy);
         if (result == 0) {
-            // Gets the new current directory after change
+            // Gets the new current directory after changing
             if (getcwd(new_dir, sizeof(new_dir)) == NULL) {
                 perror("Error getting new current directory");
                 // Continues without showing the new path
@@ -880,7 +1027,7 @@ int jntd_mkdir(const char *args) {
             } else {
                 if (WIFEXITED(status)) {
                     int exit_code = WEXITSTATUS(status);
-                    printf("mkdir command finished with status '%d'.\n", exit_code);
+                    printf("Mkdir command ended with status '%d'.\n", exit_code);
                     if (exit_code == 0) {
                         // Checks again if the directory was created
                         if (stat(args, &st) == 0) {
@@ -934,18 +1081,11 @@ void dispatch(const char *user_in) {
     if (token == NULL) return;
 
     char *args = strtok(NULL, ""); // Gets the rest of the string as arguments
-    if (strlen(buf) > 0) {
-        for (size_t i = 0; i < sizeof(cmds) / sizeof(cmds[0]); i++) {
-            if (strncmp(buf, cmds[i].key, strlen(buf)) == 0) {
-                printf("Suggestion: %s\n", cmds[i].key); // Shows suggestion
-                fflush(stdout);
-            }
-        }
-    }
+
     // Adds to history and log
     add_to_history(user_in);
     log_action("User Input", user_in);
-
+    int command_found = 0;
     for (size_t i = 0; i < sizeof(cmds) / sizeof(cmds[0]); ++i) {
         if (strcasecmp(token, cmds[i].key) == 0) {
             if (strcmp(cmds[i].key, "help") == 0) {
@@ -965,7 +1105,7 @@ void dispatch(const char *user_in) {
                 system("git log -1 --pretty=%B | head -n1");
             } else if (strcasecmp(cmds[i].key, "his") == 0) {
                 display_history();
-            } else if (strcasecmp(cmds[i].key, "ct") == 0) {
+            } else if (strcasecmp(cmds[i].key, "checkt") == 0) {
                 check_todos();
             } else if (strcasecmp(cmds[i].key, "listt") == 0) {
                 list_todo();
@@ -974,19 +1114,25 @@ void dispatch(const char *user_in) {
             } else if (strcasecmp(cmds[i].key, "quizale") == 0) {
                 quiz_aleatorio();
             } else if (strcasecmp(cmds[i].key, "quizt") == 0) {
-                quiz_timer();
+                if (args && strcasecmp(args, "cancel") == 0) {
+                    cancel_timer("quizt");
+                } else {
+                    quiz_timer();
+                }
             } else if (strcasecmp(cmds[i].key, "rscript") == 0) {
                 rscript(args);
             } else if (strcasecmp(cmds[i].key, "todo") == 0) {
                 TODO(args);
-            } else if (strcasecmp(cmds[i].key, "checkt") == 0) {
-                check_todos();
+            } else if (strcasecmp(cmds[i].key, "timer") == 0) {
+                if (args && strcasecmp(args, "cancel") == 0) {
+                    cancel_timer("timer");
+                } else {
+                    timer();
+                }
             } else if (strcasecmp(cmds[i].key, "editt") == 0) {
                 edit_todo();
-            } else if (strcasecmp(cmds[i].key, "listt") == 0) {
-                list_todo();
             } else if (strcasecmp(cmds[i].key, "remt") == 0) {
-                remove_todo(args);
+                remove_todo();
             } else if (cmds[i].shell_command != NULL) {
                 // Executes shell commands defined in the table
                 system(cmds[i].shell_command);
@@ -995,12 +1141,17 @@ void dispatch(const char *user_in) {
         }
     }
     printf("Command '%s' not recognized. Use 'help' to see available commands.\n", token);
+    if (!command_found) {
+        suggest_commands(token);
+        // If the command was not found, offers suggestions.
+    }
 }
 
 int main(void) {
     printf("Starting JNTD...\n");
+    printf("Welcome\n");
     check_todos();
-    printf("Enter a command. Use 'help' to see options or 'exit' to quit.\n");
+    printf("Type a command. Use 'help' to see options or 'exit' to quit.\n");
     while (printf("> "), fgets(buf, sizeof(buf), stdin) != NULL) {
         buf[strcspn(buf, "\n")] = '\0'; // Removes newline
         if (strcmp(buf, "exit") == 0) {
@@ -1013,10 +1164,11 @@ int main(void) {
         }
         dispatch(buf);
     }
-    // Frees memory from history before exiting
+    // Frees history memory before exiting
     for (int i = 0; i < history_count; i++) {
         free(command_history[i]);
     }
     printf("Exiting....\n");
+    // Adds a pause to avoid immediate terminal closure
     return 0;
 }
