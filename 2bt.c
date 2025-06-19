@@ -1160,6 +1160,7 @@ void dispatch(const char *user_in) {
 
 int main(void) {
     printf("Iniciando o JNTD...\n");
+    printf("Bem vindo/a\n");
     check_todos();
     printf("Digite um comando. Use 'help' para ver as opções ou 'sair' para terminar.\n");
     while (printf("> "), fgets(buf, sizeof(buf), stdin) != NULL) {
