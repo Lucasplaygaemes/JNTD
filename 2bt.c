@@ -15,7 +15,6 @@
 #include <unistd.h> // Para getcwd no Linux/macOS
 #endif
 
-
 //Define o tamanho maximo para o buffer de entrada de prompts do usuario
 #define MAX_PROMPT_LEN 256
 //Define o tamanho maximo do input do ollama + extras
@@ -953,6 +952,20 @@ void display_help() {
         printf("  %-15s: %s\n", cmds[i].key, cmds[i].descri);
     }
 }
+//Função para copiar pastas
+void cp(const char *args) {
+	if (args && strlen(args) > 0) {
+		char from[256];
+		char to[256];
+		if (getcwd(from, sizeof(from)) == NULL) {
+			perror("Erro ao obter o diretorio");
+			from[0] = '\0';
+		}
+		strcpy(args_copy, sizeof(from) - 1);
+		args_copy[sizeof(args_copy) - 1] = '\0';
+		args_copy[strcspn(args_copy, "\n")] = '\0';
+
+
 
 void cd(const char *args) {
     // Verifica se o argumento (caminho do diretório) foi fornecido
