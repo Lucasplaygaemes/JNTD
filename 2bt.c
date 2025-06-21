@@ -94,7 +94,8 @@ static const CmdEntry cmds[] = {
     { "quiz", NULL, "Mostra todas as perguntas do quiz do integrado." },
     { "quizt", NULL, "Define o intervalo de tempo entre os QUIZ'es." },
     { "quizale", NULL, "Uma pergunta aleatoria do QUIZ é feita." },
-    { "timer", NULL, "Um simples timer." }
+    { "timer", NULL, "Um simples timer." },
+    { "cp_di", NULL, "Um copy, use com <de qual arquivo para qual>" }
 };
 
 // Declaração antecipada das funções
@@ -115,6 +116,34 @@ void func_quiz();
 char* read_random_line(const char* quiz_file);
 void *timer_background(void *arg);
 void *quiz_timer_background(void *arg);
+
+int copy_f_t() {
+	FILE *fptr1, *fptr2;
+	char filename[100];
+	int c;
+	printf("Coloque o nome do arquivo para copiar\n");
+	scanf("%s", filename);
+	fptr1 = fopen(filename, "r");
+	if (fptr1 == NULL) {
+		printf("Não foi possivel abrir o arquivo %s\n", filename);
+		exit(1);
+	}
+	printf("Coloque o nome do arquivo para ser escrito\n");
+	scanf("%s", filename);
+
+	fptr2 = fopen(filename, "w");
+	if (fptr2 == NULL) {
+		printf("Não foi possivel o arquivo %s\n", filename);
+		exit(1);
+	}
+	while ((c = fgetc(fptr1)) != EOF) {
+		fputc(c, fptr2);
+	}
+	printf("Conteudo copiado para %s\n", filename);
+	fclose(fptr1);
+	fclose(fptr2);
+	return 0;
+}
 
 int main(void);
 // Função para verificar segurança de comandos
@@ -952,20 +981,6 @@ void display_help() {
         printf("  %-15s: %s\n", cmds[i].key, cmds[i].descri);
     }
 }
-//Função para copiar pastas
-void cp(const char *args) {
-	if (args && strlen(args) > 0) {
-		char from[256];
-		char to[256];
-		if (getcwd(from, sizeof(from)) == NULL) {
-			perror("Erro ao obter o diretorio");
-			from[0] = '\0';
-		}
-		strcpy(args_copy, sizeof(from) - 1);
-		args_copy[sizeof(args_copy) - 1] = '\0';
-		args_copy[strcspn(args_copy, "\n")] = '\0';
-
-
 
 void cd(const char *args) {
     // Verifica se o argumento (caminho do diretório) foi fornecido
@@ -1151,7 +1166,9 @@ void dispatch(const char *user_in) {
 		timer();
 	    } else if (strcasecmp(cmds[i].key, "checkt") == 0) {
 		check_todos();
-            } else if (strcasecmp(cmds[i].key, "editt") == 0) {
+	    } else if (strcasecmp(cmds[i]. key, "cp_di") == 0) {
+		copy_f_t(args);
+	    } else if (strcasecmp(cmds[i].key, "editt") == 0) {
             	edit_todo();
             } else if (strcasecmp(cmds[i].key, "listt") == 0) {
 		list_todo();
