@@ -12,6 +12,7 @@ I want in the next updates make she possible to make complex interactions with t
 
 # Big Updates?
 I'm want to make big updates for the code, it has some upgrades that need to be done. But i may need to change to much of the code, and also need to optimize it. So i will make slow changes in the code, i'm thinking in making headers files to make it smaller.
+
 # Calculator!
 It was getting dusty in my TODO list, so why not add it here, a calculator, i can't say it's a simple calculator, neither a cientific, so i can't name it now, but it's a calc that will have a lot of options, and one day (Probably this year) it shall be able to interact with the 2B, and may even with 9S. The reason behind me adding it it's because even though she will be able to do calculus level equations, i won't put that all on her back, and it's a cool feature so why not add it?.
 
