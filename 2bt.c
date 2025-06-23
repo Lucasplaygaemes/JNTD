@@ -90,7 +90,7 @@ static const CmdEntry cmds[] = {
     { "listt", NULL, "Lista todas as tarefas TODO salvas no arquivo todo.txt." },
     { "remt", NULL, "Remove uma tarefa TODO do arquivo pelo número." },
     { "editt", NULL, "Edita uma tarefa TODO existente pelo número." },
-    { "edit_vim", NULL, "Abre o arquivo todo.txt no vim para edição direta." },
+    { "editv", NULL, "Abre o arquivo todo.txt no vim para edição direta." },
     { "quiz", NULL, "Mostra todas as perguntas do quiz do integrado." },
     { "quizt", NULL, "Define o intervalo de tempo entre os QUIZ'es." },
     { "quizale", NULL, "Uma pergunta aleatoria do QUIZ é feita." },
@@ -667,19 +667,26 @@ void edit_todo() {
 }
 
 void edit_with_vim() {
-    printf("Abrindo todo.txt no editor vim para edição...\n");
-    int status = system("vim todo.txt");
-    if (status == -1) {
-        perror("Erro ao executar o comando vim");
-        printf("Não foi possível abrir o editor. Verifique se 'vim' está instalado.\n");
-    } else if (WIFEXITED(status)) {
-        int exit_code = WEXITSTATUS(status);
-        if (exit_code == 0) {
-            printf("Edição concluída com sucesso.\n");
-        } else {
-            printf("Editor fechado com status %d.\n", exit_code);
-        }
-    }
+	pid_t pid = fork(); //Cria um processo filho//
+	
+	if (pid == -1) {
+		perror("fork");
+		exit(EXIT_FAILURE);
+	}
+	if (pid == 0) {
+		char *args[] = {"vim", "todo.txt", NULL}; //argumentos
+		execvp("vim", args); //substitui o processo filho//
+		
+		perror("execvp");
+		exit(EXIT_FAILURE);
+	}
+	else {
+		int status;
+		waitpid(pid, &status, 0);//esperar o filho terminar
+		if (WIFEXITED(status)) {
+			printf("Processo filho terminou com status: %d\n", WEXITSTATUS(status));
+		}
+	}
 }
 
 void TODO(const char *input) {
@@ -1170,7 +1177,9 @@ void dispatch(const char *user_in) {
 		copy_f_t(args);
 	    } else if (strcasecmp(cmds[i].key, "editt") == 0) {
             	edit_todo();
-            } else if (strcasecmp(cmds[i].key, "listt") == 0) {
+	    } else if (strcasecmp(cmds[i].key, "editv") == 0) {
+		edit_with_vim();
+	    } else if (strcasecmp(cmds[i].key, "listt") == 0) {
 		list_todo();
 	    } else if (strcasecmp(cmds[i].key, "remt") == 0) {
 		remove_todo(args);
