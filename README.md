@@ -12,6 +12,7 @@ I want in the next updates make she possible to make complex interactions with t
 
 # Big Updates?
 I'm want to make big updates for the code, it has some upgrades that need to be done. But i may need to change to much of the code, and also need to optimize it. So i will make slow changes in the code, i'm thinking in making headers files to make it smaller.
+I'm making modifications, implementing more secure features, and the next big update is....
 
 # Tip's?
 I would be really gratefull if you want to improve the code, it's always open to commits. and if you want you can contact me via my email. I will put it somewhere here.
