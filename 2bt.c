@@ -445,6 +445,27 @@ int contar_linhas(const char* quiz_file) {
 	fclose(quizlin);
 	return linhaslin;
 }
+
+void git() {
+	pid_t pid = fork();
+	if (pid == -1) {
+		perror("fork");
+		exit(EXIT_FAILURE);
+	}
+	if (pid == 0) {
+		char *args[] = {"git", NULL};
+		execvp("git log -1 --pretty=%B && head -n1", args);
+		perror("Erro ao executar o execvp");
+		exit(EXIT_FAILURE);
+	} else {
+		int status;
+		waitpid(pid, &status, 0);
+		if (WIFEXITED(status)) {
+			printf("O processo filho terminou com status: %d\n", WEXITSTATUS(status));
+		}
+	}
+}
+
 char* read_speci_line(const char* quiz_file, int line_number) {
     FILE *quiz_f = fopen("quiz.txt", "r");
     if (quiz_f == NULL) {
@@ -1140,7 +1161,6 @@ void dispatch(const char *user_in) {
                 printf("O repostorio é: https://github.com/Lucasplaygaemes/JNTD\n");
 		printf("Ultimo commit: ");
 		fflush(stdout);
-		system("git log -1 --pretty=%B | head -n1");
             } else if (strcasecmp(cmds[i].key, "his") == 0) {
                 display_history();
             } else if (strcasecmp(cmds[i].key, "ct") == 0) {
