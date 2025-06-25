@@ -18,7 +18,7 @@ I'm making modifications, implementing more secure features, and the next big up
 My next big update, is the internet, i want to add curl, or any way to download something from the internet, it will be hard, but i will do it. I think. I was making a bit more resarch and, it's look hard, but i want to implemeant curl, as soon as possible.
 
 # Security?
-Until now i wasn't really think in security aspects, because it's a simple code, not much is an issue, thing's like C.
+Until now i wasn't really think in security aspects, because it's a simple code, not much is an issue, thing's like C don't having a garbage collector, and another aspects, but as all good code, mine need to have at least a bit o security.
 # Tip's?
 I would be really gratefull if you want to improve the code, it's always open to commits. and if you want you can contact me via my email. I will put it somewhere here.
 
