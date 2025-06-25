@@ -10,6 +10,10 @@ There's no such thing as "right way to use". Because you can automate things whe
 The code access the Ollama via bash, the 2B it's trained to know how and what to respond when it's questioned within the terminal, it's has been trained in a personalized dataset, that's has previous commands and interactions between she and the user and the terminal. Ex: make an .txt file that has the firts 50 firts numbers from fibonacci sequence, and it's done.
 I want in the next updates make she possible to make complex interactions with the terminal, and codes, she may be possible to execute codes, and test them by herself, so she will have the possibility to know, where, why, and how a bug it's happening, she will also be able to search for directorys that may have a bug, or a missing something.
 
+# Readme?
+As you may notice, the README file is getting big, and i can't list every new thing neither any changes that i will make in this code.
+
+
 # Big Updates?
 I'm want to make big updates for the code, it has some upgrades that need to be done. But i may need to change to much of the code, and also need to optimize it. So i will make slow changes in the code, i'm thinking in making headers files to make it smaller.
 I'm making modifications, implementing more secure features, and the next big update is....
