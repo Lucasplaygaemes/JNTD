@@ -30,9 +30,6 @@ I would be really gratefull if you want to improve the code, it's always open to
 # Calculator!
 It was getting dusty in my TODO list, so why not add it here, a calculator, i can't say it's a simple calculator, neither a cientific, so i can't name it now, but it's a calc that will have a lot of options, and one day (Probably this year) it shall be able to interact with the 2B, and may even with 9S. The reason behind me adding it it's because even though she will be able to do calculus level equations, i won't put that all on her back, and it's a cool feature so why not add it?.
 
-# Jntd_descri!
-It's simple, it will have an explanation of everything in eachline, so you can know what it do, i ain't writting all that by hand, so ai will be used. will be at least close to the newest version. Because of that, it will be big, a lot more, than usual, and theres not to much i can do about it.
-
 # Log!
 It's self explanatory, it's a log of the commands send by you, it will be stored in a file called "log.txt", it has the time, and the day the commands was executed, as well theres a history log, but in the code itself, so you can see the last commands, it's redoundant, so i will change it in the future.
 
