@@ -12,7 +12,7 @@ I want in the next updates make she possible to make complex interactions with t
 
 # Readme?
 As you may notice, the README file is getting big, and i can't list every new thing neither any changes that i will make in this code.
-
+So i will add a new file, Features, and the name again is selfexplanatory.
 
 # Big Updates?
 I'm want to make big updates for the code, it has some upgrades that need to be done. But i may need to change to much of the code, and also need to optimize it. So i will make slow changes in the code, i'm thinking in making headers files to make it smaller.
