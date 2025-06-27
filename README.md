@@ -11,7 +11,7 @@ The code access the Ollama via bash, the 2B it's trained to know how and what to
 I want in the next updates make she possible to make complex interactions with the terminal, and codes, she may be possible to execute codes, and test them by herself, so she will have the possibility to know, where, why, and how a bug it's happening, she will also be able to search for directorys that may have a bug, or a missing something.
 
 # Curl!
-I'm currentlying implementing the curl in the code, how exactly it's going to work, a don't know.
+I'm currentlying implementing the curl in the code, how exactly it's going to work? i don't know. I'm still thinking what's exactly will it download, i'm think of makig extras function's that are downloadble, like the calculator, or TODO.
 
 # Readme?
 As you may notice, the README file is getting big, and i can't list every new thing neither any changes that i will make in this code.
