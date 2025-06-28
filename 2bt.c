@@ -6,6 +6,10 @@
 #include <sys/stat.h> // Para stat (Linux/macOS)
 #include <pthread.h>
 #include <unistd.h>  // Para sleep()
+#include <dirent.h>
+#include <dlfcn.h>
+#include "plugin.h"
+
 #ifdef _WIN32
 #include <windows.h> // Para Sleep()
 #endif
@@ -14,7 +18,6 @@
 #else
 #include <unistd.h> // Para getcwd no Linux/macOS
 #endif
-
 //Define o tamanho maximo para o buffer de entrada de prompts do usuario
 #define MAX_PROMPT_LEN 256
 //Define o tamanho maximo do input do ollama + extras
@@ -51,9 +54,11 @@ int seconds;
 volatile int timer_running = 0;//indica se o timer tá ativo, 0 = inativo, 1 = ativo//
 volatile int quiz_timer_running = 0;//indica se o quiz timer está ativo//
 volatile int current_timer_seconds = 0;//armazena o tempo restante do timer//
+Plugin loaded_plugins[20];
+int plugin_count = 0;
+
 pthread_t timer_thread;//id da thread do timer
 pthread_t quiz_thread;//id da thread do quiz
-
 // Estrutura de comando
 typedef struct {
     const char *key;
@@ -116,7 +121,43 @@ void func_quiz();
 char* read_random_line(const char* quiz_file);
 void *timer_background(void *arg);
 void *quiz_timer_background(void *arg);
+void load_plugins();
+void execute_plugin(const char* name, const char* args);
 
+// Implementação básica (coloque antes de dispatch()):
+void load_plugins() {
+    DIR *dir = opendir("plugins");
+    if (!dir) {
+        printf("Pasta de plugins não encontrada. Criando...\n");
+        mkdir("plugins", 0700);  // Cria a pasta se não existir
+        return;
+    }
+
+    struct dirent *ent;
+    while ((ent = readdir(dir)) != NULL) {
+        if (ent->d_type == DT_REG && 
+           (strstr(ent->d_name, ".so") || strstr(ent->d_name, ".dll"))) {
+            printf("Plugin detectado: %s\n", ent->d_name);
+            // Implementação básica para demonstração
+            // Num sistema real, aqui você carregaria a biblioteca
+            loaded_plugins[plugin_count].name = strdup(ent->d_name);
+            plugin_count++;
+        }
+    }
+    closedir(dir);
+}
+
+void execute_plugin(const char* name, const char* args) {
+    printf("Executando plugin: %s com argumentos: %s\n", name, args);
+    for (int i = 0; i < plugin_count; i++) {
+        if (strcmp(name, loaded_plugins[i].name) == 0) {
+            // Aqui você chamaria a função real do plugin
+            printf("Plugin encontrado! (Implementação real carregaria a biblioteca)\n");
+            return;
+        }
+    }
+    printf("Plugin não encontrado: %s\n", name);
+}
 int copy_f_t() {
 	FILE *fptr1, *fptr2;
 	char filename[100];
@@ -447,25 +488,25 @@ int contar_linhas(const char* quiz_file) {
 }
 
 void git() {
-	pid_t pid = fork();
-	if (pid == -1) {
-		perror("fork");
-		exit(EXIT_FAILURE);
-	}
-	if (pid == 0) {
-		char *args[] = {"git", NULL};
-		execvp("git log -1 --pretty=%B && head -n1", args);
-		perror("Erro ao executar o execvp");
-		exit(EXIT_FAILURE);
-	} else {
-		int status;
-		waitpid(pid, &status, 0);
-		if (WIFEXITED(status)) {
-			printf("O processo filho terminou com status: %d\n", WEXITSTATUS(status));
-		}
-	}
+    pid_t pid = fork();
+    if (pid == -1) {
+        perror("fork");
+        exit(EXIT_FAILURE);
+    }
+    if (pid == 0) {
+        // CORREÇÃO: Use apenas uma declaração de args
+        char *args[] = {"git", "log", "-1", "--pretty=%B", NULL};
+        execvp("git", args);
+        perror("Erro ao executar o execvp");
+        exit(EXIT_FAILURE);
+    } else {
+        int status;
+        waitpid(pid, &status, 0);
+        if (WIFEXITED(status)) {
+            printf("O processo filho terminou com status: %d\n", WEXITSTATUS(status));
+        }
+    }
 }
-
 char* read_speci_line(const char* quiz_file, int line_number) {
     FILE *quiz_f = fopen("quiz.txt", "r");
     if (quiz_f == NULL) {
@@ -1132,18 +1173,16 @@ void dispatch(const char *user_in) {
     char *token = strtok(input_copy, " ");
     if (token == NULL) return;
     
-    char *args = strtok(NULL, ""); // Pega o resto da string como argumentos
-/*	if(strlen(buf) > 0) {
-		for (size_t i = 0; i < sizeof(cmds)/sizeof(cmds[0]); i++) {
-			if (strncmp(buf, cmds[i].key, strlen(buf)) == 0) {
-				printf("Sugestão: %s\n", cmds[i].key);//Mostra a sugestão
-				fflush(stdout);
-            }
-        }
-    }*/
+    char *args = strtok(NULL, ""); 
     // Adiciona ao histórico e log
     add_to_history(user_in);
     log_action("User Input", user_in);
+   for (int i = 0; i < plugin_count; i++) {
+        if (strcasecmp(token, loaded_plugins[i].name) == 0) {
+            execute_plugin(token, args);
+            return;
+        }
+    }
     int command_found = 0;
     for (size_t i = 0; i < sizeof(cmds) / sizeof(cmds[0]); ++i) {
         if (strcasecmp(token, cmds[i].key) == 0) {
@@ -1161,6 +1200,7 @@ void dispatch(const char *user_in) {
                 printf("O repostorio é: https://github.com/Lucasplaygaemes/JNTD\n");
 		printf("Ultimo commit: ");
 		fflush(stdout);
+		git();
             } else if (strcasecmp(cmds[i].key, "his") == 0) {
                 display_history();
             } else if (strcasecmp(cmds[i].key, "ct") == 0) {
@@ -1221,6 +1261,8 @@ int main(void) {
     printf("Iniciando o JNTD...\n");
     printf("Bem vindo/a\n");
     check_todos();
+    load_plugins();  // Carrega os plugins
+    printf("Plugins carregados: %d\n", plugin_count); // Adicione esta linha!
     printf("Digite um comando. Use 'help' para ver as opções ou 'sair' para terminar.\n");
     while (printf("> "), fgets(buf, sizeof(buf), stdin) != NULL) {
         buf[strcspn(buf, "\n")] = '\0'; // Remove newline
