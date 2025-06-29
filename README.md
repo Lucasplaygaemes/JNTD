@@ -11,7 +11,7 @@ The code access the Ollama via bash, the 2B it's trained to know how and what to
 I want in the next updates make she possible to make complex interactions with the terminal, and codes, she may be possible to execute codes, and test them by herself, so she will have the possibility to know, where, why, and how a bug it's happening, she will also be able to search for directorys that may have a bug, or a missing something.
 
 # Documentation!
-I'm going to add a new file, soon, called documentation. Why's that? Simple, the code is written by me, and i really want other people to contribuite on it, so i will make a documentation.
+I'm going to add a new file, soon, called documentation. Why's that? Simple, the code is written by me, and i really want other people to contribuite on it, so i will make a documentation. So whoever want to add something, make it own plugin.
 # Plugins!
 That's a cool things, you can add plugin on it, just put it on the plugins folder. The correct documentantion will be uploaded to how to add one. For now, i haven't make any new plugins, because i'm using fuctions that ware already implemented.
 
