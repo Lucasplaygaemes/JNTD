@@ -19,6 +19,8 @@ That's a cool things, you can add plugin on it, just put it on the plugins folde
 # Curl!
 I'm currentlying implementing the curl in the code, how exactly it's going to work? i don't know. I'm still thinking what's exactly will it download, i'm think of makig extras function's that are downloadble, like the calculator, or TODO. Don't ask how i gonna make them dowloadble like an addon, i will figure it out, eventually.
 
+# Repository!
+
 # Readme?
 As you may notice, the README file is getting big, and i can't list every new thing neither any changes that i will make in this code.
 So i will add a new file, Features, and the name again is selfexplanatory. When a big update or change be made, it will be showed in README for 5~10 days in maximum. In the features file will have all that already is on the readme, and what's not.
