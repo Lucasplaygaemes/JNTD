@@ -20,7 +20,7 @@ That's a cool things, you can add plugin on it, just put it on the plugins folde
 I'm currentlying implementing the curl in the code, how exactly it's going to work? i don't know. I'm still thinking what's exactly will it download, i'm think of makig extras function's that are downloadble, like the calculator, or TODO. Don't ask how i gonna make them dowloadble like an addon, i will figure it out, eventually.
 
 # Repository!
-Well, for now, don't suit me making a online repository for "3" plugins.
+Well, for now, don't suit me making a online repository for "3" plugins. So i'm using this repository, as a repository! It's simple, i think, the official plugins will be here.
 
 # Readme?
 As you may notice, the README file is getting big, and i can't list every new thing neither any changes that i will make in this code.
