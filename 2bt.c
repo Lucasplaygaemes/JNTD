@@ -9,6 +9,9 @@
 #include <dirent.h>
 #include <dlfcn.h>
 #include "plugin.h"
+#include <curl/curl.h>
+#include <stdint.h>
+#include <stdbool.h>
 
 #ifdef _WIN32
 #include <windows.h> // Para Sleep()
@@ -100,7 +103,8 @@ static const CmdEntry cmds[] = {
     { "quizt", NULL, "Define o intervalo de tempo entre os QUIZ'es." },
     { "quizale", NULL, "Uma pergunta aleatoria do QUIZ é feita." },
     { "timer", NULL, "Um simples timer." },
-    { "cp_di", NULL, "Um copy, use com <de qual arquivo para qual>" }
+    { "cp_di", NULL, "Um copy, use com <de qual arquivo para qual>" },
+    { "download", NULL, "Uma função de Download, (download URL nome)" }
 };
 
 // Declaração antecipada das funções
@@ -118,13 +122,13 @@ void cd(const char *args);
 int jntd_mkdir(const char *args);
 void rscript(const char *args);
 void func_quiz();
-char* read_random_line(const char* quiz_file);
+char *read_random_line(const char* quiz_file);
 void *timer_background(void *arg);
 void *quiz_timer_background(void *arg);
 void load_plugins();
 void execute_plugin(const char* name, const char* args);
 
-// Implementação básica (coloque antes de dispatch()):
+//implementação dos plugins, sempre antes do dispatch//
 void load_plugins() {
     DIR *dir = opendir("plugins");
     if (!dir) {
@@ -158,6 +162,71 @@ void execute_plugin(const char* name, const char* args) {
     }
     printf("Plugin não encontrado: %s\n", name);
 }
+
+typedef struct {
+	FILE *fp;
+	size_t dl_total;
+} dl_status;
+
+//função para escrever no arquivo//
+static size_t write_data(void *ptr, size_t size, size_t nmemb, void *stream) {
+	dl_status *status = stream;
+	size_t written = fwrite(ptr, size, nmemb, status->fp);
+
+	status->dl_total += written;
+
+	printf("\r%ld KB     ", status->dl_total);
+	fflush(stdout);
+	return written;
+
+}
+
+bool download_file(char *url, char *filename) {
+	bool sucess = true;
+
+	CURL *curl_handle = curl_easy_init();
+
+	curl_easy_setopt(curl_handle, CURLOPT_URL, url);
+	curl_easy_setopt(curl_handle, CURLOPT_VERBOSE, 0L);
+	curl_easy_setopt(curl_handle, CURLOPT_NOPROGRESS, 1L);
+	curl_easy_setopt(curl_handle, CURLOPT_FOLLOWLOCATION, 1L);
+	curl_easy_setopt(curl_handle, CURLOPT_WRITEFUNCTION, write_data);
+	curl_easy_setopt(curl_handle, CURLOPT_FAILONERROR, 1L);
+
+	FILE *pagefile = fopen(filename, "wb");
+	
+	if (!pagefile) {
+		perror("Erro ao baixar o arquivo");
+		curl_easy_cleanup(curl_handle);
+		return false;
+	}
+
+	dl_status status;
+	status.dl_total = 0;
+	status.fp = pagefile;
+	
+	curl_easy_setopt(curl_handle, CURLOPT_WRITEDATA, &status);
+	
+	for (int i = 0; i < 5; i++) {
+		if (curl_easy_perform(curl_handle)) {
+			sucess = false;
+			printf("Falha na tentativa %d\n", i + 1);
+		} else {
+			sucess = true;
+		}
+		if (sucess) {
+			break;
+		}
+		sleep(1);
+	}
+	fclose(pagefile);
+	
+	if (!sucess) {
+		remove(filename);
+	}
+	printf("\n");
+}
+
 int copy_f_t() {
 	FILE *fptr1, *fptr2;
 	char filename[100];
@@ -248,12 +317,10 @@ void remove_todo() {
         printf("Não foi possível remover TODOs. Arquivo não encontrado ou sem permissão.\n");
         return;
     }
-
     if (count >= max_todo) {
 	    printf("Limite de TODOs atingido!\n");
             return;
     }
-
     // Lê todas as linhas para um buffer temporário
     // Limite de 100 TODOs para simplificar
     int count = 0;
@@ -1229,6 +1296,16 @@ void dispatch(const char *user_in) {
 		    } else {
 			    timer();
 		    }
+	    } else if (strcasecmp(cmds[i].key, "download") == 0) {
+		    char url[512];
+		    char nome[32];
+		    printf("Qual arquivo será baixado?. (use download url nome).\n");
+		    printf("A url: \n");
+		    scanf("%s", url);
+		    printf("O nome: \n");
+		    scanf("%s", nome);
+		    bool dl = download_file(url, nome);
+		    printf("Primeiro download terminou com status: %d\n", dl);
 	    } else if (strcasecmp(cmds[i].key, "timer") == 0) {
 		timer();
 	    } else if (strcasecmp(cmds[i].key, "checkt") == 0) {
@@ -1262,7 +1339,7 @@ int main(void) {
     printf("Bem vindo/a\n");
     check_todos();
     load_plugins();  // Carrega os plugins
-    printf("Plugins carregados: %d\n", plugin_count); // Adicione esta linha!
+    printf("Plugins carregados: %d\n", plugin_count);
     printf("Digite um comando. Use 'help' para ver as opções ou 'sair' para terminar.\n");
     while (printf("> "), fgets(buf, sizeof(buf), stdin) != NULL) {
         buf[strcspn(buf, "\n")] = '\0'; // Remove newline
