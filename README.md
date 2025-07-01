@@ -10,8 +10,17 @@ There's no such thing as "right way to use". Because you can automate things whe
 The code access the Ollama via bash, the 2B it's trained to know how and what to respond when it's questioned within the terminal, it's has been trained in a personalized dataset, that's has previous commands and interactions between she and the user and the terminal. Ex: make an .txt file that has the firts 50 firts numbers from fibonacci sequence, and it's done.
 I want in the next updates make she possible to make complex interactions with the terminal, and codes, she may be possible to execute codes, and test them by herself, so she will have the possibility to know, where, why, and how a bug it's happening, she will also be able to search for directorys that may have a bug, or a missing something.
 
+# Documentation!
+I'm going to add a new file, soon, called documentation. Why's that? Simple, the code is written by me, and i really want other people to contribuite on it, so i will make a documentation. So whoever want to add something, make it own plugin, Or anything like will be able because he can read the docs. I will need AI help to implement in the whole code, but i will revise it all by myself. Just forgot to say, the documentation will be in english too.
+
+# Plugins!
+That's a cool things, you can add plugin on it, just put it on the plugins folder. The correct documentantion will be uploaded to how to add one. For now, i haven't make any new plugins, because i'm using fuctions that ware already implemented.
+
 # Curl!
 I'm currentlying implementing the curl in the code, how exactly it's going to work? i don't know. I'm still thinking what's exactly will it download, i'm think of makig extras function's that are downloadble, like the calculator, or TODO. Don't ask how i gonna make them dowloadble like an addon, i will figure it out, eventually.
+
+# Repository!
+Well, for now, don't suit me making a online repository for "3" plugins. So i'm using this repository, as a repository! It's simple, i think, the official plugins will be here.
 
 # Readme?
 As you may notice, the README file is getting big, and i can't list every new thing neither any changes that i will make in this code.
@@ -28,16 +37,13 @@ My next big update, is the internet, i want to add curl, or any way to download 
 Until now i wasn't really think in security aspects, because it's a simple code, not much is an issue, thing's like C don't having a garbage collector, and another aspects, but as all good code, mine need to have at least a bit o security. So i'm already implemented some of it, but not much, like, 2b can't run any comands as her like, only the ones that also availble to JNTD. I'm making changes in the ones where they use the system funtcion, but not all can be easily replaced. Not for now, i make my best to do some security improvements.
 
 # Tip's?
-I would be really gratefull if you want to improve the code, it's always open to commits. and if you want you can contact me via my email. I will put it somewhere here.
+I would be really gratefull if you want to improve the code, it's always open to commits. and if you want you can contact me via my email. I will put it somewhere here. My email is lucasmoura27271@gmail.com, and if you need to say something with me, we can chat by email.
 
 # Calculator!
 It was getting dusty in my TODO list, so why not add it here, a calculator, i can't say it's a simple calculator, neither a cientific, so i can't name it now, but it's a calc that will have a lot of options, and one day (Probably this year) it shall be able to interact with the 2B, and may even with 9S. The reason behind me adding it it's because even though she will be able to do calculus level equations, i won't put that all on her back, and it's a cool feature so why not add it?.
 
 # Log!
 It's self explanatory, it's a log of the commands send by you, it will be stored in a file called "log.txt", it has the time, and the day the commands was executed, as well theres a history log, but in the code itself, so you can see the last commands, it's redoundant, so i will change it in the future.
-
-# QUIZ!
-Now we have a quiz! it's a simple quiz where you answer questions of a varity of themes, and you can edit the questions! All of them are in the quiz.txt file.
 
 # Git!
 The git function show you the link to JNTD repository, but the last commit feature, probably just work in my pc, thats because my git is setted to JNTD, but your may not, and that's a problem that i will handle in the future.
@@ -48,14 +54,11 @@ Now we have the TODO funcionality, where you can define things, and be remembere
 # Languages?
 As you may noticed, all the README is in english, the commits are in english and Portuguese, and the functions are in portuguese as well. And i need to decide in which one i will make the whole code, i'm thinking in making a copy of it, and just changing the words from pt to en, and let it in a folder apart, if you want to add it in a another language just commit it in a new folder with that language. I will add only the languages that i know, that will be 3, maybe 4, Portuguese, English, Espanish and Japanese.
 
-# Copy_di
-I'm implementing a copy function, but the one that's already implemented is different one, you can copy the content from one file to another. The propely function will be future implemented.
-
 # Multithread!
 It's now a real thing! I learning it slowly, but the timer and quiz timer already working.
 
 # VIM!
-The VIM is integrated, you can edit a file, create, do everything you normally do with vim inside of it, and the when you exit you will be back in JNTD.
+The VIM is integrated, you can edit a file, create, do everything you normally do with vim inside of it, and the when you exit you will be back in JNTD. It's not complete yet, theres modifications to be done.
 
 # 9S!
 One day i may have the specs to use the most heavy LLM that i can put my hands on, until there i will need to change my mind to one that i can afford, i was already wating to train more than one AI, and i was't going to need a LLM, because of 2B, so i figured out that i can make 9S too, so i can use both of them. 9S will not have the ability to chat like 2B, it's obvius he will be able to speak with the user, but his function is to read a image text, graphs and figures, and transcribe that to text, or a understandable data tha 2B will be able to use. He is not designed to understand every image, personally, i just wanted him to function like a translator, from him to 2B.
