@@ -181,7 +181,11 @@ void calc_execute(const char* args) {
 }
 
 // Registro do plugin
-Plugin plugin = {
-    .name = "calc",
-    .execute = calc_execute
-};
+Plugin *register_plugin() {
+	Plugin *p =(Plugin*)malloc(sizeof(Plguin));
+	if (p) {
+		p->name = "calc";
+		p->execute = calc_execute;
+	}
+	return p;
+}
