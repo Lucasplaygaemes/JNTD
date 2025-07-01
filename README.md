@@ -17,8 +17,7 @@ I'm going to add a new file, soon, called documentation. Why's that? Simple, the
 That's a cool things, you can add plugin on it, just put it on the plugins folder. The correct documentantion will be uploaded to how to add one. For now, i haven't make any new plugins, because i'm using fuctions that ware already implemented.
 
 # Curl!
-I'm currentlying implementing the curl in the code, how exactly it's going to work? i don't know. I'm still thinking what's exactly will it download, i'm think of makig extras function's that are downloadble, like the calculator, or TODO. Don't ask how i gonna make them dowloadble like an addon, i will figure it out, eventually.
-
+I'm currentlying implementing the curl in the code, how exactly it's going to work? i don't know. I'm still thinking what's exactly will it download, i'm think of makig extras function's that are downloadble, like the calculator, or TODO. Don't ask how i gonna make them dowloadble like an addon, i will figure it out, eventually. It's already implemented, and it's working.
 # Repository!
 Well, for now, don't suit me making a online repository for "3" plugins. So i'm using this repository, as a repository! It's simple, i think, the official plugins will be here.
 
