@@ -26,7 +26,7 @@ int main(void) {
 		return EXIT_FAILURE;
 	}
 
-	curl_easy_setopt(curl, CURLOPT_URL, "https://google.com");
+	curl_easy_setopt(curl, CURLOPT_URL, "https://github.com/Lucasplaygaemes/JNTD/blob/b5d0daf1177f9d1c898f1e2bc92e809c7ff92cb8/plugin/calc.c");
 
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, got_data);
 
