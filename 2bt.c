@@ -12,6 +12,7 @@
 #include <curl/curl.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <dlfcn.h>
 
 #ifdef _WIN32
 #include <windows.h> // Para Sleep()
@@ -57,7 +58,6 @@ int seconds;
 volatile int timer_running = 0;//indica se o timer tá ativo, 0 = inativo, 1 = ativo//
 volatile int quiz_timer_running = 0;//indica se o quiz timer está ativo//
 volatile int current_timer_seconds = 0;//armazena o tempo restante do timer//
-Plugin loaded_plugins[20];
 int plugin_count = 0;
 
 pthread_t timer_thread;//id da thread do timer
@@ -68,6 +68,13 @@ typedef struct {
     const char *shell_command;
     const char *descri;
 } CmdEntry;
+
+typedef struct {
+        void *handle;
+        Plugin *plugin;
+} LoadedPlugin;
+
+LoadedPlugin loaded_plugins[20];
 
 // Definição dos comandos (declarado antes das funções que o utilizam)
 static const CmdEntry cmds[] = {
@@ -138,15 +145,39 @@ void load_plugins() {
     }
 
     struct dirent *ent;
-    while ((ent = readdir(dir)) != NULL) {
-        if (ent->d_type == DT_REG && 
-           (strstr(ent->d_name, ".so") || strstr(ent->d_name, ".dll"))) {
-            printf("Plugin detectado: %s\n", ent->d_name);
-            // Implementação básica para demonstração
-            // Num sistema real, aqui você carregaria a biblioteca
-            loaded_plugins[plugin_count].name = strdup(ent->d_name);
-            plugin_count++;
-        }
+    while ((ent = readdir(dir)) != NULL && plugin_count < 20) {
+        if (strstr(ent->d_name, ".so")) {
+		char plugin_path[512];
+		snprintf(plugin_path, sizeof(plugin_path), "plugins/%s", ent->d_name);
+
+
+		//carrega a biblioteca compartilhada//
+		void *handle = dlopen(plugin_path, RTLD_LAZY);
+		if (!handle) {
+			fprintf(stderr, "Erro ao carregar o plugin %s: %s\n", plugin_path, dlerror());
+			continue;
+		}
+		// Procura a função registrar plugin dentro da biblioteca//
+		Plugin *(*register_func)();//declara uma função de pointer//
+		register_func = dlsym(handle, "register_plugin");
+		if (!register_func) {
+			fprintf(stderr, "Erro: Plugin %s não tem função register_plugin.\n", plugin_path);
+			dlclose(handle);
+			continue;
+		}
+		//chama a função para conseguir a data do plugin//
+		Plugin *p = register_func();
+		if (!p) {
+			fprintf(stderr, "Erro: register_plugin em %s retornou NULL.\n", plugin_path);
+			dlclose(handle);
+			continue;
+		}
+		//armazena o handle e a data do plugin//
+		loaded_plugins[plugin_count].handle = handle;
+		loaded_plugins[plugin_count].plugin = p;
+		plugin_count++;
+		printf("Plugin '%s' carregado com sucesso.\n", p->name);
+	}
     }
     closedir(dir);
 }
@@ -154,13 +185,13 @@ void load_plugins() {
 void execute_plugin(const char* name, const char* args) {
     printf("Executando plugin: %s com argumentos: %s\n", name, args);
     for (int i = 0; i < plugin_count; i++) {
-        if (strcmp(name, loaded_plugins[i].name) == 0) {
+        if (strcmp(name, loaded_plugins[i].plugin->name) == 0) {
             // Aqui você chamaria a função real do plugin
-            printf("Plugin encontrado! (Implementação real carregaria a biblioteca)\n");
-            return;
+	    loaded_plugins[i].plugin->execute(args);
+	    return;
         }
     }
-    printf("Plugin não encontrado: %s\n", name);
+    printf("plugin não econtrado\n");
 }
 
 typedef struct {
@@ -1245,7 +1276,7 @@ void dispatch(const char *user_in) {
     add_to_history(user_in);
     log_action("User Input", user_in);
    for (int i = 0; i < plugin_count; i++) {
-        if (strcasecmp(token, loaded_plugins[i].name) == 0) {
+        if (strcasecmp(token, loaded_plugins[i].plugin->name) == 0) {
             execute_plugin(token, args);
             return;
         }
@@ -1282,7 +1313,7 @@ void dispatch(const char *user_in) {
 		quiz_timer();
 	    } else if (strcasecmp(cmds[i].key, "rscript") == 0) {
                 rscript(args);
-            } else if (strcasecmp(cmds[i].key, "todo") == 0) {
+	    } else if (strcasecmp(cmds[i].key, "todo") == 0) {
 		TODO(args);
 	    } else if (strcasecmp(cmds[i].key, "quizt") == 0) {
 		    if(args && strcasecmp(args, "cancel") == 0) {
