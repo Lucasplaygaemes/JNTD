@@ -1,4 +1,3 @@
-// File: plugins/plugin_todo.c
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h> 
@@ -8,12 +7,9 @@
 #include <sys/types.h>
 #include "plugin.h"
 
-// --- Self-Contained Definitions ---
-// These were previously global in your main file. A plugin should be independent.
 #define MAX_TODO_LINES 100
 static char lines[MAX_TODO_LINES][1024];
 
-// --- Forward Declarations of Helper Functions ---
 void handle_add_todo();
 void list_todo();
 void remove_todo();
@@ -22,7 +18,6 @@ void check_todos();
 void edit_with_vim();
 time_t parse_date(const char *date_str);
 
-// --- Main Plugin Entry Point ---
 void execute_todo(const char* args) {
     char command[256] = {0};
 
@@ -30,8 +25,8 @@ void execute_todo(const char* args) {
         sscanf(args, "%255s", command);
     } else {
         // If no args, show help for this plugin
-        printf("Comando TODO incompleto. Uso: todo <acao>\n");
-        printf("Acoes disponiveis: add, list, remove, edit, check, vim\n");
+        printf("Comando TODO incompleto. Uso: todo <ação>\n");
+        printf("Ações disponiveis: add, list, remove, edit, check, vim\n");
         return;
     }
 
@@ -48,11 +43,9 @@ void execute_todo(const char* args) {
     } else if (strcmp(command, "vim") == 0) {
         edit_with_vim();
     } else {
-        printf("Acao TODO desconhecida: '%s'. Use 'add', 'list', 'remove', 'edit', 'check', 'vim'.\n", command);
+        printf("Ação TODO desconhecida: '%s'. Use 'add', 'list', 'remove', 'edit', 'check', 'vim'.\n", command);
     }
 }
-
-// --- Plugin Registration ---
 Plugin* register_plugin() {
     static Plugin todo_plugin = {
         "todo",
@@ -60,9 +53,6 @@ Plugin* register_plugin() {
     };
     return &todo_plugin;
 }
-
-// --- Helper Function Implementations ---
-
 time_t parse_date(const char *date_str) {
     if (strcmp(date_str, "Sem prazo") == 0) {
         return -1;
@@ -76,7 +66,6 @@ time_t parse_date(const char *date_str) {
     tm.tm_hour = 23; tm.tm_min = 59; tm.tm_sec = 59;
     return mktime(&tm);
 }
-
 void list_todo() {
     int count = 0;
     printf("--- Lista de Tarefas ---\n");
@@ -95,7 +84,6 @@ void list_todo() {
     }
     printf("------------------------\n");
 }
-
 void remove_todo() {
     list_todo();
     FILE *todo_file = fopen("todo.txt", "r");
@@ -146,7 +134,6 @@ void remove_todo() {
     }
     printf("TODO numero %d removido com sucesso.\n", index);
 }
-
 void edit_todo() {
     list_todo();
     FILE *todo_file = fopen("todo.txt", "r");
@@ -186,7 +173,6 @@ void edit_todo() {
         perror("Erro ao ler nova tarefa");
         return;
     }
-    // Remove newline from new task
     nova_tarefa[strcspn(nova_tarefa, "\n")] = 0;
 
     FILE *temp_file = fopen("todo_temp.txt", "w");
