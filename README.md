@@ -11,7 +11,7 @@ The code access the Ollama via bash, the 2B it's trained to know how and what to
 I want in the next updates make she possible to make complex interactions with the terminal, and codes, she may be possible to execute codes, and test them by herself, so she will have the possibility to know, where, why, and how a bug it's happening, she will also be able to search for directorys that may have a bug, when something is missing.
 
 # Unwanted Delay.
-Unfortunately my system has currpted. I wasn't able to fully recover it, but i was able to recover the most valuable files. However, i'm need to reconfigure my whole system, and i don't think it will take a long time, but if the updates got decrement for the next week, i'm sorry.
+Unfortunately my system has corrupted. I wasn't able to fully recover it, but i was able to recover the most valuable files. However, i'm need to reconfigure my whole system, and i don't think it will take a long time, but if the updates got decrement for the next week, i'm sorry.
 
 # Documentation!
 I'm going to add a new file, soon, called documentation. Why's that? Simple, the code is written by me, and i really want other people to contribuite on it, so i will make a documentation. So whoever want to add something, make it own plugin, Or anything like will be able because he can read the docs. I will need AI help to implement in the whole code, but i will revise it all by myself. Just forgot to say, the documentation will be in english too.
@@ -25,6 +25,7 @@ The curl function is now working. The curl functions is also working parially, i
 # Repository!
 Well, for now, don't suit me making a online repository for "3" plugins. So i'm using this repository, as a repository! It's simple, i think, the official plugins will be here.
 Any important file or plugin can and will be possible to download from this repository.
+
 # Readme?
 As you may notice, the README file is getting big, and i can't list every new thing neither any changes that i will make in this code.
 So i will add a new file, Features, and the name again is selfexplanatory. When a big update or change be made, it will be showed in README for 5~10 days in maximum. In the features file will have all that already is on the readme, and what's not.
