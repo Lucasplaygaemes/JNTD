@@ -34,9 +34,6 @@ So i will add a new file, Features, and the name again is selfexplanatory. When 
 I'm want to make big updates for the code, it has some upgrades that need to be done. But i may need to change to much of the code, and also need to optimize it. So i will make slow changes in the code, i'm thinking in making headers files to make it smaller.
 I'm making modifications, implementing more secure features, and the next big update is....
 
-# The internet! This function will mescled with the Curl.
-My next big update, is the internet, i want to add curl, or any way to download something from the internet, it will be hard, but i will do it. I think. I was making a bit more resarch and, it's look hard, but i want to implemeant curl, as soon as possible.
-
 # Security?
 Until now i wasn't really think in security aspects, because it's a simple code, not much is an issue, thing's like C don't having a garbage collector, and another aspects, but as all good code, mine need to have at least a bit o security. So i'm already implemented some of it, but not much, like, 2b can't run any comands as her like, only the ones that also availble to JNTD. I'm making changes in the ones where they use the system funtcion, but not all can be easily replaced. Not for now, i make my best to do some security improvements.
 
