@@ -13,6 +13,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <dlfcn.h>
+#include <json-c/json.h>
 
 #ifdef _WIN32
 #include <windows.h> // Para Sleep()
@@ -76,6 +77,11 @@ typedef struct {
 
 LoadedPlugin loaded_plugins[20];
 
+typedef struct MemoryStruct {
+	char *memory;
+	size_t size;
+};
+
 // Definição dos comandos (declarado antes das funções que o utilizam)
 static const CmdEntry cmds[] = {
     { "ls", "pwd && ls -l", "Diretorio atual e lista arquivos detalhadamente." },
@@ -111,7 +117,7 @@ static const CmdEntry cmds[] = {
     { "quizale", NULL, "Uma pergunta aleatoria do QUIZ é feita." },
     { "timer", NULL, "Um simples timer." },
     { "cp_di", NULL, "Um copy, use com <de qual arquivo para qual>" },
-    { "download", NULL, "Uma função de Download, (download URL nome)" }
+    { "download", NULL, "Uma função de download, <use com download, depois irá pedir o nome do arquivo.>" }
 };
 
 // Declaração antecipada das funções
@@ -199,9 +205,26 @@ typedef struct {
 	size_t dl_total;
 } dl_status;
 
+
+static size_t escreverMemoCallback(void *contents, size_t size, size_t nmemb, void *userp) {
+    size_t realsize = size * nmemb;
+    struct MemoryStruct *mem = (struct MemoryStruct *)userp;
+
+    char *ptr = realloc(mem->memory, mem->size + realsize + 1);
+    if (ptr == NULL) {
+        printf("Erro: sem memoria suficiente. (realloc retornou NULL).\n");
+        return 0;
+    }
+    mem->memory = ptr;
+    memcpy(&(mem->memory[mem->size]), contents, realsize);
+    mem->size += realsize;
+    mem->memory[mem->size] = 0;
+    return realsize;
+}
+
 //função para escrever no arquivo//
 static size_t write_data(void *ptr, size_t size, size_t nmemb, void *stream) {
-	dl_status *status = stream;
+	dl_status *status = (dl_status *)stream;
 	size_t written = fwrite(ptr, size, nmemb, status->fp);
 
 	status->dl_total += written;
@@ -256,6 +279,7 @@ bool download_file(char *url, char *filename) {
 		remove(filename);
 	}
 	printf("\n");
+    return sucess;
 }
 
 int copy_f_t() {
@@ -286,7 +310,7 @@ int copy_f_t() {
 	return 0;
 }
 
-int main(void);
+// int main(void); // This is a forward declaration for a main function that does not exist.
 // Função para verificar segurança de comandos
 int is_safe_command(const char *cmd) {
     for (size_t i = 0; i < sizeof(cmds) / sizeof(cmds[0]); ++i) {
@@ -460,7 +484,7 @@ void quiz_timer() {
 	printf("Qual o intervalo de tempo QUIZES em segundos? (Aperte enter para o padrão, 10[600s] min)\n");
 	char input[256];
 	if (fgets(input, sizeof(input), stdin) == NULL || input[0] == '\n') {
-		seconds == 600;
+		seconds = 600;
 	} else {
 		seconds = atoi(input);
 		if (seconds <= 0) seconds = 600;
@@ -504,9 +528,9 @@ void *timer_background(void *arg) {
 	timer_running = 1;
 	printf("\rTimer iniciado em segundo plano: %d segundos\n", seconds);
 	while (current_timer_seconds > 0 && timer_running) {
-		int horas = current_timer_seconds / 3600;
-		int minutos = (current_timer_seconds % 3600) / 60;
-		int segundos = current_timer_seconds % 60;
+		// int horas = current_timer_seconds / 3600;
+		// int minutos = (current_timer_seconds % 3600) / 60;
+		// int segundos = current_timer_seconds % 60;
 		//printf("\rTimer: %02d:%02d:%02d\n", horas, minutos, segundos);
 		//fflush(stdout);
 		#ifdef _WIN32
@@ -955,8 +979,6 @@ int jntd_mkdir(const char *args) {
                 }
             }
         }
-    } else {
-        printf("Erro: Nome do diretório não fornecido. Uso: mkdir <nome>\n");
     }
     return 0; // Adicionado retorno para evitar warnings
 }
@@ -983,8 +1005,6 @@ void rscript(const char *args) {
             printf("Fim da execução do script '%s'.\n", args);
             fclose(script_file);
         }
-    } else {
-        printf("Erro: Nome do arquivo de script não fornecido. Uso: rscript <nome_arquivo>\n");
     }
 }
 
