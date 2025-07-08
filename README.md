@@ -14,7 +14,7 @@ I want in the next updates make she possible to make complex interactions with t
 Unfortunately my system has corrupted. I wasn't able to fully recover it, but i was able to recover the most valuable files. However, i'm need to reconfigure my whole system, and i don't think it will take a long time, but if the updates got decrement for the next week, i'm sorry.
 
 # Makefile!
-Theres now a make file where you don't need to compile,
+Theres now a make file where you don't need to compile every single file by hand. But currently it's not working properly.
 
 # Documentation!
 I'm going to add a new file, soon, called documentation. Why's that? Simple, the code is written by me, and i really want other people to contribuite on it, so i will make a documentation. So whoever want to add something, make it own plugin, Or anything like will be able because he can read the docs. I will need AI help to implement in the whole code, but i will revise it all by myself. Just forgot to say, the documentation will be in english too.
