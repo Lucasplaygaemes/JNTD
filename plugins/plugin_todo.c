@@ -8,13 +8,15 @@
 #include "plugin.h"
 
 #define MAX_TODO_LINES 100
+#define max_todo 100
 static char lines[MAX_TODO_LINES][1024];
+int count;
 
+void check_todos();
 void handle_add_todo();
 void list_todo();
 void remove_todo();
 void edit_todo();
-void check_todos();
 void edit_with_vim();
 time_t parse_date(const char *date_str);
 
@@ -66,190 +68,332 @@ time_t parse_date(const char *date_str) {
     tm.tm_hour = 23; tm.tm_min = 59; tm.tm_sec = 59;
     return mktime(&tm);
 }
-void list_todo() {
-    int count = 0;
-    printf("--- Lista de Tarefas ---\n");
-    FILE *todo_file = fopen("todo.txt", "r");
-    if (todo_file == NULL) {
-        printf("Arquivo todo.txt nao encontrado ou vazio.\n");
-        return;
-    }
-    char line[1024];
-    while (fgets(line, sizeof(line), todo_file) != NULL) {
-        printf("%d: %s", ++count, line);
-    }
-    fclose(todo_file);
-    if (count == 0) {
-        printf("Nenhum TODO encontrado.\n");
-    }
-    printf("------------------------\n");
-}
-void remove_todo() {
-    list_todo();
-    FILE *todo_file = fopen("todo.txt", "r");
-    if (todo_file == NULL) {
-        perror("Erro ao abrir todo.txt para remocao");
-        return;
-    }
 
-    int count = 0;
-    while (fgets(lines[count], sizeof(lines[0]), todo_file) != NULL && count < MAX_TODO_LINES) {
-        count++;
-    }
-    fclose(todo_file);
-
-    if (count == 0) {
-        printf("Nenhum TODO para remover.\n");
-        return;
-    }
-
-    char temp_input[256];
-    printf("Digite o numero do TODO a ser removido (1-%d, ou 0 para cancelar): ", count);
-    fflush(stdout);
-    if (fgets(temp_input, sizeof(temp_input), stdin) == NULL) {
-        perror("Erro ao ler entrada");
-        return;
-    }
-    int index = atoi(temp_input);
-    if (index <= 0 || index > count) {
-        printf("Operacao cancelada ou numero invalido.\n");
-        return;
-    }
-
-    FILE *temp_file = fopen("todo_temp.txt", "w");
-    if (temp_file == NULL) {
-        perror("Erro ao criar arquivo temporario");
-        return;
-    }
-    for (int i = 0; i < count; i++) {
-        if (i != index - 1) {
-            fprintf(temp_file, "%s", lines[i]);
-        }
-    }
-    fclose(temp_file);
-
-    if (remove("todo.txt") != 0 || rename("todo_temp.txt", "todo.txt") != 0) {
-        perror("Erro ao atualizar o arquivo todo.txt");
-        return;
-    }
-    printf("TODO numero %d removido com sucesso.\n", index);
-}
-void edit_todo() {
-    list_todo();
-    FILE *todo_file = fopen("todo.txt", "r");
-    if (todo_file == NULL) {
-        perror("Erro ao abrir todo.txt para edicao");
-        return;
-    }
-
-    int count = 0;
-    while (fgets(lines[count], sizeof(lines[0]), todo_file) != NULL && count < MAX_TODO_LINES) {
-        count++;
-    }
-    fclose(todo_file);
-
-    if (count == 0) {
-        printf("Nenhum TODO para editar.\n");
-        return;
-    }
-
-    char temp_input[256];
-    printf("Digite o numero do TODO a ser editado (1-%d, ou 0 para cancelar): ", count);
-    fflush(stdout);
-    if (fgets(temp_input, sizeof(temp_input), stdin) == NULL) {
-        perror("Erro ao ler entrada");
-        return;
-    }
-    int index = atoi(temp_input);
-    if (index <= 0 || index > count) {
-        printf("Operacao cancelada ou numero invalido.\n");
-        return;
-    }
-
-    char nova_tarefa[512];
-    printf("Digite o novo texto da tarefa:\n");
-    fflush(stdout);
-    if (fgets(nova_tarefa, sizeof(nova_tarefa), stdin) == NULL) {
-        perror("Erro ao ler nova tarefa");
-        return;
-    }
-    nova_tarefa[strcspn(nova_tarefa, "\n")] = 0;
-
-    FILE *temp_file = fopen("todo_temp.txt", "w");
-    if (temp_file == NULL) {
-        perror("Erro ao criar arquivo temporario");
-        return;
-    }
-    for (int i = 0; i < count; i++) {
-        if (i == index - 1) {
-            fprintf(temp_file, "%s\n", nova_tarefa);
-        } else {
-            fprintf(temp_file, "%s", lines[i]);
-        }
-    }
-    fclose(temp_file);
-
-    if (remove("todo.txt") != 0 || rename("todo_temp.txt", "todo.txt") != 0) {
-        perror("Erro ao atualizar o arquivo todo.txt");
-        return;
-    }
-    printf("TODO numero %d editado com sucesso.\n", index);
-}
-
-void handle_add_todo() {
-    char tarefa[512];
-    printf("Digite o assunto da tarefa: ");
-    fflush(stdout);
-    if (fgets(tarefa, sizeof(tarefa), stdin) == NULL) {
-        perror("Erro ao ler o assunto da tarefa");
-        return;
-    }
-    tarefa[strcspn(tarefa, "\n")] = 0; // Remove newline
-
-    if (strlen(tarefa) == 0) {
-        printf("Erro: Nenhuma tarefa fornecida. Operacao cancelada.\n");
-        return;
-    }
-
-    FILE *todo_file = fopen("todo.txt", "a");
-    if (todo_file == NULL) {
-        perror("Erro ao abrir todo.txt");
-        return;
-    }
-    fprintf(todo_file, "%s\n", tarefa);
-    fclose(todo_file);
-    printf("TODO '%s' salvo com sucesso.\n", tarefa);
-}
 
 void check_todos() {
     FILE *todo_file = fopen("todo.txt", "r");
-    if (todo_file == NULL) return; // Silently fail if no file
-
+    if (todo_file == NULL) {
+        perror("Erro ao abrir o arquivo todo.txt para verificação");
+        printf("Não foi possível verificar os TODOs. Arquivo não encontrado ou sem permissão.\n");
+        return;
+    }
     time_t now = time(NULL);
-    printf("Verificando TODOs...\n");
+    struct tm *tm_now = localtime(&now);
+    char current_date[11];
+    snprintf(current_date, sizeof(current_date), "%02d/%02d/%04d",
+             tm_now->tm_mday, tm_now->tm_mon + 1, tm_now->tm_year + 1900);
+    printf("Verificando TODOs vencidos ou a vencer hoje (%s)...\n", current_date);
     int has_overdue = 0;
-    char line[1024];
+    char line[1024]; // Buffer temporário para cada linha
     while (fgets(line, sizeof(line), todo_file) != NULL) {
+        line[strcspn(line, "\n")] = '\0'; // Remove nova linha
+        // Extrai os campos da linha
         char *prazo_start = strstr(line, "Prazo: ");
         if (prazo_start) {
-            prazo_start += 7;
+            prazo_start += 7; // Pula "Prazo: "
             char prazo[32] = {0};
+            char *end = strchr(prazo_start, '\n');
+            if (end) *end = '\0'; // Termina a string no final da linha
             strncpy(prazo, prazo_start, sizeof(prazo) - 1);
-            
             time_t prazo_time = parse_date(prazo);
-            if (prazo_time != -1 && difftime(now, prazo_time) >= 0) {
-                if (!has_overdue) {
-                    printf("--- AVISO: Tarefas Vencidas ou Vencendo Hoje ---\n");
+            if (prazo_time != -1) { // Data válida
+                if (difftime(now, prazo_time) >= 0) { // Data atual >= prazo
                     has_overdue = 1;
+                    printf("TODO VENCIDO OU HOJE: %s\n", line);
                 }
-                printf("  -> %s", line);
             }
         }
     }
     fclose(todo_file);
     if (!has_overdue) {
-        printf("Nenhum TODO vencido encontrado.\n");
+        printf("Nenhum TODO vencido ou a vencer hoje.\n");
     }
+}
+
+void list_todo() {
+    count = 0; // Reinicia o contador global
+    printf("Lista de TODOs:\n");
+    printf("------------------------------------------------\n");
+    FILE *todo_file = fopen("todo.txt", "r");
+    if (todo_file == NULL) {
+        perror("Erro ao abrir o arquivo todo.txt");
+        printf("Não foi possível listar os TODOs. Arquivo não encontrado ou sem permissão.\n");
+        return;
+    }
+    char line[1024]; // Buffer temporário para cada linha
+    while (fgets(line, sizeof(line), todo_file) != NULL) {
+        line[strcspn(line, "\n")] = '\0'; // Remove nova linha do final
+        printf("%d: %s\n", ++count, line);
+    }
+    fclose(todo_file);
+    if (count == 0) {
+        printf("Nenhum TODO encontrado no arquivo.\n");
+    }
+    printf("------------------------------------------------\n");
+}
+
+void remove_todo() {
+    list_todo(); // Mostra a lista de TODOs para o usuário escolher
+    FILE *todo_file = fopen("todo.txt", "r");
+    if (todo_file == NULL) {
+        perror("Erro ao abrir o arquivo todo.txt");
+        printf("Não foi possível remover TODOs. Arquivo não encontrado ou sem permissão.\n");
+        return;
+    }
+    if (count >= max_todo) {
+	    printf("Limite de TODOs atingido!\n");
+            return;
+    }
+    // Lê todas as linhas para um buffer temporário
+    // Limite de 100 TODOs para simplificar
+    int count = 0;
+    while (fgets(lines[count], sizeof(lines[count]), todo_file) != NULL && count < 100) {
+        lines[count][strcspn(lines[count], "\n")] = '\0';
+        count++;
+    }
+    fclose(todo_file);
+    if (count == 0) {
+        printf("Nenhum TODO para remover.\n");
+        return;
+    }
+
+    // Solicita o número do TODO a ser removido
+    char temp_input[256];
+    printf("Digite o número do TODO a ser removido (1-%d, ou 0 para cancelar): ", count);
+    fflush(stdout);
+    if (fgets(temp_input, sizeof(temp_input), stdin) == NULL) {
+        perror("Erro ao ler entrada");
+        return;
+    }
+    temp_input[strcspn(temp_input, "\n")] = '\0';
+    int index = atoi(temp_input);
+    if (index <= 0 || index > count) {
+        printf("Operação cancelada ou número inválido.\n");
+        return;
+    }
+
+    // Escreve todas as linhas, exceto a escolhida, de volta ao arquivo
+    FILE *temp_file = fopen("todo_temp.txt", "w");
+    if (temp_file == NULL) {
+        perror("Erro ao criar arquivo temporário");
+        printf("Não foi possível remover o TODO.\n");
+        return;
+    }
+    for (int i = 0; i < count; i++) {
+        if (i != index - 1) { // Ignora a linha a ser removida
+            fprintf(temp_file, "%s\n", lines[i]);
+        }
+    }
+    fclose(temp_file);
+
+    // Substitui o arquivo original pelo temporário
+    if (remove("todo.txt") != 0 || rename("todo_temp.txt", "todo.txt") != 0) {
+        perror("Erro ao atualizar o arquivo todo.txt");
+        printf("Não foi possível completar a remoção.\n");
+        return;
+    }
+    printf("TODO número %d removido com sucesso.\n", index);
+}
+
+
+
+void handle_add_todo(const char *input) {
+
+    char tarefa[512] = {0};
+
+    char usuario[128] = {0};
+
+    char prazo[32] = {0};
+
+    char temp_input[256] = {0};
+
+
+
+    do {
+        // Limpa os buffers para nova entrada
+        memset(tarefa, 0, sizeof(tarefa));
+        memset(usuario, 0, sizeof(usuario));
+
+        memset(prazo, 0, sizeof(prazo));
+
+
+
+        // Solicita o assunto da tarefa
+
+        printf("Digite o assunto da tarefa: ");
+
+        fflush(stdout);
+
+        if (fgets(temp_input, sizeof(temp_input), stdin) == NULL) {
+
+            perror("Erro ao ler o assunto da tarefa");
+
+            return;
+
+        }
+
+        temp_input[strcspn(temp_input, "\n")] = '\0'; // Remove nova linha
+
+        strncpy(tarefa, temp_input, sizeof(tarefa) - 1);
+
+        tarefa[sizeof(tarefa) - 1] = '\0';
+
+        // Remove espaços em branco do início e fim
+
+        char *ptr = tarefa;
+
+        while (*ptr == ' ') ptr++;
+
+        memmove(tarefa, ptr, strlen(ptr) + 1);
+
+        char *end = tarefa + strlen(tarefa) - 1;
+
+        while (end >= tarefa && *end == ' ') *end-- = '\0';
+
+
+
+        if (strlen(tarefa) == 0) {
+
+            printf("Erro: Nenhuma tarefa fornecida. Operação cancelada.\n");
+
+            return;
+
+        }
+
+
+
+        // Solicita o nome do responsável
+
+        printf("Digite o nome do responsável (ou deixe vazio para 'Desconhecido'): ");
+
+        fflush(stdout);
+
+        if (fgets(temp_input, sizeof(temp_input), stdin) == NULL) {
+
+            perror("Erro ao ler o nome do responsável");
+
+            return;
+
+        }
+
+        temp_input[strcspn(temp_input, "\n")] = '\0'; // Remove nova linha
+
+        if (strlen(temp_input) > 0) {
+
+            strncpy(usuario, temp_input, sizeof(usuario) - 1);
+
+            usuario[sizeof(usuario) - 1] = '\0';
+
+            ptr = usuario;
+
+            while (*ptr == ' ') ptr++;
+
+            memmove(usuario, ptr, strlen(ptr) + 1);
+
+            end = usuario + strlen(usuario) - 1;
+
+            while (end >= usuario && *end == ' ') *end-- = '\0';
+
+        } else {
+
+            strcpy(usuario, "Desconhecido");
+
+        }
+
+
+
+        // Solicita a data de vencimento
+
+        printf("Digite a data de vencimento (dd/mm/aaaa ou deixe vazio para 'Sem prazo'): ");
+
+        fflush(stdout);
+
+        if (fgets(temp_input, sizeof(temp_input), stdin) == NULL) {
+
+            perror("Erro ao ler a data de vencimento");
+
+            return;
+
+        }
+
+        temp_input[strcspn(temp_input, "\n")] = '\0'; // Remove nova linha
+
+        if (strlen(temp_input) > 0) {
+
+            strncpy(prazo, temp_input, sizeof(prazo) - 1);
+
+            prazo[sizeof(prazo) - 1] = '\0';
+
+            ptr = prazo;
+
+            while (*ptr == ' ') ptr++;
+
+            memmove(prazo, ptr, strlen(ptr) + 1);
+
+            end = prazo + strlen(prazo) - 1;
+
+            while (end >= prazo && *end == ' ') *end-- = '\0';
+
+        } else {
+
+            strcpy(prazo, "Sem prazo");
+
+        }
+
+
+
+        // Obtém o tempo atual para o carimbo de criação
+
+        char time_str[26];
+
+        time_t now = time(NULL);
+
+        ctime_r(&now, time_str);
+
+        time_str[24] = '\0'; // Remove newline do final da string de tempo
+
+
+
+        // Salva no arquivo
+
+        FILE *todo_file = fopen("todo.txt", "a");
+
+        if (todo_file == NULL) {
+
+            perror("Erro ao abrir todo.txt");
+
+            printf("Não foi possível salvar o TODO. Verifique as permissões ou o diretório.\n");
+
+            return;
+
+        }
+
+        fprintf(todo_file, "[%s] TODO: %s | Usuário: %s | Prazo: %s\n", time_str, tarefa, usuario, prazo);
+
+        fclose(todo_file);
+
+        printf("TODO salvo com sucesso: '%s' por '%s' com prazo '%s' em [%s]\n", tarefa, usuario, prazo, time_str);
+
+
+
+        // Pergunta se o usuário deseja adicionar outro TODO
+
+        printf("Deseja adicionar outro TODO? (s/n): ");
+
+        fflush(stdout);
+
+        if (fgets(temp_input, sizeof(temp_input), stdin) == NULL) {
+
+            perror("Erro ao ler resposta");
+
+            return;
+
+        }
+
+        temp_input[strcspn(temp_input, "\n")] = '\0';
+
+    } while (temp_input[0] == 's' || temp_input[0] == 'S');
+
 }
 
 void edit_with_vim() {
