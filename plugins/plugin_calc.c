@@ -1,11 +1,9 @@
-// File: plugins/plugin_calc.c
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-#include "plugin.h" // Your existing plugin header
+#include "plugin.h" 
 
-// --- Missing Defines and Structs ---
 #define MAX_TERMS 10
 #define EPSILON 0.0001
 #define TRAPEZOID_STEPS 1000
@@ -21,9 +19,6 @@ typedef struct {
     double coef;   // Coeficiente (ex.: 2)
     char type[10]; // Tipo: "sin", "cos", "tan"
 } TrigTerm;
-
-
-// --- Missing Helper Function Implementations ---
 
 double eval_polynomial(Term *terms, int num_terms, double x) {
     double result = 0.0;
@@ -131,8 +126,6 @@ double integrate_trapezoid(Term *terms, int num_terms, TrigTerm *trig_terms, int
     return sum;
 }
 
-
-// --- Corrected execute_calc Function ---
 void execute_calc(const char *args) {
     if (args == NULL || strlen(args) == 0) {
         printf("Uso: calc <operacao> <parametros>...\n");
@@ -155,12 +148,10 @@ void execute_calc(const char *args) {
     }
     argv[argc] = NULL;
 
-    // Check if there are enough arguments to avoid a crash
     if (argc < 2) {
         printf("Comando da calculadora invalido. Use 'calc <operacao>'.\n");
         return;
     }
-
     if (strcmp(argv[1], "soma") == 0 && argc == 4) {
         double num1 = atof(argv[2]);
         double num2 = atof(argv[3]);
@@ -265,12 +256,10 @@ void execute_calc(const char *args) {
         printf("Integral aproximada de %.2f a %.2f: %.4f\n", a, b, integral_val);
     } else {
         printf("Comando ou argumentos invalidos para 'calc'.\n");
-        // FIX: The function is void, so just return.
         return;
     }
 }
 
-// --- Correctly Placed register_plugin Function ---
 Plugin* register_plugin() {
     static Plugin calc_plugin = {
         "calc",
