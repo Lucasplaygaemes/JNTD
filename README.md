@@ -52,6 +52,3 @@ As you may noticed, all the README is in english, the commits are in english and
 
 # Unwanted Delay.
 Unfortunately my system has corrupted. I wasn't able to fully recover it, but i was able to recover the most valuable files. However, i'm need to reconfigure my whole system, and i don't think it will take a long time, but if the updates got decrement for the next week, i'm sorry.
-
-# 2B and images!
-2B it's has it's code already implemented but, she isn't ready yet, so my next thing to do will to finish her, for some reasons i will just be able to do this in the next month, and therefore i will need to wait for my next update, that's right, images! I was planning to train she to be able to understand images and graphics, but it may overload her size and specs requeired, so there will be her auxiliator, and his name is 9S! (There a lot of NA references, i just can't not do it).
