@@ -16,6 +16,9 @@ Theres now a make file where you don't need to compile every single file by hand
 # Documentation!
 I'm going to add a new file, soon, called documentation. Why's that? Simple, the code is written by me, and i really want other people to contribuite on it, so i will make a documentation. So whoever want to add something, make it own plugin, Or anything like will be able because he can read the docs. I will need AI help to implement in the whole code, but i will revise it all by myself. Just forgot to say, the documentation will be in english too.
 
+# Tip's?
+I would be really gratefull if you want to improve the code, it's always open to commits. and if you want you can contact me via my email. I will put it somewhere here. My email is lucasmoura27271@gmail.com, and if you need to say something with me, we can chat by email.
+
 # Plugins!
 That's a cool things, you can add plugin on it, just put it on the plugins folder. The correct documentantion will be uploaded to how to add one. For now, i haven't make any new plugins, because i'm using fuctions that ware already implemented. The plugin function is now almost 100% working, just a little of adjustment need to be done.
 
@@ -36,9 +39,6 @@ I'm making modifications, implementing more secure features, and the next big up
 
 # Security?
 Until now i wasn't really think in security aspects, because it's a simple code, not much is an issue, thing's like C don't having a garbage collector, and another aspects, but as all good code, mine need to have at least a bit o security. So i'm already implemented some of it, but not much, like, 2b can't run any comands as her like, only the ones that also availble to JNTD. I'm making changes in the ones where they use the system funtcion, but not all can be easily replaced. Not for now, i make my best to do some security improvements.
-
-# Tip's?
-I would be really gratefull if you want to improve the code, it's always open to commits. and if you want you can contact me via my email. I will put it somewhere here. My email is lucasmoura27271@gmail.com, and if you need to say something with me, we can chat by email.
 
 # Calculator!
 It was getting dusty in my TODO list, so why not add it here, a calculator, i can't say it's a simple calculator, neither a cientific, so i can't name it now, but it's a calc that will have a lot of options, and one day (Probably this year) it shall be able to interact with the 2B, and may even with 9S. The reason behind me adding it it's because even though she will be able to do calculus level equations, i won't put that all on her back, and it's a cool feature so why not add it?.
