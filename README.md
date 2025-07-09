@@ -53,8 +53,5 @@ As you may noticed, all the README is in english, the commits are in english and
 # Unwanted Delay.
 Unfortunately my system has corrupted. I wasn't able to fully recover it, but i was able to recover the most valuable files. However, i'm need to reconfigure my whole system, and i don't think it will take a long time, but if the updates got decrement for the next week, i'm sorry.
 
-# 9S!
-One day i may have the specs to use the most heavy LLM that i can put my hands on, until there i will need to change my mind to one that i can afford, i was already wating to train more than one AI, and i was't going to need a LLM, because of 2B, so i figured out that i can make 9S too, so i can use both of them. 9S will not have the ability to chat like 2B, it's obvius he will be able to speak with the user, but his function is to read a image text, graphs and figures, and transcribe that to text, or a understandable data tha 2B will be able to use. He is not designed to understand every image, personally, i just wanted him to function like a translator, from him to 2B.
-
 # 2B and images!
 2B it's has it's code already implemented but, she isn't ready yet, so my next thing to do will to finish her, for some reasons i will just be able to do this in the next month, and therefore i will need to wait for my next update, that's right, images! I was planning to train she to be able to understand images and graphics, but it may overload her size and specs requeired, so there will be her auxiliator, and his name is 9S! (There a lot of NA references, i just can't not do it).
