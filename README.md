@@ -37,8 +37,7 @@ So i will add a new file, Features, and the name again is selfexplanatory. When 
 Until now i wasn't really think in security aspects, because it's a simple code, not much is an issue, thing's like C don't having a garbage collector, and another aspects, but as all good code, mine need to have at least a bit o security. So i'm already implemented some of it, but not much, like, 2b can't run any comands as her like, only the ones that also availble to JNTD. I'm making changes in the ones where they use the system funtcion, but not all can be easily replaced. Not for now, i make my best to do some security improvements.
 
 # Calculator!
-It was getting dusty in my TODO list, so why not add it here, a calculator, i can't say it's a simple calculator, neither a cientific, so i can't name it now, but it's a calc that will have a lot of options, and one day (Probably this year) it shall be able to interact with the 2B, and may even with 9S. The reason behind me adding it it's because even though she will be able to do calculus level equations, i won't put that all on her back, and it's a cool feature so why not add it?.
-
+There is a calculator, it's not a scientific calculator but neither a common one, it's between the line, a frined of mine will help me improve it futurely.
 # Log!
 It's self explanatory, it's a log of the commands send by you, it will be stored in a file called "log.txt", it has the time, and the day the commands was executed, as well theres a history log, but in the code itself, so you can see the last commands, it's redoundant, so i will change it in the future.
 
