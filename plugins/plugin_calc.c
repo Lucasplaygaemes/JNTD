@@ -128,7 +128,16 @@ double integrate_trapezoid(Term *terms, int num_terms, TrigTerm *trig_terms, int
 
 void execute_calc(const char *args) {
     if (args == NULL || strlen(args) == 0) {
-        printf("Uso: calc <operacao> <parametros>...\n");
+        printf("Uso: calc <operacao> <parametros>\n");
+        printf("Operacoes disponiveis:\n");
+        printf("  soma <num1> <num2> - Soma dois números\n");
+        printf("  sub <num1> <num2> - Subtrai dois números\n");
+        printf("  mult <num1> <num2> - Multiplica dois números\n");
+        printf("  div <num1> <num2> - Divide dois números\n");
+        printf("  deriv_poly <coef1> <exp1> <coef2> <exp2> ... - Derivada de polinômio (até 5 termos)\n");
+        printf("  deriv_trig <coef> <tipo> - Derivada de função trigonométrica (tipo: sin, cos, tan)\n");
+        printf("  limit <a> <coef1> <exp1> ... / <coef> <tipo> - Limite em x=a (polinômio ou trigonométrica)\n");
+        printf("  integ <a> <b> <coef1> <exp1> ... / <coef> <tipo> - Integral de a a b (polinômio ou trigonométrica)\n");
         return;
     }
 
