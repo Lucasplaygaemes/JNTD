@@ -23,6 +23,8 @@
 #else
 #include <unistd.h> // Para getcwd no Linux/macOS
 #endif
+
+#define MAX_ALIASES 128
 //Define o tamanho maximo para o buffer de entrada de prompts do usuario
 #define MAX_PROMPT_LEN 256
 //Define o tamanho maximo do input do ollama + extras
@@ -71,6 +73,13 @@ typedef struct {
 } CmdEntry;
 
 typedef struct {
+	char *name;
+	char *command;
+} Alias;
+Alias alias_list[MAX_ALIASES];
+int alias_count = 0;
+
+typedef struct {
         void *handle;
         Plugin *plugin;
 } LoadedPlugin;
@@ -96,7 +105,6 @@ static const CmdEntry cmds[] = {
     { "criador", "echo lucasplayagemes é o criador deste codigo.", "Diz o nome do criador do JNTD e 2B." },
     { "2b", NULL, "Inicia uma conversa com a 2B, e processa sua saida." },
     { "log", NULL, "O codigo sempre salva um arquivo log para eventuais casualidades," },
-    { "calc", NULL, "Usa a calculadora avançada. Exemplo: calc soma 5 3 ou calc deriv_poly 3 2 2 1 -1 0." },
     { "his", NULL, "Exibe o histórico de comandos digitados." },
     { "cl", "clear", "Limpa o terminal" },
     { "git", NULL, "Mostra o link para Github do repositorio, além da ultima commit, mas a commit não funciona sempre. Pois depende do git do sistema, que pode estar ligado a outro repo." },
@@ -117,13 +125,14 @@ static const CmdEntry cmds[] = {
     { "quizale", NULL, "Uma pergunta aleatoria do QUIZ é feita." },
     { "timer", NULL, "Um simples timer." },
     { "cp_di", NULL, "Um copy, use com <de qual arquivo para qual>" },
+    { "alias", NULL, "Adiciona alias." },
     { "download", NULL, "Uma função de download, <use com download, depois irá pedir o nome do arquivo.>" }
 };
 
 // Declaração antecipada das funções
 void dispatch(const char *user_in);
 void handle_ollama_interaction();
-void handle_calc_interaction(const char *args);
+
 void display_help();
 void log_action(const char *action, const char *details);
 int is_safe_command(const char *cmd);
@@ -187,6 +196,83 @@ void load_plugins() {
     }
     closedir(dir);
 }
+
+void save_aliases_to_file();
+
+void handle_alias_command(const char *args) {
+	if (!args || strlen(args) == 0) {
+		printf("Uso: alias <nome> \"<comando>\"\n");
+		printf("Exemplo: alias listar \"ls -la\"\n");
+		printf("\nAlaises atuais:\n");
+		for (int i = 0; i < alias_count; i++) {
+			printf("  %s = \"%s\"\n", alias_list[i].name, alias_list[i].command);
+		}
+		return;
+	}
+	if (alias_count >= MAX_ALIASES) {
+		printf("Erro: Limite de aliases atingido.\n");
+		return;
+	}
+	char args_copy[256];
+	strncpy(args_copy, args, sizeof(args_copy) - 1);
+
+	char *name = strtok(args_copy, " ");
+	char *command = strtok(NULL, "");
+	if (!name || !command) {
+		printf("Erro: Formato Invalido. Use: alias <nome>\"<comando>\"\n");
+		return;
+	}
+	
+	if (command[0] == '"' || command[0] == '\'') {
+		command++;
+		char *end = strrchr(command, command[-1]);
+		if (end) *end = '\0';
+	}
+	alias_list[alias_count].name = strdup(name);
+	alias_list[alias_count].command = strdup(command);
+	
+	if (!alias_list[alias_count].name || !alias_list[alias_count].command) {
+		printf("Erro de alocação de memoria!\n");
+		free(alias_list[alias_count].name);
+		free(alias_list[alias_count].command);
+		return;
+	}
+	printf("Alias criado: %s -> %s\n", name, command);
+	alias_count++;
+	save_aliases_to_file();
+}
+
+void load_aliases_from_file() {
+	FILE *file = fopen("aliases.txt", "r");
+	if (!file) {
+		return;
+	}
+	char line[512];
+	while (fgets(line, sizeof(line), file) && alias_count < MAX_ALIASES) {
+		line[strcspn(line, "\n")] = 0;
+		char *name = strtok(line, "=");
+		char *command = strtok(NULL, "");
+		if (name && command) {
+			alias_list[alias_count].name = strdup(name);
+			alias_list[alias_count].command = strdup(command);
+			alias_count++;
+		}
+	}
+	fclose(file);
+}
+
+void save_aliases_to_file() {
+	FILE *file = fopen("aliases.txt", "w");
+	if (!file) {
+		perror("Erro ao salvar aliases");
+		return;
+	}
+	for (int i = 0; i < alias_count; i++) {
+		fprintf(file, "%s=%s\n", alias_list[i].name, alias_list[i].command);
+	}
+	fclose(file);
+}
+
 
 void execute_plugin(const char* name, const char* args) {
     printf("Executando plugin: %s com argumentos: %s\n", name, args);
@@ -767,47 +853,7 @@ void log_action(const char *action, const char *details) {
     fclose(log_file);
 }
 
-// Função para interagir com a calculadora
-void handle_calc_interaction(const char *args) {
-    char calc_command[256];
-    char calc_output[1024];
-    FILE *calc_pipe;
 
-    ult_calc_resu[0] = '\0'; // Limpa o resultado anterior da calculadora
-
-    // Constrói o comando com argumentos (se houver)
-    if (args && strlen(args) > 0) {
-        snprintf(calc_command, sizeof(calc_command), "./calc %s", args);
-    } else {
-        snprintf(calc_command, sizeof(calc_command), "./calc");
-    }
-    printf("Executando calculadora: %s\n", calc_command);
-    calc_pipe = popen(calc_command, "r");
-    if (calc_pipe == NULL) {
-        perror("Falha ao executar a calculadora com popen");
-        fprintf(stderr, "Verifique se ./calc está no diretório atual.\n");
-        return;
-    }
-
-    printf("-------------- Saída da Calculadora --------------\n");
-    while (fgets(calc_output, sizeof(calc_output), calc_pipe) != NULL) {
-        printf("%s", calc_output);
-        fflush(stdout);
-        // Acumula a saída no ult_calc_resu
-        strncat(ult_calc_resu, calc_output, sizeof(ult_calc_resu) - strlen(ult_calc_resu) - 1);
-        log_action("Calculadora Output", calc_output);
-    }
-    printf("---------------- Fim da Saída --------------\n");
-
-    int status = pclose(calc_pipe);
-    if (status == -1) {
-        perror("pclose falhou para o pipe da calculadora");
-    } else {
-        if (WIFEXITED(status)) {
-            printf("Calculadora terminou com status: %d\n", WEXITSTATUS(status));
-        }
-    }
-}
 
 // Função para interação com Ollama/2B
 void handle_ollama_interaction() {
@@ -1035,8 +1081,6 @@ void dispatch(const char *user_in) {
                 jntd_mkdir(args); // Passa os argumentos para mkdir
             } else if (strcasecmp(cmds[i].key, "2b") == 0) {
                 handle_ollama_interaction();
-            } else if (strcasecmp(cmds[i].key, "calc") == 0) {
-                handle_calc_interaction(args);
             } else if (strcasecmp(cmds[i].key, "cd") == 0) {
                 cd(args); // Passa os argumentos para cd
             } else if (strcasecmp(cmds[i].key, "git") == 0) {
@@ -1046,6 +1090,9 @@ void dispatch(const char *user_in) {
 		git();
             } else if (strcasecmp(cmds[i].key, "his") == 0) {
                 display_history();
+	    } else if (strcasecmp(token, "alias") == 0) {
+		    handle_alias_command(args);
+		    return;
 	    } else if (strcasecmp(cmds[i].key, "quiz") == 0) {
 		 func_quiz();
 	    } else if (strcasecmp(cmds[i].key, "quizale") == 0) {
@@ -1101,6 +1148,7 @@ int main(void) {
     printf("Bem vindo/a\n");
     check_todos();
     load_plugins();  // Carrega os plugins
+    load_aliases_from_file();
     printf("Plugins carregados: %d\n", plugin_count);
     printf("Digite um comando. Use 'help' para ver as opções ou 'sair' para terminar.\n");
     while (printf("> "), fgets(buf, sizeof(buf), stdin) != NULL) {
