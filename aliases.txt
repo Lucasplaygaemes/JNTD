@@ -1,0 +1,3 @@
+"ls=la"
+"clear=cl"
+"clear=cl"
