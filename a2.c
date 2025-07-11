@@ -40,14 +40,39 @@ int editor_mode() {
 	buffer_index = 0;
 
 	while ((ch = getch()) != 27) { // é o codigo ASCII para ESC
+		int y, x;
+		getyx(stdscr, y, x);
+
 		switch(ch) {
 			case KEY_BACKSPACE:
 			case 127:
 				if (buffer_index > 0) {
 					buffer_index--;
-					int y, x;
-					getyx(stdscr, y, x);
 					mvdelch(y, x - 1);
+					refresh();
+				}
+				break;
+			case KEY_UP:
+				move(y - 1, x);
+				refresh();
+				break;
+			case KEY_DOWN:
+				move(y + 1, x);
+				refresh();
+				break;
+			case KEY_LEFT:
+				move(y, x - 1);
+				refresh();
+				break;
+			case KEY_RIGHT:
+				move(y, x + 1);
+				refresh();
+				break;
+			case '\n':
+			case KEY_ENTER:
+				if (buffer_index < sizeof(buffer) - 1) {
+					buffer[buffer_index++] = '\n';
+					addch('\n');
 					refresh();
 				}
 				break;
@@ -58,14 +83,6 @@ int editor_mode() {
 					refresh();
 				}
 				break;
-			case '\n':
-			case KEY_ENTER:
-				if (buffer_index < sizeof(buffer) - 1) {
-					buffer[buffer_index++] = '\n';
-					addch('\n');
-					refresh();
-					break;
-				}
 		}
 	}
 	buffer[buffer_index] = '\0';
