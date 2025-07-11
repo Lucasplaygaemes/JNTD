@@ -31,6 +31,7 @@ void save_file(const char *filename, const char *content) {
 }
 
 int editor_mode() {
+	curs_set(1);
 	clear();
 	printw("Modo editor... (Pressione ESC para salvar e sair)\n");
 	refresh();
@@ -73,7 +74,7 @@ int editor_mode() {
 	int rows, cols;
 	getmaxyx(stdscr, rows, cols);
 	
-echo(); // ativa echo para ver o nome do arquivo
+	echo(); // ativa echo para ver o nome do arquivo
 	mvprintw(rows - 1, 0, "Nome do arquivo para ser salvo: ");
 	getstr(filename);
 	noecho();
