@@ -12,6 +12,7 @@ typedef struct {
     int num_lines;
     int current_line;
     int current_col;
+    int ideal_col; // Coluna "ideal" para movimentação vertical
     int top_line; // Linha do texto no topo da tela
 } EditorState;
 
@@ -136,9 +137,11 @@ void editor_insert_char(EditorState *state, int ch) {
 
 
 int editor_mode() {
+    curs_set(1); // Garante que o cursor esteja visível no modo editor
     EditorState state = {0};
     state.num_lines = 1;
     state.lines[0] = calloc(1, 1); // Começa com uma linha vazia
+    state.ideal_col = 0;
 
     int ch;
     char status_msg[100] = "Modo editor... (Pressione ESC para salvar e sair)";
@@ -146,28 +149,43 @@ int editor_mode() {
     while ((ch = getch()) != 27) { // 27 é o código ASCII para ESC
         switch (ch) {
             case KEY_UP:
-                if (state.current_line > 0) state.current_line--;
+                if (state.current_line > 0) {
+                    state.current_line--;
+                    state.current_col = state.ideal_col;
+                }
                 break;
             case KEY_DOWN:
-                if (state.current_line < state.num_lines - 1) state.current_line++;
+                if (state.current_line < state.num_lines - 1) {
+                    state.current_line++;
+                    state.current_col = state.ideal_col;
+                }
                 break;
             case KEY_LEFT:
-                if (state.current_col > 0) state.current_col--;
+                if (state.current_col > 0) {
+                    state.current_col--;
+                    state.ideal_col = state.current_col;
+                }
                 break;
             case KEY_RIGHT:
-                if (state.current_col < strlen(state.lines[state.current_line])) state.current_col++;
+                if (state.current_col < strlen(state.lines[state.current_line])) {
+                    state.current_col++;
+                    state.ideal_col = state.current_col;
+                }
                 break;
             case KEY_ENTER:
             case '\n':
                 editor_handle_enter(&state);
+                state.ideal_col = state.current_col; // Manter a indentação
                 break;
             case KEY_BACKSPACE:
             case 127:
                 editor_handle_backspace(&state);
+                state.ideal_col = state.current_col;
                 break;
             default:
                 if (isprint(ch)) {
                     editor_insert_char(&state, ch);
+                    state.ideal_col = state.current_col;
                 }
                 break;
         }
@@ -176,6 +194,16 @@ int editor_mode() {
         int line_len = strlen(state.lines[state.current_line]);
         if (state.current_col > line_len) {
             state.current_col = line_len;
+        }
+
+        // Lógica de scroll
+        int rows, cols;
+        getmaxyx(stdscr, rows, cols);
+        if (state.current_line < state.top_line) {
+            state.top_line = state.current_line;
+        }
+        if (state.current_line >= state.top_line + rows - 1) {
+            state.top_line = state.current_line - (rows - 1) + 1;
         }
 
         editor_redraw(&state, status_msg);
