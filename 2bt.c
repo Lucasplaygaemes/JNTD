@@ -37,24 +37,17 @@
 #define MAX_HISTORY 50
 //define o tamanho maximo do input do usario + extras como calc
 #define COMBINED_PROMPT_LEN 2048 // Já estava adequado, mas mantido para clareza
-int max_todo = 100;
-char tarefa[512] = {0};
-char usuario[128] = "Desconhecido";
-char prazo[32] = "Sem prazo";
 char input_copy[1024];
 char dir_novo[100];
 char *path[100];
 char dir_ant[100];
 char *command_history[MAX_HISTORY];
 int history_count = 0;
-static char ult_calc_resu[1024] = "";
 char buf[512];
-char lines[100][1024];
 int linhazinhas[100];
 char quiz[1024];
 int countar = 0;
 int line_number;
-int count = 0;
 const char* quiz_file = "quiz.txt";
 char time_str[26] = {0};
 int seconds;
@@ -114,18 +107,14 @@ static const CmdEntry cmds[] = {
     { "cd", NULL, "O comando cd, você troca de diretorio, use cd <destino>." },
     { "pwd", "pwd", "Fala o diretorio atual" },
     { "vim", "vim", "Abre o editor, aceita nome para editar um arquivo." },
-    { "todo", NULL, "Adiciona uma ou mais tarefas TODO ao arquivo todo.txt." },
-    { "checkt", NULL, "Verifica se há TODOs vencidos ou a vencer hoje." },
-    { "listt", NULL, "Lista todas as tarefas TODO salvas no arquivo todo.txt." },
-    { "remt", NULL, "Remove uma tarefa TODO do arquivo pelo número." },
-    { "editt", NULL, "Edita uma tarefa TODO existente pelo número." },
-    { "editv", NULL, "Abre o arquivo todo.txt no vim para edição direta." },
+    { "todo", NULL, "Gerencia tarefas (add, list, remove, edit, check, vim)." },
     { "quiz", NULL, "Mostra todas as perguntas do quiz do integrado." },
     { "quizt", NULL, "Define o intervalo de tempo entre os QUIZ'es." },
     { "quizale", NULL, "Uma pergunta aleatoria do QUIZ é feita." },
     { "timer", NULL, "Um simples timer." },
     { "cp_di", NULL, "Um copy, use com <de qual arquivo para qual>" },
     { "alias", NULL, "Adiciona alias." },
+    { "a2", NULL, "Inicia a A2, um editor de texto simples do JNTD." },
     { "download", NULL, "Uma função de download, <use com download, depois irá pedir o nome do arquivo.>" }
 };
 
@@ -138,13 +127,11 @@ void log_action(const char *action, const char *details);
 int is_safe_command(const char *cmd);
 void add_to_history(const char *cmd);
 void display_history();
-void TODO(const char *input);
-void check_todos();
 void cd(const char *args);
 int jntd_mkdir(const char *args);
 void rscript(const char *args);
 void func_quiz();
-char *read_random_line(const char* quiz_file);
+char *read_random_line();
 void *timer_background(void *arg);
 void *quiz_timer_background(void *arg);
 void load_plugins();
@@ -292,22 +279,6 @@ typedef struct {
 } dl_status;
 
 
-static size_t escreverMemoCallback(void *contents, size_t size, size_t nmemb, void *userp) {
-    size_t realsize = size * nmemb;
-    struct MemoryStruct *mem = (struct MemoryStruct *)userp;
-
-    char *ptr = realloc(mem->memory, mem->size + realsize + 1);
-    if (ptr == NULL) {
-        printf("Erro: sem memoria suficiente. (realloc retornou NULL).\n");
-        return 0;
-    }
-    mem->memory = ptr;
-    memcpy(&(mem->memory[mem->size]), contents, realsize);
-    mem->size += realsize;
-    mem->memory[mem->size] = 0;
-    return realsize;
-}
-
 //função para escrever no arquivo//
 static size_t write_data(void *ptr, size_t size, size_t nmemb, void *stream) {
 	dl_status *status = (dl_status *)stream;
@@ -428,99 +399,13 @@ void display_history() {
     }
 }
 
-void list_todo() {
-    count = 0; // Reinicia o contador global
-    printf("Lista de TODOs:\n");
-    printf("------------------------------------------------\n");
-    FILE *todo_file = fopen("todo.txt", "r");
-    if (todo_file == NULL) {
-        perror("Erro ao abrir o arquivo todo.txt");
-        printf("Não foi possível listar os TODOs. Arquivo não encontrado ou sem permissão.\n");
-        return;
-    }
-    char line[1024]; // Buffer temporário para cada linha
-    while (fgets(line, sizeof(line), todo_file) != NULL) {
-        line[strcspn(line, "\n")] = '\0'; // Remove nova linha do final
-        printf("%d: %s\n", ++count, line);
-    }
-    fclose(todo_file);
-    if (count == 0) {
-        printf("Nenhum TODO encontrado no arquivo.\n");
-    }
-    printf("------------------------------------------------\n");
-}
-
-void remove_todo() {
-    list_todo(); // Mostra a lista de TODOs para o usuário escolher
-    FILE *todo_file = fopen("todo.txt", "r");
-    if (todo_file == NULL) {
-        perror("Erro ao abrir o arquivo todo.txt");
-        printf("Não foi possível remover TODOs. Arquivo não encontrado ou sem permissão.\n");
-        return;
-    }
-    if (count >= max_todo) {
-	    printf("Limite de TODOs atingido!\n");
-            return;
-    }
-    // Lê todas as linhas para um buffer temporário
-    // Limite de 100 TODOs para simplificar
-    int count = 0;
-    while (fgets(lines[count], sizeof(lines[count]), todo_file) != NULL && count < 100) {
-        lines[count][strcspn(lines[count], "\n")] = '\0';
-        count++;
-    }
-    fclose(todo_file);
-    if (count == 0) {
-        printf("Nenhum TODO para remover.\n");
-        return;
-    }
-
-    // Solicita o número do TODO a ser removido
-    char temp_input[256];
-    printf("Digite o número do TODO a ser removido (1-%d, ou 0 para cancelar): ", count);
-    fflush(stdout);
-    if (fgets(temp_input, sizeof(temp_input), stdin) == NULL) {
-        perror("Erro ao ler entrada");
-        return;
-    }
-    temp_input[strcspn(temp_input, "\n")] = '\0';
-    int index = atoi(temp_input);
-    if (index <= 0 || index > count) {
-        printf("Operação cancelada ou número inválido.\n");
-        return;
-    }
-
-    // Escreve todas as linhas, exceto a escolhida, de volta ao arquivo
-    FILE *temp_file = fopen("todo_temp.txt", "w");
-    if (temp_file == NULL) {
-        perror("Erro ao criar arquivo temporário");
-        printf("Não foi possível remover o TODO.\n");
-        return;
-    }
-    for (int i = 0; i < count; i++) {
-        if (i != index - 1) { // Ignora a linha a ser removida
-            fprintf(temp_file, "%s\n", lines[i]);
-        }
-    }
-    fclose(temp_file);
-
-    // Substitui o arquivo original pelo temporário
-    if (remove("todo.txt") != 0 || rename("todo_temp.txt", "todo.txt") != 0) {
-        perror("Erro ao atualizar o arquivo todo.txt");
-        printf("Não foi possível completar a remoção.\n");
-        return;
-    }
-    printf("TODO número %d removido com sucesso.\n", index);
-}
-
 void quiz_aleatorio() {
     printf("Você deseja jogar o QUIZ? (s/n)\n");
     char respostas[256];
     if (fgets(respostas, sizeof(respostas), stdin) != NULL) {
         respostas[strcspn(respostas, "\n")] = '\0'; // Remove newline character
         if (strcasecmp(respostas, "s") == 0 || strcasecmp(respostas, "sim") == 0) {
-            const char* arquivo_quiz = "quiz.txt"; // Define o nome do arquivo do quiz
-            char* linha_aleatoria = read_random_line(arquivo_quiz);
+            char* linha_aleatoria = read_random_line();
             if (linha_aleatoria != NULL) {
                 printf("Pergunta aleatória: %s\n", linha_aleatoria);
                 free(linha_aleatoria); // Libera a memória alocada por read_random_line
@@ -679,7 +564,7 @@ void func_quiz() {
     printf("------------------------------------------------\n");
 }
 
-int contar_linhas(const char* quiz_file) {
+int contar_linhas() {
 	FILE *quizlin = fopen("quiz.txt", "r");
 	if (quizlin == NULL) {
 		perror("Erro ao abrir o arquivo quiz.txt");
@@ -715,7 +600,7 @@ void git() {
         }
     }
 }
-char* read_speci_line(const char* quiz_file, int line_number) {
+char* read_speci_line(int line_number) {
     FILE *quiz_f = fopen("quiz.txt", "r");
     if (quiz_f == NULL) {
         perror("Erro ao abrir o arquivo");
@@ -764,8 +649,8 @@ void suggest_commands(const char *partial) {
 }
 
 //Função para ler uma linha aleatoria
-char* read_random_line(const char* quiz_file) {
-    int total_lines = contar_linhas(quiz_file);
+char* read_random_line() {
+    int total_lines = contar_linhas();
     if (total_lines <= 0) {
         fprintf(stderr, "Erro: Arquivo vazio ou falha ao contar linhas em '%s'\n", quiz_file);
         return NULL;
@@ -774,69 +659,12 @@ char* read_random_line(const char* quiz_file) {
     int random_line = (rand() % total_lines) + 1;
     srand(time(NULL)); 
     // Lê a linha correspondente ao número aleatório
-    char* result = read_speci_line(quiz_file, random_line);
+    char* result = read_speci_line(random_line);
     if (result == NULL) {
         fprintf(stderr, "Erro: Falha ao ler a linha %d do arquivo '%s'\n", random_line, quiz_file);
         return NULL;
     }
     return result;
-}
-// Função auxiliar para converter data no formato dd/mm/aaaa para time_t
-
-time_t parse_date(const char *date_str) {
-    if (strcmp(date_str, "Sem prazo") == 0) {
-        return -1; // Indicador de "sem prazo"
-    }
-    struct tm tm = {0};
-    if (sscanf(date_str, "%d/%d/%d", &tm.tm_mday, &tm.tm_mon, &tm.tm_year) != 3) {
-        return -1; // Formato inválido
-    }
-    tm.tm_mon -= 1; // Ajusta mês (0-11 em tm)
-    tm.tm_year -= 1900; // Ajusta ano (desde 1900 em tm)
-    tm.tm_hour = 23; // Define para o final do dia (23:59:59)
-    tm.tm_min = 59;
-    tm.tm_sec = 59;
-    return mktime(&tm);
-}
-
-void check_todos() {
-    FILE *todo_file = fopen("todo.txt", "r");
-    if (todo_file == NULL) {
-        perror("Erro ao abrir o arquivo todo.txt para verificação");
-        printf("Não foi possível verificar os TODOs. Arquivo não encontrado ou sem permissão.\n");
-        return;
-    }
-    time_t now = time(NULL);
-    struct tm *tm_now = localtime(&now);
-    char current_date[11];
-    snprintf(current_date, sizeof(current_date), "%02d/%02d/%04d",
-             tm_now->tm_mday, tm_now->tm_mon + 1, tm_now->tm_year + 1900);
-    printf("Verificando TODOs vencidos ou a vencer hoje (%s)...\n", current_date);
-    int has_overdue = 0;
-    char line[1024]; // Buffer temporário para cada linha
-    while (fgets(line, sizeof(line), todo_file) != NULL) {
-        line[strcspn(line, "\n")] = '\0'; // Remove nova linha
-        // Extrai os campos da linha
-        char *prazo_start = strstr(line, "Prazo: ");
-        if (prazo_start) {
-            prazo_start += 7; // Pula "Prazo: "
-            char prazo[32] = {0};
-            char *end = strchr(prazo_start, '\n');
-            if (end) *end = '\0'; // Termina a string no final da linha
-            strncpy(prazo, prazo_start, sizeof(prazo) - 1);
-            time_t prazo_time = parse_date(prazo);
-            if (prazo_time != -1) { // Data válida
-                if (difftime(now, prazo_time) >= 0) { // Data atual >= prazo
-                    has_overdue = 1;
-                    printf("TODO VENCIDO OU HOJE: %s\n", line);
-                }
-            }
-        }
-    }
-    fclose(todo_file);
-    if (!has_overdue) {
-        printf("Nenhum TODO vencido ou a vencer hoje.\n");
-    }
 }
 // Função para logging de ações
 void log_action(const char *action, const char *details) {
@@ -858,7 +686,6 @@ void log_action(const char *action, const char *details) {
 // Função para interação com Ollama/2B
 void handle_ollama_interaction() {
     char user_prompt[MAX_PROMPT_LEN];
-    char combined_prompt[COMBINED_PROMPT_LEN];
     char ollama_full_command[MAX_OLLAMA_CMD_LEN];
     char ollama_output_line[OLLAMA_BUFFER_SIZE];
     FILE *ollama_pipe;
@@ -880,16 +707,7 @@ void handle_ollama_interaction() {
         return;
     }
     
-    // Adiciona o ultimo resultado da calculadora ao prompt, se houver
-    if (strlen(ult_calc_resu) > 0) {
-        snprintf(combined_prompt, sizeof(combined_prompt),
-                 "%s\n[Ultimo resultado da calculadora: %s]", user_prompt, ult_calc_resu);
-        snprintf(ollama_full_command, sizeof(ollama_full_command),
-                 "ollama run %s \"%s\"", OLLAMA_MODEL, combined_prompt);
-    } else {
-        snprintf(ollama_full_command, sizeof(ollama_full_command),
-                 "ollama run %s \"%s\"", OLLAMA_MODEL, user_prompt);
-    }
+    snprintf(ollama_full_command, sizeof(ollama_full_command), "ollama run %s \"%s\"", OLLAMA_MODEL, user_prompt);
 
     printf("executando ollama com: %s\n", ollama_full_command);
     printf("aguardando resposta da 2B...\n");
@@ -1125,10 +943,8 @@ void dispatch(const char *user_in) {
 		    printf("Primeiro download terminou com status: %d\n", dl);
 	    } else if (strcasecmp(cmds[i].key, "timer") == 0) {
 		timer();
-	    } else if (strcasecmp(cmds[i].key, "checkt") == 0) {
-		check_todos();
 	    } else if (strcasecmp(cmds[i]. key, "cp_di") == 0) {
-		copy_f_t(args);
+		copy_f_t();
 	    }else if (cmds[i].shell_command != NULL) {
                 // Executa comandos shell definidos na tabela
                 system(cmds[i].shell_command);
@@ -1146,8 +962,7 @@ void dispatch(const char *user_in) {
 int main(void) {
     printf("Iniciando o JNTD...\n");
     printf("Bem vindo/a\n");
-    check_todos();
-    load_plugins();  // Carrega os plugins
+    load_plugins();
     load_aliases_from_file();
     printf("Plugins carregados: %d\n", plugin_count);
     printf("Digite um comando. Use 'help' para ver as opções ou 'sair' para terminar.\n");
