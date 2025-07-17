@@ -135,6 +135,9 @@ void editor_insert_char(EditorState *state, int ch) {
     state->current_col++;
 }
 
+int modo_visual() {
+	printf("Modo visual.\n");
+}
 
 int editor_mode() {
     curs_set(1); // Garante que o cursor esteja visível no modo editor
@@ -246,8 +249,9 @@ int main() {
     int choice = getch();
     if (choice == 'e') {
         editor_mode();
+    } else if (choice == 'v') {
+	    modo_visual();
     }
-
     endwin();
     return 0;
 }
