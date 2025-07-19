@@ -880,6 +880,19 @@ void dispatch(const char *user_in) {
     char *token = strtok(input_copy, " ");
     if (token == NULL) return;
     
+    
+    for (int i = 0; i < alias_count; i++) {
+	    if (alias_list[i].name && strcasecmp(token, alias_list[i].name) == 0) {
+		    char new_command[256];
+		    if (args) {
+			    snprintf(new_command, sizeof(new_command), "%s %s", alias_list[i].command, args);
+		    } else {
+			    snprintf(new_command, sizeof(new_command), "%s", alias_list[i].command);
+		    }
+		    dispatch(new_command);
+		    return;
+	    }
+    }
     char *args = strtok(NULL, ""); 
     // Adiciona ao histórico e log
     add_to_history(user_in);
