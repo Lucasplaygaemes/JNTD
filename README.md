@@ -10,6 +10,9 @@ There's no such thing as "right way to use". Because you can automate things whe
 The code access the Ollama via bash, the 2B it's trained to know how and what to respond when it's questioned within the terminal, it's has been trained in a personalized dataset, that's has previous commands and interactions between she and the user and the terminal. Ex: make an .txt file that has the firts 50 firts numbers from fibonacci sequence, and it's done.
 I want in the next updates make she possible to make complex interactions with the terminal, and codes, she may be possible to execute codes, and test them by herself, so she will have the possibility to know, where, why, and how a bug it's happening, she will also be able to search for directorys that may have a bug, when something is missing.
 
+# Repository!
+I will make my own repository! and you ask where? In the beloved Github! I will make the repository folder here, on github, it's not the best, but it's what i can do for now.
+
 # Delay.
 I'm sorry guys but i have been out for sometime, taked a time to relax, but i'm back.
 
