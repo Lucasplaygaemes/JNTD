@@ -11,7 +11,7 @@ The code access the Ollama via bash, the 2B it's trained to know how and what to
 I want in the next updates make she possible to make complex interactions with the terminal, and codes, she may be possible to execute codes, and test them by herself, so she will have the possibility to know, where, why, and how a bug it's happening, she will also be able to search for directorys that may have a bug, when something is missing.
 
 # Repository!
-I will make my own repository! and you ask where? In the beloved Github! I will make the repository folder here, on github, it's not the best, but it's what i can do for now.
+I will make my own repository! and you ask where? In the beloved Github! I will make the repository folder here, on github, it's not the best, but it's what i can do for now. Just like you can download the files from the linux with one command from a repository, any important file will be in the repository.
 
 # Delay.
 I'm sorry guys but i have been out for sometime, taked a time to relax, but i'm back.
