@@ -10,6 +10,9 @@ There's no such thing as "right way to use". Because you can automate things whe
 The code access the Ollama via bash, the 2B it's trained to know how and what to respond when it's questioned within the terminal, it's has been trained in a personalized dataset, that's has previous commands and interactions between she and the user and the terminal. Ex: make an .txt file that has the firts 50 firts numbers from fibonacci sequence, and it's done.
 I want in the next updates make she possible to make complex interactions with the terminal, and codes, she may be possible to execute codes, and test them by herself, so she will have the possibility to know, where, why, and how a bug it's happening, she will also be able to search for directorys that may have a bug, when something is missing.
 
+# Multiplataform?
+And it's a miracle! The code is "multiplataform", not really, but the code was able to run on my pc.
+
 # Repository!
 I will make my own repository! and you ask where? In the beloved Github! I will make the repository folder here, on github, it's not the best, but it's what i can do for now. Just like you can download the files from the linux with one command from a repository, any important file will be in the repository.
 
@@ -20,7 +23,8 @@ I'm sorry guys but i have been out for sometime, taked a time to relax, but i'm 
 And the plugins parts are back, but this time isn't with good news, but i'm making a clean and revision, and unfortunetly with AI help, to debug the code. And i'm not having sucess yet haha.
 
 # A2!
-What's A2 you might ask? It's my own file editor. The VIM is my main file editor, and that won't change, but when you need to edit a file, or make a correction or whatever reason, the A2 will be there waiting you. It's inspired by vim. A2 isn't perfect yet but it's working.
+What's A2 you might ask? It's my own file editor. The VIM is my main file editor, and that won't change, but when you need to edit a file, or make a correction or whatever reason, the A2 will be there waiting you. It's inspired by vim. A2 isn't perfect yet but it's working. 
+
 # Makefile!
 Theres now a make file where you don't need to compile every single file by hand. But currently it's not working properly.
 
