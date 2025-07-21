@@ -580,6 +580,45 @@ int contar_linhas() {
 	return linhaslin;
 }
 
+
+void a2(const char *cmd_args) {
+	pid_t pid = fork();
+	int status;
+
+	if (pid == -1) {
+		perror("Erro com o FORK\n");
+		exit(EXIT_FAILURE);
+	}
+	if (pid == 0) {
+		char *argv[MAX_PROMPT_LEN / 2 + 2]; // Max tokens + program name + NULL
+		int i = 0;
+		argv[i++] = "./a2";
+
+		if (cmd_args && strlen(cmd_args) > 0) {
+			char args_copy[MAX_PROMPT_LEN];
+			strncpy(args_copy, cmd_args, sizeof(args_copy) - 1);
+			args_copy[sizeof(args_copy) - 1] = '\0';
+
+			char *arg_token = strtok(args_copy, " ");
+			while (arg_token != NULL && i < (MAX_PROMPT_LEN / 2 + 1)) {
+				argv[i++] = arg_token;
+				arg_token = strtok(NULL, " ");
+			}
+		}
+		argv[i] = NULL;
+
+		execvp("./a2", argv);
+		perror("Erro ao executar o a2\n");
+		exit(EXIT_FAILURE);
+	} else {
+		waitpid(pid, &status, 0);
+		if (WIFEXITED(status)) {
+			printf("Processo filho terminou com status: %d\n", WEXITSTATUS(status));
+		}
+	}
+}
+
+
 void git() {
     pid_t pid = fork();
     if (pid == -1) {
@@ -681,8 +720,6 @@ void log_action(const char *action, const char *details) {
     fclose(log_file);
 }
 
-
-
 // Função para interação com Ollama/2B
 void handle_ollama_interaction() {
     char user_prompt[MAX_PROMPT_LEN];
@@ -746,7 +783,8 @@ void handle_ollama_interaction() {
     int status = pclose(ollama_pipe);
     if (status == -1) {
         perror("pclose falhou para o pipe do ollama");
-    } else {
+    }
+    else {
         if (WIFEXITED(status)) {
             printf("processo do ollama terminou com o status: %d\n", WEXITSTATUS(status));
         } else if (WIFSIGNALED(status)) {
@@ -880,32 +918,38 @@ void dispatch(const char *user_in) {
     char *token = strtok(input_copy, " ");
     if (token == NULL) return;
     
-    
+    char *args = strtok(NULL, ""); // Declare and initialize args here
+
+    // Handle aliases first, as they might change the command and args
     for (int i = 0; i < alias_count; i++) {
 	    if (alias_list[i].name && strcasecmp(token, alias_list[i].name) == 0) {
-		    char new_command[256];
-		    if (args) {
-			    snprintf(new_command, sizeof(new_command), "%s %s", alias_list[i].command, args);
-		    } else {
-			    snprintf(new_command, sizeof(new_command), "%s", alias_list[i].command);
-		    }
-		    dispatch(new_command);
-		    return;
+	        char new_command[256];
+	        if (args) {
+	            snprintf(new_command, sizeof(new_command), "%s %s", alias_list[i].command, args);
+	        } else {
+	            snprintf(new_command, sizeof(new_command), "%s", alias_list[i].command);
+	        }
+	        dispatch(new_command); // Recursively call dispatch with the aliased command
+	        return;
 	    }
     }
-    char *args = strtok(NULL, ""); 
+
     // Adiciona ao histórico e log
     add_to_history(user_in);
     log_action("User Input", user_in);
-   for (int i = 0; i < plugin_count; i++) {
+
+    // Handle plugins
+    for (int i = 0; i < plugin_count; i++) {
         if (strcasecmp(token, loaded_plugins[i].plugin->name) == 0) {
             execute_plugin(token, args);
             return;
         }
     }
+
     int command_found = 0;
     for (size_t i = 0; i < sizeof(cmds) / sizeof(cmds[0]); ++i) {
         if (strcasecmp(token, cmds[i].key) == 0) {
+            command_found = 1; // Mark command as found
             if (strcmp(cmds[i].key, "help") == 0) {
                 display_help();
             } else if (strcasecmp(cmds[i].key, "mkdir") == 0) {
@@ -923,53 +967,49 @@ void dispatch(const char *user_in) {
                 display_history();
 	    } else if (strcasecmp(token, "alias") == 0) {
 		    handle_alias_command(args);
-		    return;
 	    } else if (strcasecmp(cmds[i].key, "quiz") == 0) {
 		 func_quiz();
 	    } else if (strcasecmp(cmds[i].key, "quizale") == 0) {
 		 quiz_aleatorio();
-	    } else if (strcasecmp(cmds[i].key, "quizt") == 0) {
-		quiz_timer();
-	    } else if (strcasecmp(cmds[i].key, "rscript") == 0) {
-                rscript(args);
 	    } else if (strcasecmp(cmds[i].key, "quizt") == 0) {
 		    if(args && strcasecmp(args, "cancel") == 0) {
 			    cancel_timer("quizt");
 		    } else {
 			    quiz_timer();
 		    }
-	    } else if (strcasecmp(cmds[i].key, "timer") == 0) {
+	    } else if (strcasecmp(cmds[i].key, "rscript") == 0) {
+                rscript(args);
+	    } else if (strcasecmp(cmds[i].key, "a2") == 0) {
+		a2(args);
+	    } else if (strcasecmp(cmds[i].key, "timer") == 0) { // This was duplicated, keeping one
 		    if (args && strcasecmp(args, "cancel") == 0) {
 			    cancel_timer("timer");
 		    } else {
 			    timer();
 		    }
-	    } else if (strcasecmp(cmds[i].key, "download") == 0) {
+	    } else if (strcasecmp(cmds[i]. key, "cp_di") == 0) {
+		copy_f_t();
+	    } else if (strcasecmp(cmds[i].key, "download") == 0) { // This was duplicated, keeping one
 		    char url[512];
 		    char nome[32];
 		    printf("Qual arquivo será baixado?. (use download url nome).\n");
 		    printf("A url: \n");
 		    scanf("%s", url);
-		    printf("O nome: \n");
-		    scanf("%s", nome);
+		    printf("O nome: \n");		    scanf("%s", nome);
 		    bool dl = download_file(url, nome);
 		    printf("Primeiro download terminou com status: %d\n", dl);
-	    } else if (strcasecmp(cmds[i].key, "timer") == 0) {
-		timer();
-	    } else if (strcasecmp(cmds[i]. key, "cp_di") == 0) {
-		copy_f_t();
-	    }else if (cmds[i].shell_command != NULL) {
+	    } else if (cmds[i].shell_command != NULL) {
                 // Executa comandos shell definidos na tabela
                 system(cmds[i].shell_command);
             }
-            return;
+            return; // Command handled, exit dispatch
         }
     }
-    printf("Comando '%s' não reconhecido. Use 'help' para ver os comandos disponíveis.\n", token);
+    
     if (!command_found) {
+        printf("Comando '%s' não reconhecido. Use 'help' para ver os comandos disponíveis.\n", token);
 	    suggest_commands(token);
-	    //se o comando não foi encontrado oferece sugestões.//
-       } 	    
+    }
 }
 
 int main(void) {
