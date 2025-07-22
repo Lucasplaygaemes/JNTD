@@ -5,6 +5,7 @@
 
 #define MAX_LINES 1000
 #define MAX_LINE_LEN 1024
+#define STATUS_MSG_LEN 100  // Tamanho do buffer de mensagens
 
 // Editor modes
 typedef enum {
@@ -23,7 +24,7 @@ typedef struct {
     int top_line;
     EditorMode mode;
     char filename[256];
-    char status_msg[100];
+    char status_msg[STATUS_MSG_LEN];  // Usar constante definida
     char command_buffer[100];
 } EditorState;
 
@@ -99,6 +100,7 @@ void load_file(EditorState *state, const char *filename) {
     }
     state->num_lines = 0;
 
+    // Garantir terminação nula
     strncpy(state->filename, filename, sizeof(state->filename) - 1);
     state->filename[sizeof(state->filename) - 1] = '\0';
 
@@ -110,33 +112,51 @@ void load_file(EditorState *state, const char *filename) {
             state->lines[state->num_lines++] = strdup(line);
         }
         fclose(file);
-        snprintf(state->status_msg, sizeof(state->status_msg), "\"%s\" loaded", filename);
+        
+        // Limitar comprimento do filename na mensagem
+        char safe_filename[80];
+        strncpy(safe_filename, filename, sizeof(safe_filename) - 1);
+        safe_filename[sizeof(safe_filename) - 1] = '\0';
+        
+        snprintf(state->status_msg, sizeof(state->status_msg), "\"%s\" loaded", safe_filename);
     }
     if (state->num_lines == 0) {
         state->lines[0] = calloc(1, 1);
         state->num_lines = 1;
-        if (file) { // File was empty
-             snprintf(state->status_msg, sizeof(state->status_msg), "\"%s\" is an empty file", filename);
-        } else { // File did not exist
-             snprintf(state->status_msg, sizeof(state->status_msg), "New file: \"%s\"", filename);
+        
+        // Limitar comprimento do filename na mensagem
+        char safe_filename[80];
+        strncpy(safe_filename, filename, sizeof(safe_filename) - 1);
+        safe_filename[sizeof(safe_filename) - 1] = '\0';
+        
+        if (file) {
+            snprintf(state->status_msg, sizeof(state->status_msg), "\"%s\" is empty", safe_filename);
+        } else {
+            snprintf(state->status_msg, sizeof(state->status_msg), "New file: \"%s\"", safe_filename);
         }
     }
 }
 
 void save_file(EditorState *state) {
     if (strcmp(state->filename, "[No Name]") == 0) {
-        snprintf(state->status_msg, sizeof(state->status_msg), "No file name. Use :w <filename>");
+        strncpy(state->status_msg, "No file name. Use :w <filename>", sizeof(state->status_msg));
         return;
     }
+    
+    // Limitar comprimento do filename na mensagem
+    char safe_filename[80];
+    strncpy(safe_filename, state->filename, sizeof(safe_filename) - 1);
+    safe_filename[sizeof(safe_filename) - 1] = '\0';
+    
     FILE *file = fopen(state->filename, "w");
     if (file) {
         for (int i = 0; i < state->num_lines; i++) {
             fprintf(file, "%s\n", state->lines[i]);
         }
         fclose(file);
-        snprintf(state->status_msg, sizeof(state->status_msg), "\"%s\" written", state->filename);
+        snprintf(state->status_msg, sizeof(state->status_msg), "\"%s\" written", safe_filename);
     } else {
-        snprintf(state->status_msg, sizeof(state->status_msg), "Error saving to \"%s\"", state->filename);
+        snprintf(state->status_msg, sizeof(state->status_msg), "Error saving to \"%s\"", safe_filename);
     }
 }
 
@@ -224,8 +244,10 @@ void process_command(EditorState *state) {
         state->lines[0] = calloc(1, 1);
         strcpy(state->filename, "[No Name]");
         snprintf(state->status_msg, sizeof(state->status_msg), "New file opened.");
-    } else if (strcmp(command, "help") == 0) {
-        snprintf(state->status_msg, sizeof(state->status_msg), "Commands: :q, :w, :open, :new, :help");
+    } else if (strcmp(command, "wq") == 0) {
+        save_file(state);
+        endwin();
+        exit(0);
     } else {
         snprintf(state->status_msg, sizeof(state->status_msg), "Unknown command: %s", command);
     }
