@@ -474,6 +474,11 @@ int main(int argc, char *argv[]) {
                         case KEY_LEFT: if (state->current_col > 0) state->current_col--; state->ideal_col = state->current_col; break;
                         case KEY_RIGHT: { char* line = state->lines[state->current_line]; int line_len = line ? strlen(line) : 0; if (state->current_col < line_len) state->current_col++; state->ideal_col = state->current_col; } break;
                         default: if (ch >= 32 && ch != 127) { editor_insert_char(state, ch); } break;
+                        case '\t': for (int i = 0; i < TABSIZE; i++) {
+				editor_insert_char(state, ' ');
+				}
+				break;
+				
                     }
                     break;
                 case COMMAND:
