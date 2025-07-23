@@ -36,6 +36,8 @@ const char *c_numbers[NUM_C_NUM] = {
 #define MAX_LINES 4098
 #define MAX_LINE_LEN 2048
 #define STATUS_MSG_LEN 250
+#define PAGE_JUMP 10
+
 
 typedef enum {
     NORMAL,
@@ -421,6 +423,8 @@ void ensure_cursor_in_bounds(EditorState *state) {
     }
 }
 
+// Função main() atualizada com a funcionalidade de rolagem rápida
+
 int main(int argc, char *argv[]) {
     setlocale(LC_ALL, "");
     inicializar_ncurses();
@@ -462,6 +466,27 @@ int main(int argc, char *argv[]) {
                         case KEY_DOWN: if (state->current_line < state->num_lines - 1) { state->current_line++; state->current_col = state->ideal_col; } break;
                         case KEY_LEFT: if (state->current_col > 0) state->current_col--; state->ideal_col = state->current_col; break;
                         case KEY_RIGHT: { char* line = state->lines[state->current_line]; int line_len = line ? strlen(line) : 0; if (state->current_col < line_len) state->current_col++; state->ideal_col = state->current_col; } break;
+                        
+                        // --- NOVA FUNCIONALIDADE AQUI (MODO NORMAL) ---
+                        case KEY_PPAGE: // Page Up
+                        case KEY_SR:    // Shift + Seta para Cima
+                            for (int i = 0; i < PAGE_JUMP; i++) {
+                                if (state->current_line > 0) {
+                                    state->current_line--;
+                                }
+                            }
+                            state->current_col = state->ideal_col;
+                            break;
+                        case KEY_NPAGE: // Page Down
+                        case KEY_SF:    // Shift + Seta para Baixo
+                            for (int i = 0; i < PAGE_JUMP; i++) {
+                                if (state->current_line < state->num_lines - 1) {
+                                    state->current_line++;
+                                }
+                            }
+                            state->current_col = state->ideal_col;
+                            break;
+                        // --- FIM DA NOVA FUNCIONALIDADE ---
                     }
                     break;
                 case INSERT:
@@ -469,16 +494,34 @@ int main(int argc, char *argv[]) {
                         case 27: state->mode = NORMAL; break; 
                         case KEY_ENTER: case '\n': editor_handle_enter(state); break;
                         case KEY_BACKSPACE: case 127: case 8: editor_handle_backspace(state); break;
+                        case '\t': for (int i = 0; i < TABSIZE; i++) { editor_insert_char(state, ' '); } break;
                         case KEY_UP: if (state->current_line > 0) { state->current_line--; state->current_col = state->ideal_col; } break;
                         case KEY_DOWN: if (state->current_line < state->num_lines - 1) { state->current_line++; state->current_col = state->ideal_col; } break;
                         case KEY_LEFT: if (state->current_col > 0) state->current_col--; state->ideal_col = state->current_col; break;
                         case KEY_RIGHT: { char* line = state->lines[state->current_line]; int line_len = line ? strlen(line) : 0; if (state->current_col < line_len) state->current_col++; state->ideal_col = state->current_col; } break;
+
+                        // --- NOVA FUNCIONALIDADE AQUI (MODO INSERT) ---
+                        case KEY_PPAGE: // Page Up
+                        case KEY_SR:    // Shift + Seta para Cima
+                            for (int i = 0; i < PAGE_JUMP; i++) {
+                                if (state->current_line > 0) {
+                                    state->current_line--;
+                                }
+                            }
+                            state->current_col = state->ideal_col;
+                            break;
+                        case KEY_NPAGE: // Page Down
+                        case KEY_SF:    // Shift + Seta para Baixo
+                            for (int i = 0; i < PAGE_JUMP; i++) {
+                                if (state->current_line < state->num_lines - 1) {
+                                    state->current_line++;
+                                }
+                            }
+                            state->current_col = state->ideal_col;
+                            break;
+                        // --- FIM DA NOVA FUNCIONALIDADE ---
+
                         default: if (ch >= 32 && ch != 127) { editor_insert_char(state, ch); } break;
-                        case '\t': for (int i = 0; i < TABSIZE; i++) {
-				editor_insert_char(state, ' ');
-				}
-				break;
-				
                     }
                     break;
                 case COMMAND:
@@ -497,3 +540,4 @@ int main(int argc, char *argv[]) {
     free(state);
     return 0;
 }
+
