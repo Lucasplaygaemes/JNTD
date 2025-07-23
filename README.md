@@ -16,9 +16,6 @@ And it's a miracle! The code is "multiplataform", not really, but the code was a
 # Repository!
 I will make my own repository! and you ask where? In the beloved Github! I will make the repository folder here, on github, it's not the best, but it's what i can do for now. Just like you can download the files from the linux with one command from a repository, any important file will be in the repository.
 
-# Delay.
-I'm sorry guys but i have been out for sometime, taked a time to relax, but i'm back.
-
 # Plugins?
 And the plugins parts are back, but this time isn't with good news, but i'm making a clean and revision, and unfortunetly with AI help, to debug the code. And i'm not having sucess yet haha.
 
