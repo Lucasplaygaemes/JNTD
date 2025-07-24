@@ -1,13 +1,17 @@
-#define NCURSES_WIDECHAR 1 // Ativa o suporte a wide-char
+#define NCURSES_WIDECHAR 1
 #include <ncurses.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <wctype.h>
 #include <errno.h>
-#include <locale.h> // Para setlocale()
-#include <wchar.h>  // Para wint_t
-#include <unistd.h> // Para chdir(), getcwd()
-#include <sys/wait.h> // Para waitpid()
+#include <locale.h>
+#include <wchar.h>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <stdbool.h>
+
+#define KEY_CTRL_P 16
 
 // --- Estrutura para a tela de ajuda ---
 typedef struct {
@@ -35,6 +39,24 @@ const char *c_types[NUM_C_TYPES] = { "int", "float", "unsigned", "signed", "char
 #define NUM_C_STD_FUNCTIONS 10
 const char *c_std_functions[NUM_C_STD_FUNCTIONS] = { "printf", "scanf", "fprintf", "sprintf", "fopen", "fclose", "malloc", "free", "strcpy", "strlen" };
 
+// --- Dicionários estáticos para autocompletar headers ---
+const char* stdio_h_symbols[] = {"printf", "scanf", "fprintf", "sprintf", "sscanf", "fopen", "fclose", "fgetc", "fgets", "fputc", "fputs", "fread", "fwrite", "fseek", "ftell", "rewind", "remove", "rename", "tmpfile", "tmpnam", "setvbuf", "setbuf", "ferror", "feof", "clearerr", "perror", "FILE", "EOF", "NULL", "SEEK_SET", "SEEK_CUR", "SEEK_END"};
+const char* stdlib_h_symbols[] = {"malloc", "calloc", "realloc", "free", "atoi", "atof", "atol", "strtod", "strtol", "strtoul", "rand", "srand", "system", "exit", "getenv", "abs", "labs", "div", "ldiv", "qsort", "bsearch", "EXIT_SUCCESS", "EXIT_FAILURE", "RAND_MAX"};
+const char* string_h_symbols[] = {"strcpy", "strncpy", "strcat", "strncat", "strcmp", "strncmp", "strchr", "strrchr", "strlen", "strspn", "strcspn", "strpbrk", "strstr", "strtok", "memset", "memcpy", "memmove", "memcmp", "memchr", "strerror"};
+
+typedef struct {
+    const char* header_name;
+    const char** symbols;
+    int count;
+} HeaderDef;
+
+HeaderDef known_headers[] = {
+    {"<stdio.h>", stdio_h_symbols, sizeof(stdio_h_symbols) / sizeof(char*)},
+    {"<stdlib.h>", stdlib_h_symbols, sizeof(stdlib_h_symbols) / sizeof(char*)},
+    {"<string.h>", string_h_symbols, sizeof(string_h_symbols) / sizeof(char*)}
+};
+int num_known_headers = sizeof(known_headers) / sizeof(HeaderDef);
+
 // --- Definições do Editor ---
 #define MAX_LINES 4098
 #define MAX_LINE_LEN 2048
@@ -52,6 +74,15 @@ typedef struct {
     char *command_history[MAX_COMMAND_HISTORY];
     int history_count;
     int history_pos;
+    // Campos para o estado do autocompletar
+    bool completion_active;
+    char **completion_suggestions;
+    int num_suggestions;
+    int selected_suggestion;
+    WINDOW *completion_win;
+    char word_to_complete[100];
+    int completion_start_col;
+    int completion_scroll_top; // +++ NOVO: Para controlar a rolagem da lista
 } EditorState;
 
 // --- Declarações de Funções ---
@@ -73,6 +104,16 @@ void editor_move_to_previous_word(EditorState *state);
 void process_command(EditorState *state);
 void ensure_cursor_in_bounds(EditorState *state);
 void adjust_viewport(EditorState *state);
+void handle_insert_mode_key(EditorState *state, wint_t ch);
+
+
+// Declarações de Funções do Autocompletar
+void editor_start_completion(EditorState *state);
+void editor_end_completion(EditorState *state);
+void editor_draw_completion_win(EditorState *state);
+void editor_apply_completion(EditorState *state);
+void add_suggestion(EditorState *state, const char *suggestion);
+
 
 // --- Definições das Funções ---
 
@@ -84,6 +125,7 @@ void inicializar_ncurses() {
     init_pair(5, COLOR_BLUE, COLOR_BLACK); init_pair(6, COLOR_CYAN, COLOR_BLACK);
     init_pair(7, COLOR_MAGENTA, COLOR_BLACK);
     init_pair(8, COLOR_WHITE, COLOR_BLACK);
+    init_pair(9, COLOR_WHITE, COLOR_MAGENTA);
     bkgd(COLOR_PAIR(8)); 
 }
 
@@ -105,7 +147,7 @@ void display_help_screen() {
     };
     int num_commands = sizeof(commands) / sizeof(commands[0]);
     
-    attron(COLOR_PAIR(8)); // <<< CORREÇÃO: Define o par de cores padrão (branco/preto)
+    attron(COLOR_PAIR(8));
     clear(); 
     bkgd(COLOR_PAIR(8));
 
@@ -117,7 +159,7 @@ void display_help_screen() {
     refresh(); get_wch(NULL);
 
     bkgd(COLOR_PAIR(8));
-    attroff(COLOR_PAIR(8)); // <<< CORREÇÃO: Boa prática desativar o atributo ao sair.
+    attroff(COLOR_PAIR(8));
 }
 
 FileViewer* create_file_viewer(const char* filename) {
@@ -151,7 +193,7 @@ void display_output_screen(const char *title, const char *filename) {
     wint_t ch;
     while (1) {
         int rows, cols; getmaxyx(stdscr, rows, cols);
-        attron(COLOR_PAIR(8)); // <<< CORREÇÃO: Define o par de cores padrão (branco/preto)
+        attron(COLOR_PAIR(8));
         clear();
         bkgd(COLOR_PAIR(8));
 
@@ -178,7 +220,7 @@ end_viewer:
     destroy_file_viewer(viewer);
     if(filename) remove(filename);
     bkgd(COLOR_PAIR(8));
-    attroff(COLOR_PAIR(8)); // <<< CORREÇÃO: Boa prática desativar o atributo ao sair.
+    attroff(COLOR_PAIR(8));
 }
 
 void execute_shell_command(EditorState *state) {
@@ -263,26 +305,35 @@ void compile_file(EditorState *state, char* args) {
 }
 
 void editor_redraw(EditorState *state) {
-    clear(); int rows, cols; getmaxyx(stdscr, rows, cols); adjust_viewport(state);
-    attron(COLOR_PAIR(8));
+    erase();
+
+    int rows, cols; 
+    getmaxyx(stdscr, rows, cols); 
+    adjust_viewport(state);
+
     for (int i = 0; i < rows - 2; i++) {
         int line_idx = state->top_line + i;
         if (line_idx < state->num_lines) {
-            char *line = state->lines[line_idx]; if (!line) continue;
-            move(i, 0); clrtoeol(); int len = strlen(line); int start_display_col = state->left_col;
+            char *line = state->lines[line_idx]; 
+            if (!line) continue;
+            
+            move(i, 0); 
+            int len = strlen(line); 
+            int start_display_col = state->left_col;
             if (start_display_col >= len) continue;
-            char *line_ptr = &line[start_display_col]; int display_len = len - start_display_col;
+            char *line_ptr = &line[start_display_col]; 
+            int display_len = len - start_display_col;
             if (display_len > cols) display_len = cols;
             int current_pos = 0;
             while (current_pos < display_len) {
-                attroff(COLOR_PAIR(8));
                 if (line_ptr[current_pos] == '#' || (line_ptr[current_pos] == '/' && current_pos + 1 < display_len && line_ptr[current_pos + 1] == '/')) {
                     attron(COLOR_PAIR(6)); printw("%.*s", display_len - current_pos, &line_ptr[current_pos]); attroff(COLOR_PAIR(6)); break;
                 }
                 int token_start = current_pos;
-                if (isalnum(line_ptr[token_start])) { while (current_pos < display_len && isalnum(line_ptr[current_pos])) current_pos++;
+                if (isalnum(line_ptr[token_start]) || line_ptr[token_start] == '_') { 
+                    while (current_pos < display_len && (isalnum(line_ptr[current_pos]) || line_ptr[current_pos] == '_')) current_pos++;
                 } else {
-                    while (current_pos < display_len && !isalnum(line_ptr[current_pos])) {
+                    while (current_pos < display_len && !isalnum(line_ptr[current_pos]) && line_ptr[current_pos] != '_') {
                         if (line_ptr[current_pos] == '/' && current_pos + 1 < display_len && line_ptr[current_pos + 1] == '/') break;
                         current_pos++;
                     }
@@ -290,7 +341,7 @@ void editor_redraw(EditorState *state) {
                 int token_len = current_pos - token_start;
                 if (token_len > 0) {
                     char *token_ptr = &line_ptr[token_start]; int color_pair = 0;
-                    if (isalnum(token_ptr[0])) {
+                    if (isalnum(token_ptr[0]) || token_ptr[0] == '_') {
                         for (int j = 0; j < NUM_C_KEYWORDS; j++) if (strlen(c_keywords[j]) == token_len && strncmp(token_ptr, c_keywords[j], token_len) == 0) { color_pair = 3; break; }
                         if (!color_pair) for (int j = 0; j < NUM_C_TYPES; j++) if (strlen(c_types[j]) == token_len && strncmp(token_ptr, c_types[j], token_len) == 0) { color_pair = 4; break; }
                         if (!color_pair) for (int j = 0; j < NUM_C_STD_FUNCTIONS; j++) if (strlen(c_std_functions[j]) == token_len && strncmp(token_ptr, c_std_functions[j], token_len) == 0) { color_pair = 5; break; }
@@ -299,28 +350,41 @@ void editor_redraw(EditorState *state) {
                     printw("%.*s", token_len, token_ptr);
                     if (color_pair) attroff(COLOR_PAIR(color_pair));
                 }
-                attron(COLOR_PAIR(8));
             }
         }
     }
-    attroff(COLOR_PAIR(8));
 
-    attron(COLOR_PAIR(2)); move(rows - 2, 0); clrtoeol(); mvprintw(rows - 2, 0, "%s", state->status_msg); attroff(COLOR_PAIR(2));
-    attron(COLOR_PAIR(1)); move(rows - 1, 0); clrtoeol();
+    attron(COLOR_PAIR(2)); 
+    mvprintw(rows - 2, 0, "%s", state->status_msg); 
+    attroff(COLOR_PAIR(2));
+    attron(COLOR_PAIR(1)); 
+    move(rows - 1, 0); 
+    clrtoeol();
     if (state->mode == COMMAND) {
         mvprintw(rows - 1, 0, ":%s", state->command_buffer);
-        move(rows - 1, state->command_pos + 1);
     } else {
         char mode_str[20];
         switch (state->mode) { case NORMAL: strcpy(mode_str, "-- NORMAL --"); break; case INSERT: strcpy(mode_str, "-- INSERT --"); break; default: strcpy(mode_str, "--          --"); break; }
         char display_filename[40]; strncpy(display_filename, state->filename, sizeof(display_filename) - 1); display_filename[sizeof(display_filename) - 1] = '\0'; 
         mvprintw(rows - 1, 0, "%s | %s | Line %d/%d, Col %d", mode_str, display_filename, state->current_line + 1, state->num_lines, state->current_col + 1);
-        int cursor_y = state->current_line - state->top_line;
-        int cursor_x = state->current_col - state->left_col;
-        move(cursor_y, cursor_x);
     }
-    attroff(COLOR_PAIR(1)); // <<< CORREÇÃO PRINCIPAL: Desativa o par de cores branco/azul
-    curs_set(1); refresh();
+    attroff(COLOR_PAIR(1)); 
+    
+    if (state->mode == COMMAND) {
+        move(rows - 1, state->command_pos + 1);
+    } else {
+        move(state->current_line - state->top_line, state->current_col - state->left_col);
+    }
+
+    wnoutrefresh(stdscr);
+
+    if (state->completion_active) {
+        editor_draw_completion_win(state);
+    } else {
+       curs_set(1);
+    }
+
+    doupdate();
 }
 
 void load_file(EditorState *state, const char *filename) {
@@ -370,7 +434,11 @@ void editor_handle_enter(EditorState *state) {
 void editor_handle_backspace(EditorState *state) {
     if (state->current_col == 0 && state->current_line == 0) return;
     if (state->current_col > 0) {
-        editor_insert_char(state, '\b');
+        char *line = state->lines[state->current_line];
+        int line_len = strlen(line);
+        memmove(&line[state->current_col - 1], &line[state->current_col], line_len - state->current_col + 1);
+        state->current_col--; 
+        state->ideal_col = state->current_col;
     } else {
         if (state->current_line == 0) return;
         int prev_line_idx = state->current_line - 1;
@@ -392,22 +460,21 @@ void editor_insert_char(EditorState *state, wint_t ch) {
     char *line = state->lines[state->current_line];
     if (!line) { line = calloc(1, 1); if (!line) return; state->lines[state->current_line] = line; }
     int line_len = strlen(line);
-    if (ch == '\b') {
-        if (state->current_col > 0) {
-            memmove(&line[state->current_col - 1], &line[state->current_col], line_len - state->current_col + 1);
-            state->current_col--; state->ideal_col = state->current_col;
-        }
-        return;
-    }
+    
     char multibyte_char[MB_CUR_MAX + 1];
     int char_len = wctomb(multibyte_char, ch); if (char_len < 0) return;
     multibyte_char[char_len] = '\0';
+
     if (line_len + char_len >= MAX_LINE_LEN - 1) return;
     char *new_line = realloc(line, line_len + char_len + 1); if (!new_line) return;
     state->lines[state->current_line] = new_line;
-    if (state->current_col < line_len) memmove(&new_line[state->current_col + char_len], &new_line[state->current_col], line_len - state->current_col);
+
+    if (state->current_col < line_len) {
+        memmove(&new_line[state->current_col + char_len], &new_line[state->current_col], line_len - state->current_col);
+    }
     memcpy(&new_line[state->current_col], multibyte_char, char_len);
-    state->current_col += char_len; state->ideal_col = state->current_col;
+    state->current_col += char_len; 
+    state->ideal_col = state->current_col;
     new_line[line_len + char_len] = '\0';
 }
 
@@ -506,110 +573,313 @@ void ensure_cursor_in_bounds(EditorState *state) {
     if (state->current_col < 0) state->current_col = 0;
 }
 
+// --- Funções do Autocompletar ---
+
+void add_suggestion(EditorState *state, const char *suggestion) {
+    for (int i = 0; i < state->num_suggestions; i++) {
+        if (strcmp(state->completion_suggestions[i], suggestion) == 0) return;
+    }
+    state->num_suggestions++;
+    state->completion_suggestions = realloc(state->completion_suggestions, state->num_suggestions * sizeof(char*));
+    state->completion_suggestions[state->num_suggestions - 1] = strdup(suggestion);
+}
+
+void editor_start_completion(EditorState *state) {
+    char* line = state->lines[state->current_line];
+    if (!line) return;
+    int start = state->current_col;
+    while (start > 0 && (isalnum(line[start - 1]) || line[start - 1] == '_')) {
+        start--;
+    }
+    state->completion_start_col = start;
+    int len = state->current_col - start;
+    if (len == 0) return; 
+
+    strncpy(state->word_to_complete, &line[start], len);
+    state->word_to_complete[len] = '\0';
+
+    state->num_suggestions = 0;
+    state->completion_suggestions = NULL;
+
+    const char *delimiters = " \t\n\r`~!@#$%^&*()-=+[]{}|\\;:'\",.<>/?";
+    for (int i = 0; i < state->num_lines; i++) {
+        char *line_copy = strdup(state->lines[i]);
+        if (!line_copy) continue;
+        char *saveptr;
+        for (char *token = strtok_r(line_copy, delimiters, &saveptr);
+             token != NULL;
+             token = strtok_r(NULL, delimiters, &saveptr))
+        {
+            if (strncmp(token, state->word_to_complete, len) == 0 && strlen(token) > len) {
+                add_suggestion(state, token);
+            }
+        }
+        free(line_copy);
+    }
+    
+    for (int i = 0; i < state->num_lines; i++) {
+        for (int j = 0; j < num_known_headers; j++) {
+            if (strstr(state->lines[i], known_headers[j].header_name)) {
+                for (int k = 0; k < known_headers[j].count; k++) {
+                    if (strncmp(known_headers[j].symbols[k], state->word_to_complete, len) == 0) {
+                        add_suggestion(state, known_headers[j].symbols[k]);
+                    }
+                }
+            }
+        }
+    }
+
+    if (state->num_suggestions > 0) {
+        state->completion_active = true;
+        state->selected_suggestion = 0;
+        state->completion_scroll_top = 0; // +++ NOVO: Reseta a rolagem
+    }
+}
+
+void editor_end_completion(EditorState *state) {
+    state->completion_active = false;
+    if (state->completion_win) {
+        delwin(state->completion_win);
+        state->completion_win = NULL;
+    }
+    for (int i = 0; i < state->num_suggestions; i++) {
+        free(state->completion_suggestions[i]);
+    }
+    free(state->completion_suggestions);
+    state->completion_suggestions = NULL;
+    state->num_suggestions = 0;
+    curs_set(1); 
+}
+
+void editor_apply_completion(EditorState *state) {
+    if (!state->completion_active || state->num_suggestions == 0) return;
+
+    const char* selected = state->completion_suggestions[state->selected_suggestion];
+    int prefix_len = strlen(state->word_to_complete);
+    int selected_len = strlen(selected);
+    
+    char* line = state->lines[state->current_line];
+    int line_len = strlen(line);
+    
+    char* new_line = malloc(line_len - prefix_len + selected_len + 1);
+
+    strncpy(new_line, line, state->completion_start_col);
+    strcpy(new_line + state->completion_start_col, selected);
+    strcpy(new_line + state->completion_start_col + selected_len, line + state->current_col);
+
+    free(state->lines[state->current_line]);
+    state->lines[state->current_line] = new_line;
+    state->current_col = state->completion_start_col + selected_len;
+    state->ideal_col = state->current_col;
+
+    editor_end_completion(state);
+}
+
+// +++ FUNÇÃO COMPLETAMENTE REFEITA +++
+void editor_draw_completion_win(EditorState *state) {
+    int max_len = 0;
+    for (int i = 0; i < state->num_suggestions; i++) {
+        int len = strlen(state->completion_suggestions[i]);
+        if (len > max_len) max_len = len;
+    }
+
+    int rows, cols;
+    getmaxyx(stdscr, rows, cols);
+
+    // Calcula a altura máxima que a janela pode ter sem sair da tela
+    int cursor_screen_y = state->current_line - state->top_line;
+    int max_h = rows - 2 - (cursor_screen_y + 1); // Espaço abaixo do cursor
+    if (max_h < 3) max_h = 3; // Mínimo de 3 linhas
+    if (max_h > 15) max_h = 15; // Máximo de 15 linhas
+
+    // A altura da janela é o menor valor entre o número de sugestões e a altura máxima
+    int win_h = state->num_suggestions < max_h ? state->num_suggestions : max_h;
+    int win_w = max_len + 2; 
+    
+    int win_y = cursor_screen_y + 1;
+    int win_x = state->completion_start_col - state->left_col;
+    
+    if (win_x + win_w >= cols) win_x = cols - win_w;
+    if (win_y < 0) win_y = 0;
+    if (win_x < 0) win_x = 0;
+
+    if(state->completion_win) delwin(state->completion_win); 
+    state->completion_win = newwin(win_h, win_w, win_y, win_x);
+    wbkgd(state->completion_win, COLOR_PAIR(9)); 
+
+    // Desenha apenas os itens visíveis na janela, baseado na rolagem
+    for (int i = 0; i < win_h; i++) {
+        int suggestion_idx = state->completion_scroll_top + i;
+        if (suggestion_idx < state->num_suggestions) {
+            if (suggestion_idx == state->selected_suggestion) wattron(state->completion_win, A_REVERSE);
+            mvwprintw(state->completion_win, i, 1, "%.*s", win_w - 2, state->completion_suggestions[suggestion_idx]);
+            if (suggestion_idx == state->selected_suggestion) wattroff(state->completion_win, A_REVERSE);
+        }
+    }
+    
+    wnoutrefresh(state->completion_win);
+    curs_set(0); 
+}
+
+void handle_insert_mode_key(EditorState *state, wint_t ch) {
+    switch (ch) {
+        case KEY_CTRL_P:
+            editor_start_completion(state);
+            break;
+        case KEY_ENTER: case '\n': editor_handle_enter(state); break;
+        case KEY_BACKSPACE: case 127: case 8: editor_handle_backspace(state); break;
+        case '\t': for (int i = 0; i < TAB_SIZE; i++) editor_insert_char(state, ' '); break;
+        case KEY_UP: if (state->current_line > 0) { state->current_line--; state->current_col = state->ideal_col; } break;
+        case KEY_DOWN: if (state->current_line < state->num_lines - 1) { state->current_line++; state->current_col = state->ideal_col; } break;
+        case KEY_LEFT: if (state->current_col > 0) state->current_col--; state->ideal_col = state->current_col; break;
+        case KEY_RIGHT: { char* line = state->lines[state->current_line]; int line_len = line ? strlen(line) : 0; if (state->current_col < line_len) state->current_col++; state->ideal_col = state->current_col; } break;
+        case KEY_PPAGE: case KEY_SR: for (int i = 0; i < PAGE_JUMP; i++) if (state->current_line > 0) state->current_line--; state->current_col = state->ideal_col; break;
+        case KEY_NPAGE: case KEY_SF: for (int i = 0; i < PAGE_JUMP; i++) if (state->current_line < state->num_lines - 1) state->current_line++; state->current_col = state->ideal_col; break;
+        case KEY_HOME: state->current_col = 0; state->ideal_col = 0; break;
+        case KEY_END: { char* line = state->lines[state->current_line]; if(line) state->current_col = strlen(line); state->ideal_col = state->current_col; } break;
+        case KEY_SDC: editor_delete_line(state); break;
+        default: if (iswprint(ch)) { editor_insert_char(state, ch); } break;
+    }
+}
+
+
 int main(int argc, char *argv[]) {
-    setlocale(LC_ALL, ""); inicializar_ncurses();
+    #define _XOPEN_SOURCE_EXTENDED 1
+    #define NCURSES_WIDECHAR 1
+    
+    setlocale(LC_ALL, ""); 
+    inicializar_ncurses();
     EditorState *state = calloc(1, sizeof(EditorState));
     if (!state) { endwin(); fprintf(stderr, "Fatal: Could not allocate memory for editor state.\n"); return 1; }
-    state->mode = NORMAL; strcpy(state->filename, "[No Name]");
-    if (argc > 1) { load_file(state, argv[1]);
+    state->mode = NORMAL; 
+    strcpy(state->filename, "[No Name]");
+    state->completion_active = false; 
+    state->completion_win = NULL;
+
+    if (argc > 1) { 
+        load_file(state, argv[1]);
     } else {
         state->lines[0] = calloc(1, 1);
         if (!state->lines[0]) { endwin(); free(state); fprintf(stderr, "Memory allocation failed\n"); return 1; }
         state->num_lines = 1;
     }
+
     while (1) {
         ensure_cursor_in_bounds(state);
         editor_redraw(state);
         wint_t ch;
-        int result = get_wch(&ch);
-        if (result != ERR) {
-            if (state->mode != COMMAND) state->status_msg[0] = '\0';
-            
-            if (ch == 27) {
-                nodelay(stdscr, TRUE); 
-                int next_ch = getch();
-                if (next_ch == ERR) { if (state->mode == INSERT) state->mode = NORMAL;
-                } else if (next_ch == 'f' || next_ch == 'F') { editor_move_to_next_word(state);
-                } else if (next_ch == 'b' || next_ch == 'B') { editor_move_to_previous_word(state); }
-                nodelay(stdscr, FALSE);
-                continue;
+        get_wch(&ch);
+
+        if (state->completion_active) {
+            // +++ LÓGICA DE NAVEGAÇÃO E ROLAGEM +++
+            int win_h = 0;
+            if (state->completion_win) {
+                win_h = getmaxy(state->completion_win);
             }
 
-            switch (state->mode) {
-                case NORMAL:
-                    switch (ch) {
-                        case 'i': state->mode = INSERT; break;
-                        case ':': state->mode = COMMAND; state->history_pos = state->history_count; state->command_buffer[0] = '\0'; state->command_pos = 0; break;
-                        case KEY_UP: if (state->current_line > 0) { state->current_line--; state->current_col = state->ideal_col; } break;
-                        case KEY_DOWN: if (state->current_line < state->num_lines - 1) { state->current_line++; state->current_col = state->ideal_col; } break;
-                        case KEY_LEFT: if (state->current_col > 0) state->current_col--; state->ideal_col = state->current_col; break;
-                        case KEY_RIGHT: { char* line = state->lines[state->current_line]; int line_len = line ? strlen(line) : 0; if (state->current_col < line_len) state->current_col++; state->ideal_col = state->current_col; } break;
-                        case KEY_PPAGE: case KEY_SR: for (int i = 0; i < PAGE_JUMP; i++) if (state->current_line > 0) state->current_line--; state->current_col = state->ideal_col; break;
-                        case KEY_NPAGE: case KEY_SF: for (int i = 0; i < PAGE_JUMP; i++) if (state->current_line < state->num_lines - 1) state->current_line++; state->current_col = state->ideal_col; break;
-                        case KEY_HOME: state->current_col = 0; state->ideal_col = 0; break;
-                        case KEY_END: { char* line = state->lines[state->current_line]; if(line) state->current_col = strlen(line); state->ideal_col = state->current_col; } break;
-                        case KEY_SDC: editor_delete_line(state); break;
+            switch(ch) {
+                case KEY_UP:
+                    state->selected_suggestion--;
+                    if (state->selected_suggestion < 0) {
+                        state->selected_suggestion = state->num_suggestions - 1;
+                        // Rola para o final
+                        int new_top = state->num_suggestions - win_h;
+                        state->completion_scroll_top = new_top > 0 ? new_top : 0;
+                    }
+                    if (state->selected_suggestion < state->completion_scroll_top) {
+                        state->completion_scroll_top = state->selected_suggestion;
                     }
                     break;
-                case INSERT:
-                    switch (ch) {
-                        case KEY_ENTER: case '\n': editor_handle_enter(state); break;
-                        case KEY_BACKSPACE: case 127: case 8: editor_handle_backspace(state); break;
-                        case '\t': for (int i = 0; i < TAB_SIZE; i++) editor_insert_char(state, ' '); break;
-                        case KEY_UP: if (state->current_line > 0) { state->current_line--; state->current_col = state->ideal_col; } break;
-                        case KEY_DOWN: if (state->current_line < state->num_lines - 1) { state->current_line++; state->current_col = state->ideal_col; } break;
-                        case KEY_LEFT: if (state->current_col > 0) state->current_col--; state->ideal_col = state->current_col; break;
-                        case KEY_RIGHT: { char* line = state->lines[state->current_line]; int line_len = line ? strlen(line) : 0; if (state->current_col < line_len) state->current_col++; state->ideal_col = state->current_col; } break;
-                        case KEY_PPAGE: case KEY_SR: for (int i = 0; i < PAGE_JUMP; i++) if (state->current_line > 0) state->current_line--; state->current_col = state->ideal_col; break;
-                        case KEY_NPAGE: case KEY_SF: for (int i = 0; i < PAGE_JUMP; i++) if (state->current_line < state->num_lines - 1) state->current_line++; state->current_col = state->ideal_col; break;
-                        case KEY_HOME: state->current_col = 0; state->ideal_col = 0; break;
-                        case KEY_END: { char* line = state->lines[state->current_line]; if(line) state->current_col = strlen(line); state->ideal_col = state->current_col; } break;
-                        case KEY_SDC: editor_delete_line(state); break;
-                        default: if (ch >= 32 && ch != 127) { editor_insert_char(state, ch); } break;
+                case KEY_DOWN:
+                    state->selected_suggestion++;
+                    if (state->selected_suggestion >= state->num_suggestions) {
+                        state->selected_suggestion = 0;
+                        state->completion_scroll_top = 0; // Rola para o início
+                    }
+                    if (state->selected_suggestion >= state->completion_scroll_top + win_h) {
+                        state->completion_scroll_top = state->selected_suggestion - win_h + 1;
                     }
                     break;
-                case COMMAND:
-                    switch (ch) {
-                        case KEY_LEFT: if (state->command_pos > 0) state->command_pos--; break;
-                        case KEY_RIGHT: if (state->command_pos < strlen(state->command_buffer)) state->command_pos++; break;
-                        case KEY_UP:
-                            if (state->history_pos > 0) {
-                                state->history_pos--;
-                                strncpy(state->command_buffer, state->command_history[state->history_pos], sizeof(state->command_buffer) - 1);
-                                state->command_pos = strlen(state->command_buffer);
-                            }
-                            break;
-                        case KEY_DOWN:
-                            if (state->history_pos < state->history_count) {
-                                state->history_pos++;
-                                if (state->history_pos == state->history_count) {
-                                    state->command_buffer[0] = '\0';
-                                } else {
-                                    strncpy(state->command_buffer, state->command_history[state->history_pos], sizeof(state->command_buffer) - 1);
-                                }
-                                state->command_pos = strlen(state->command_buffer);
-                            }
-                            break;
-                        case KEY_ENTER: case '\n': process_command(state); break;
-                        case KEY_BACKSPACE: case 127:
-                            if (state->command_pos > 0) {
-                                memmove(&state->command_buffer[state->command_pos - 1], &state->command_buffer[state->command_pos], strlen(state->command_buffer) - state->command_pos + 1);
-                                state->command_pos--;
-                            }
-                            break;
-                        default:
-                            if (ch >= 32 && ch < 127 && strlen(state->command_buffer) < sizeof(state->command_buffer) - 1) {
-                                memmove(&state->command_buffer[state->command_pos + 1], &state->command_buffer[state->command_pos], strlen(state->command_buffer) - state->command_pos + 1);
-                                state->command_buffer[state->command_pos] = (char)ch;
-                                state->command_pos++;
-                            }
-                            break;
-                    }
+                case KEY_ENTER: case '\n':
+                    editor_apply_completion(state);
+                    break;
+                case 27: // ESC
+                    editor_end_completion(state);
+                    break;
+                default: 
+                    editor_end_completion(state);
+                    if (state->mode == INSERT) handle_insert_mode_key(state, ch);
                     break;
             }
+            continue; 
+        }
+            
+        if (ch == 27) {
+             if (state->mode == INSERT) state->mode = NORMAL;
+             continue;
+        }
+
+        switch (state->mode) {
+            case NORMAL:
+                switch (ch) {
+                    case 'i': state->mode = INSERT; break;
+                    case ':': state->mode = COMMAND; state->history_pos = state->history_count; state->command_buffer[0] = '\0'; state->command_pos = 0; break;
+                    case KEY_UP: if (state->current_line > 0) { state->current_line--; state->current_col = state->ideal_col; } break;
+                    case KEY_DOWN: if (state->current_line < state->num_lines - 1) { state->current_line++; state->current_col = state->ideal_col; } break;
+                    case KEY_LEFT: if (state->current_col > 0) state->current_col--; state->ideal_col = state->current_col; break;
+                    case KEY_RIGHT: { char* line = state->lines[state->current_line]; int line_len = line ? strlen(line) : 0; if (state->current_col < line_len) state->current_col++; state->ideal_col = state->current_col; } break;
+                    case KEY_PPAGE: case KEY_SR: for (int i = 0; i < PAGE_JUMP; i++) if (state->current_line > 0) state->current_line--; state->current_col = state->ideal_col; break;
+                    case KEY_NPAGE: case KEY_SF: for (int i = 0; i < PAGE_JUMP; i++) if (state->current_line < state->num_lines - 1) state->current_line++; state->current_col = state->ideal_col; break;
+                    case KEY_HOME: state->current_col = 0; state->ideal_col = 0; break;
+                    case KEY_END: { char* line = state->lines[state->current_line]; if(line) state->current_col = strlen(line); state->ideal_col = state->current_col; } break;
+                    case KEY_SDC: editor_delete_line(state); break;
+                }
+                break;
+            case INSERT:
+                handle_insert_mode_key(state, ch);
+                break;
+            case COMMAND:
+                switch (ch) {
+                    case KEY_LEFT: if (state->command_pos > 0) state->command_pos--; break;
+                    case KEY_RIGHT: if (state->command_pos < strlen(state->command_buffer)) state->command_pos++; break;
+                    case KEY_UP:
+                        if (state->history_pos > 0) {
+                            state->history_pos--;
+                            strncpy(state->command_buffer, state->command_history[state->history_pos], sizeof(state->command_buffer) - 1);
+                            state->command_pos = strlen(state->command_buffer);
+                        }
+                        break;
+                    case KEY_DOWN:
+                        if (state->history_pos < state->history_count) {
+                            state->history_pos++;
+                            if (state->history_pos == state->history_count) {
+                                state->command_buffer[0] = '\0';
+                            } else {
+                                strncpy(state->command_buffer, state->command_history[state->history_pos], sizeof(state->command_buffer) - 1);
+                            }
+                            state->command_pos = strlen(state->command_buffer);
+                        }
+                        break;
+                    case KEY_ENTER: case '\n': process_command(state); break;
+                    case KEY_BACKSPACE: case 127:
+                        if (state->command_pos > 0) {
+                            memmove(&state->command_buffer[state->command_pos - 1], &state->command_buffer[state->command_pos], strlen(state->command_buffer) - state->command_pos + 1);
+                            state->command_pos--;
+                        }
+                        break;
+                    default:
+                        if (ch >= 32 && ch < 127 && strlen(state->command_buffer) < sizeof(state->command_buffer) - 1) {
+                            memmove(&state->command_buffer[state->command_pos + 1], &state->command_buffer[state->command_pos], strlen(state->command_buffer) - state->command_pos + 1);
+                            state->command_buffer[state->command_pos] = (char)ch;
+                            state->command_pos++;
+                        }
+                        break;
+                }
+                break;
         }
     }
     endwin(); 
+    if (state->completion_active) editor_end_completion(state);
     for(int i=0; i < state->history_count; i++) free(state->command_history[i]);
     free(state); 
     return 0;
