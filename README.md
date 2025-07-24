@@ -23,6 +23,9 @@ And the plugins parts are back, but this time isn't with good news, but i'm maki
 What's A2 you might ask? It's my own file editor. The VIM is my main file editor, and that won't change, but when you need to edit a file, or make a correction or whatever reason, the A2 will be there waiting you. It's inspired by vim. A2 isn't perfect yet but it's working.
 A2 is working well! The code now has color in the text, and have a documented way where you can study it to help you understand the code.
 
+A2 is now a much more complete then before, you can run linux commands just like vim, and there a new file "c.syntax" and what does that file do you might ask?
+Easy! There is the words who will be highlighted and i will add in the future a c.dict that will be a dictionary for words! and the best!
+
 # Makefile!
 Theres now a make file where you don't need to compile every single file by hand. But currently it's not working properly.
 

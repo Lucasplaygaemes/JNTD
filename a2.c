@@ -1,4 +1,6 @@
+#define _XOPEN_SOURCE_EXTENDED 1
 #define NCURSES_WIDECHAR 1
+
 #include <ncurses.h>
 #include <stdlib.h>
 #include <string.h>
@@ -11,8 +13,22 @@
 #include <sys/wait.h>
 #include <stdbool.h>
 
-#define KEY_CTRL_P 16
+// --- Definições do Editor ---
+#define MAX_LINES 4098
+#define MAX_LINE_LEN 2048
+#define STATUS_MSG_LEN 250
+#define PAGE_JUMP 10
+#define TAB_SIZE 4
+#define MAX_COMMAND_HISTORY 50 
 
+#define KEY_CTRL_P 16
+#define KEY_CTRL_DEL 520
+#define KEY_CTRL_K 11
+#define KEY_CTRL_F 6
+#define KEY_CTRL_D 4
+#define KEY_CTRL_A 1
+
+// Enum para os tipos de sintaxe que definimos no arquivo .syntax
 typedef enum {
     SYNTAX_KEYWORD,
     SYNTAX_TYPE,
@@ -38,20 +54,8 @@ typedef struct {
     int num_lines;
 } FileViewer;
 
-// --- Constantes para Syntax Highlighting ---
-#define NUM_C_KEYWORDS 31
-const char *c_keywords[NUM_C_KEYWORDS] = {
-    "auto", "break", "case", "char", "continue", "default", "do",
-    "double", "else", "enum", "extern", "float", "for", "goto", "if",
-    "int", "long", "register", "return", "short", "signed", "sizeof", "static",
-    "struct", "switch", "typedef", "union", "unsigned", "void", "volatile", "while"
-};
-#define NUM_C_TYPES 10
-const char *c_types[NUM_C_TYPES] = { "int", "float", "unsigned", "signed", "char", "long", "double", "void", "short", "const" };
-#define NUM_C_STD_FUNCTIONS 10
-const char *c_std_functions[NUM_C_STD_FUNCTIONS] = { "printf", "scanf", "fprintf", "sprintf", "fopen", "fclose", "malloc", "free", "strcpy", "strlen" };
 
-// --- Dicionários estáticos para autocompletar headers ---
+// --- Dicionários estáticos para autocompletar headers (será substituído no futuro) ---
 const char* stdio_h_symbols[] = {"printf", "scanf", "fprintf", "sprintf", "sscanf", "fopen", "fclose", "fgetc", "fgets", "fputc", "fputs", "fread", "fwrite", "fseek", "ftell", "rewind", "remove", "rename", "tmpfile", "tmpnam", "setvbuf", "setbuf", "ferror", "feof", "clearerr", "perror", "FILE", "EOF", "NULL", "SEEK_SET", "SEEK_CUR", "SEEK_END"};
 const char* stdlib_h_symbols[] = {"malloc", "calloc", "realloc", "free", "atoi", "atof", "atol", "strtod", "strtol", "strtoul", "rand", "srand", "system", "exit", "getenv", "abs", "labs", "div", "ldiv", "qsort", "bsearch", "EXIT_SUCCESS", "EXIT_FAILURE", "RAND_MAX"};
 const char* string_h_symbols[] = {"strcpy", "strncpy", "strcat", "strncat", "strcmp", "strncmp", "strchr", "strrchr", "strlen", "strspn", "strcspn", "strpbrk", "strstr", "strtok", "memset", "memcpy", "memmove", "memcmp", "memchr", "strerror"};
@@ -67,15 +71,8 @@ HeaderDef known_headers[] = {
     {"<stdlib.h>", stdlib_h_symbols, sizeof(stdlib_h_symbols) / sizeof(char*)},
     {"<string.h>", string_h_symbols, sizeof(string_h_symbols) / sizeof(char*)}
 };
-int num_known_headers = sizeof(known_headers) / sizeof(HeaderDef);
 
-// --- Definições do Editor ---
-#define MAX_LINES 4098
-#define MAX_LINE_LEN 2048
-#define STATUS_MSG_LEN 250
-#define PAGE_JUMP 10
-#define TAB_SIZE 4
-#define MAX_COMMAND_HISTORY 50 
+int num_known_headers = sizeof(known_headers) / sizeof(HeaderDef);
 
 typedef enum { NORMAL, INSERT, COMMAND } EditorMode;
 typedef struct {
@@ -86,10 +83,6 @@ typedef struct {
     char *command_history[MAX_COMMAND_HISTORY];
     int history_count;
     int history_pos;
-    //New struct to plugins//
-    char word_to_complete[100];
-    int completion_start_col;
-    int completion_scroll_top;
     // Campos para o estado do autocompletar
     bool completion_active;
     char **completion_suggestions;
@@ -98,54 +91,20 @@ typedef struct {
     WINDOW *completion_win;
     char word_to_complete[100];
     int completion_start_col;
-    int completion_scroll_top;// +++ NOVO: Para controlar a rolagem da lista
-    SyntaxRule *syntax_rules;      // Array dinâmico para as regras de cor
+    int completion_scroll_top;
+
+    // Campos para sintaxe dinâmica
+    SyntaxRule *syntax_rules;
     int num_syntax_rules;
-
-    char **dictionary_words;       // (Vamos usar este no futuro para o autocompletar)
+    char **dictionary_words;
     int num_dictionary_words;
+    
+    // +++ NOVOS CAMPOS PARA A BUSCA +++
+    char last_search[100];
+    int last_match_line;
+    int last_match_col;
+
 } EditorState;
-
-// Nova função para carregar regras de sintaxe de um arquivo
-void load_syntax_file(EditorState *state, const char *filename) {
-    FILE *file = fopen(filename, "r");
-    if (!file) {
-        // Se o arquivo não existir, não fazemos nada. O editor funcionará sem cores.
-        return;
-    }
-
-    char line[256];
-    while (fgets(line, sizeof(line), file)) {
-        // Ignora comentários e linhas em branco
-        if (line[0] == '#' || line[0] == '\n' || line[0] == '\r') continue;
-
-        // Remove a quebra de linha do final
-        line[strcspn(line, "\r\n")] = 0;
-
-        // Separa a linha em "TIPO" e "palavra" usando o ":" como delimitador
-        char *type_str = strtok(line, ":");
-        char *word_str = strtok(NULL, ":");
-
-        if (type_str && word_str) {
-            // Aumenta o tamanho do nosso array de regras
-            state->num_syntax_rules++;
-            state->syntax_rules = realloc(state->syntax_rules, sizeof(SyntaxRule) * state->num_syntax_rules);
-            
-            SyntaxRule *new_rule = &state->syntax_rules[state->num_syntax_rules - 1];
-            new_rule->word = strdup(word_str);
-
-            // Converte o TIPO de string para nosso enum
-            if (strcmp(type_str, "KEYWORD") == 0) {
-                new_rule->type = SYNTAX_KEYWORD;
-            } else if (strcmp(type_str, "TYPE") == 0) {
-                new_rule->type = SYNTAX_TYPE;
-            } else if (strcmp(type_str, "STD_FUNCTION") == 0) {
-                new_rule->type = SYNTAX_STD_FUNCTION;
-            }
-        }
-    }
-    fclose(file);
-}
 
 // --- Declarações de Funções ---
 void inicializar_ncurses();
@@ -167,6 +126,10 @@ void process_command(EditorState *state);
 void ensure_cursor_in_bounds(EditorState *state);
 void adjust_viewport(EditorState *state);
 void handle_insert_mode_key(EditorState *state, wint_t ch);
+void load_syntax_file(EditorState *state, const char *filename);
+FileViewer* create_file_viewer(const char* filename);
+void destroy_file_viewer(FileViewer* viewer);
+void editor_find(EditorState *state); // +++ NOVA FUNÇÃO DE BUSCA +++
 
 
 // Declarações de Funções do Autocompletar
@@ -175,8 +138,6 @@ void editor_end_completion(EditorState *state);
 void editor_draw_completion_win(EditorState *state);
 void editor_apply_completion(EditorState *state);
 void add_suggestion(EditorState *state, const char *suggestion);
-
-
 // --- Definições das Funções ---
 
 void inicializar_ncurses() {
@@ -190,6 +151,59 @@ void inicializar_ncurses() {
     init_pair(9, COLOR_WHITE, COLOR_MAGENTA);
     bkgd(COLOR_PAIR(8)); 
 }
+
+char* trim_whitespace(char *str) {
+    char *end;
+    while(isspace((unsigned char)*str)) str++;
+    if(*str == 0) return str;
+
+    end = str + strlen(str) - 1;
+    while(end > str && isspace((unsigned char)*end)) end--;
+    end[1] = '\0';
+
+    return str;
+}
+
+void load_syntax_file(EditorState *state, const char *filename) {
+    FILE *file = fopen(filename, "r");
+    if (!file) return;
+
+    char line_buffer[256];
+    while (fgets(line_buffer, sizeof(line_buffer), file)) {
+        if (line_buffer[0] == '#' || line_buffer[0] == '\n' || line_buffer[0] == '\r') continue;
+
+        line_buffer[strcspn(line_buffer, "\r\n")] = 0;
+
+        char *colon = strchr(line_buffer, ':');
+        if (!colon) continue;
+
+        *colon = '\0'; 
+        
+        char *type_str = trim_whitespace(line_buffer);
+        char *word_str = trim_whitespace(colon + 1);
+
+        if (strlen(type_str) == 0 || strlen(word_str) == 0) continue;
+
+        state->num_syntax_rules++;
+        state->syntax_rules = realloc(state->syntax_rules, sizeof(SyntaxRule) * state->num_syntax_rules);
+        
+        SyntaxRule *new_rule = &state->syntax_rules[state->num_syntax_rules - 1];
+        new_rule->word = strdup(word_str);
+
+        if (strcmp(type_str, "KEYWORD") == 0) {
+            new_rule->type = SYNTAX_KEYWORD;
+        } else if (strcmp(type_str, "TYPE") == 0) {
+            new_rule->type = SYNTAX_TYPE;
+        } else if (strcmp(type_str, "STD_FUNCTION") == 0) {
+            new_rule->type = SYNTAX_STD_FUNCTION;
+        } else {
+            free(new_rule->word);
+            state->num_syntax_rules--;
+        }
+    }
+    fclose(file);
+}
+
 
 void adjust_viewport(EditorState *state) {
     int rows, cols; getmaxyx(stdscr, rows, cols); rows -= 2;
@@ -240,6 +254,115 @@ FileViewer* create_file_viewer(const char* filename) {
     fclose(f);
     return viewer;
 }
+
+void editor_find_next(EditorState *state) {
+    if (state->last_search[0] == '\0') {
+        snprintf(state->status_msg, sizeof(state->status_msg), "Nenhum termo para buscar. Use Ctrl+F primeiro.");
+        return;
+    }
+
+    int start_line = state->current_line;
+    int start_col = state->current_col + 1;
+
+    for (int i = 0; i < state->num_lines; i++) {
+        int current_line_idx = (start_line + i) % state->num_lines;
+        char *line = state->lines[current_line_idx];
+        
+        char *match = strstr(&line[start_col], state->last_search);
+        
+        if (match) {
+            state->current_line = current_line_idx;
+            state->current_col = match - line;
+            state->ideal_col = state->current_col;
+            state->top_line = current_line_idx;
+            state->last_match_line = state->current_line;
+            snprintf(state->status_msg, sizeof(state->status_msg), "Encontrado em L:%d C:%d", state->current_line + 1, state->current_col + 1);
+            return;
+        }
+        start_col = 0; 
+    }
+    snprintf(state->status_msg, sizeof(state->status_msg), "Nenhuma outra ocorrência de: %s", state->last_search);
+}
+void editor_find_previous(EditorState *state) {
+    if (state->last_search[0] == '\0') {
+        snprintf(state->status_msg, sizeof(state->status_msg), "Nenhum termo para buscar. Use Ctrl+F primeiro.");
+        return;
+    }
+
+    int start_line = state->current_line;
+    int start_col = state->current_col;
+
+    for (int i = 0; i < state->num_lines; i++) {
+        int current_line_idx = (start_line - i + state->num_lines) % state->num_lines;
+        char *line = state->lines[current_line_idx];
+        
+        char *last_match_in_line = NULL;
+        char *match = strstr(line, state->last_search);
+        while (match) {
+            // Se estamos na linha original, só considera matches antes da posição inicial
+            if (current_line_idx == start_line && (match - line) >= start_col) {
+                break;
+            }
+            last_match_in_line = match;
+            match = strstr(match + 1, state->last_search);
+        }
+
+        if (last_match_in_line) {
+            state->current_line = current_line_idx;
+            state->current_col = last_match_in_line - line;
+            state->ideal_col = state->current_col;
+            state->top_line = current_line_idx;
+            state->last_match_line = state->current_line;
+            snprintf(state->status_msg, sizeof(state->status_msg), "Encontrado em L:%d C:%d", state->current_line + 1, state->current_col + 1);
+            return;
+        }
+        // Para as próximas linhas (anteriores), a posição inicial não importa
+        start_col = strlen(line);
+    }
+    snprintf(state->status_msg, sizeof(state->status_msg), "Nenhuma outra ocorrência de: %s", state->last_search);
+}
+
+
+void editor_find(EditorState *state) {
+    char query[100] = {0};
+    int query_pos = 0;
+
+    int original_line = state->current_line;
+    int original_col = state->current_col;
+
+    while (1) {
+        snprintf(state->status_msg, sizeof(state->status_msg), "Buscar: %s", query);
+        editor_redraw(state);
+
+        wint_t ch;
+        get_wch(&ch);
+
+        if (ch == 27) { // ESC para cancelar
+            state->status_msg[0] = '\0';
+            state->current_line = original_line;
+            state->current_col = original_col;
+            return;
+        } else if (ch == KEY_ENTER || ch == '\n') {
+            if (query_pos > 0) {
+                strncpy(state->last_search, query, sizeof(state->last_search) - 1);
+                state->last_search[sizeof(state->last_search) - 1] = '\0';
+            } else {
+                state->status_msg[0] = '\0';
+                return;
+            }
+            break;
+        } else if (ch == KEY_BACKSPACE || ch == 127 || ch == 8) {
+            if (query_pos > 0) query[--query_pos] = '\0';
+        } else if (iswprint(ch) && query_pos < sizeof(query) - 1) {
+            query[query_pos++] = (char)ch;
+            query[query_pos] = '\0';
+        }
+    }
+
+    // Após pegar o termo, chama a função de buscar próximo
+    editor_find_next(state);
+}
+
 
 void destroy_file_viewer(FileViewer* viewer) {
     if (!viewer) return;
@@ -368,65 +491,77 @@ void compile_file(EditorState *state, char* args) {
 
 void editor_redraw(EditorState *state) {
     erase();
-
     int rows, cols; 
     getmaxyx(stdscr, rows, cols); 
     adjust_viewport(state);
 
+    const char *delimiters = " \t\r\n,;()[]{}<>=+-*/%&|!^<>.`\"'";
+
     for (int i = 0; i < rows - 2; i++) {
         int line_idx = state->top_line + i;
-        if (line_idx < state->num_lines) {
-            char *line = state->lines[line_idx]; 
-            if (!line) continue;
+        if (line_idx >= state->num_lines) continue;
+
+        char *line = state->lines[line_idx]; 
+        if (!line) continue;
+        
+        move(i, 0);
+        
+        int line_len = strlen(line);
+        int start_col = state->left_col;
+        if (start_col >= line_len) continue;
+
+        int current_pos = start_col;
+        
+        while(current_pos < line_len) {
             
-            move(i, 0); 
-            int len = strlen(line); 
-            int start_display_col = state->left_col;
-            if (start_display_col >= len) continue;
-            char *line_ptr = &line[start_display_col]; 
-            int display_len = len - start_display_col;
-            if (display_len > cols) display_len = cols;
-            int current_pos = 0;
-            while (current_pos < display_len) {
-                if (line_ptr[current_pos] == '#' || (line_ptr[current_pos] == '/' && current_pos + 1 < display_len && line_ptr[current_pos + 1] == '/')) {
-                    attron(COLOR_PAIR(6)); printw("%.*s", display_len - current_pos, &line_ptr[current_pos]); attroff(COLOR_PAIR(6)); break;
+            if (line[current_pos] == '#' || 
+                (line[current_pos] == '/' && current_pos + 1 < line_len && line[current_pos + 1] == '/')) {
+                attron(COLOR_PAIR(6));
+                printw("%s", &line[current_pos]);
+                attroff(COLOR_PAIR(6));
+                break; 
+            }
+
+            int token_start = current_pos;
+            if (strchr(delimiters, line[current_pos])) {
+                while(current_pos < line_len && strchr(delimiters, line[current_pos])) {
+                    current_pos++;
                 }
-                int token_start = current_pos;
-                if (isalnum(line_ptr[token_start]) || line_ptr[token_start] == '_') { 
-                    while (current_pos < display_len && (isalnum(line_ptr[current_pos]) || line_ptr[current_pos] == '_')) current_pos++;
-                } else {
-                    while (current_pos < display_len && !isalnum(line_ptr[current_pos]) && line_ptr[current_pos] != '_') {
-                        if (line_ptr[current_pos] == '/' && current_pos + 1 < display_len && line_ptr[current_pos + 1] == '/') break;
-                        current_pos++;
+            } else {
+                while(current_pos < line_len && !strchr(delimiters, line[current_pos])) {
+                    current_pos++;
+                }
+            }
+            
+            int token_len = current_pos - token_start;
+            if (token_len > 0) {
+                char *token_ptr = &line[token_start];
+                int color_pair = 0;
+                
+                if (!strchr(delimiters, *token_ptr)) {
+                    for (int j = 0; j < state->num_syntax_rules; j++) {
+                        if (strlen(state->syntax_rules[j].word) == token_len &&
+                            strncmp(token_ptr, state->syntax_rules[j].word, token_len) == 0) {
+                            
+                            switch(state->syntax_rules[j].type) {
+                                case SYNTAX_KEYWORD:      color_pair = 3; break;
+                                case SYNTAX_TYPE:         color_pair = 4; break;
+                                case SYNTAX_STD_FUNCTION: color_pair = 5; break;
+                            }
+                            break;
+                        }
                     }
                 }
-                int token_len = current_pos - token_start;
-                if (token_len > 0) {
-                    char *token_ptr = &line_ptr[token_start]; int color_pair = 0;
-                    if (isalnum(token_ptr[0]) || token_ptr[0] == '_') {
-    // Agora temos apenas UM loop que verifica nossa lista de regras carregadas
-    		for (int j = 0; j < state->num_syntax_rules; j++) {
-        	if (strlen(state->syntax_rules[j].word) == token_len && 
-            	strncmp(token_ptr, state->syntax_rules[j].word, token_len) == 0) {
 
-            // Mapeia o tipo da regra para a cor correta
-            	switch(state->syntax_rules[j].type) {
-                case SYNTAX_KEYWORD:      color_pair = 3; break; // Amarelo
-                case SYNTAX_TYPE:         color_pair = 4; break; // Verde
-                case SYNTAX_STD_FUNCTION: color_pair = 5; break; // Azul
-            }
-            break; // Encontrou a regra, pode parar de procurar
-        }
-    }
-}
-if (color_pair) attron(COLOR_PAIR(color_pair));
-                    printw("%.*s", token_len, token_ptr);
-                    if (color_pair) attroff(COLOR_PAIR(color_pair));
-                }
+                if (color_pair) attron(COLOR_PAIR(color_pair));
+                printw("%.*s", token_len, token_ptr);
+                if (color_pair) attroff(COLOR_PAIR(color_pair));
             }
         }
+        clrtoeol();
     }
 
+    // Barras de status e cursor
     attron(COLOR_PAIR(2)); 
     mvprintw(rows - 2, 0, "%s", state->status_msg); 
     attroff(COLOR_PAIR(2));
@@ -460,6 +595,7 @@ if (color_pair) attron(COLOR_PAIR(color_pair));
     doupdate();
 }
 
+
 void load_file(EditorState *state, const char *filename) {
     for (int i = 0; i < state->num_lines; i++) { if(state->lines[i]) free(state->lines[i]); state->lines[i] = NULL; }
     state->num_lines = 0; strncpy(state->filename, filename, sizeof(state->filename) - 1); state->filename[sizeof(state->filename) - 1] = '\0';
@@ -467,7 +603,7 @@ void load_file(EditorState *state, const char *filename) {
     if (file) {
         char line[MAX_LINE_LEN];
         while (fgets(line, sizeof(line), file) && state->num_lines < MAX_LINES) {
-            line[strcspn(line, "\n")] = '\0'; state->lines[state->num_lines] = strdup(line);
+            line[strcspn(line, "\n\r")] = 0; state->lines[state->num_lines] = strdup(line);
             if (!state->lines[state->num_lines]) { fclose(file); return; }
             state->num_lines++;
         }
@@ -705,7 +841,7 @@ void editor_start_completion(EditorState *state) {
     if (state->num_suggestions > 0) {
         state->completion_active = true;
         state->selected_suggestion = 0;
-        state->completion_scroll_top = 0; // +++ NOVO: Reseta a rolagem
+        state->completion_scroll_top = 0;
     }
 }
 
@@ -748,7 +884,6 @@ void editor_apply_completion(EditorState *state) {
     editor_end_completion(state);
 }
 
-// +++ FUNÇÃO COMPLETAMENTE REFEITA +++
 void editor_draw_completion_win(EditorState *state) {
     int max_len = 0;
     for (int i = 0; i < state->num_suggestions; i++) {
@@ -759,13 +894,11 @@ void editor_draw_completion_win(EditorState *state) {
     int rows, cols;
     getmaxyx(stdscr, rows, cols);
 
-    // Calcula a altura máxima que a janela pode ter sem sair da tela
     int cursor_screen_y = state->current_line - state->top_line;
-    int max_h = rows - 2 - (cursor_screen_y + 1); // Espaço abaixo do cursor
-    if (max_h < 3) max_h = 3; // Mínimo de 3 linhas
-    if (max_h > 15) max_h = 15; // Máximo de 15 linhas
+    int max_h = rows - 2 - (cursor_screen_y + 1); 
+    if (max_h < 3) max_h = 3; 
+    if (max_h > 15) max_h = 15;
 
-    // A altura da janela é o menor valor entre o número de sugestões e a altura máxima
     int win_h = state->num_suggestions < max_h ? state->num_suggestions : max_h;
     int win_w = max_len + 2; 
     
@@ -780,7 +913,6 @@ void editor_draw_completion_win(EditorState *state) {
     state->completion_win = newwin(win_h, win_w, win_y, win_x);
     wbkgd(state->completion_win, COLOR_PAIR(9)); 
 
-    // Desenha apenas os itens visíveis na janela, baseado na rolagem
     for (int i = 0; i < win_h; i++) {
         int suggestion_idx = state->completion_scroll_top + i;
         if (suggestion_idx < state->num_suggestions) {
@@ -799,6 +931,10 @@ void handle_insert_mode_key(EditorState *state, wint_t ch) {
         case KEY_CTRL_P:
             editor_start_completion(state);
             break;
+        case KEY_CTRL_DEL:
+        case KEY_CTRL_K:
+            editor_delete_line(state);
+            break;
         case KEY_ENTER: case '\n': editor_handle_enter(state); break;
         case KEY_BACKSPACE: case 127: case 8: editor_handle_backspace(state); break;
         case '\t': for (int i = 0; i < TAB_SIZE; i++) editor_insert_char(state, ' '); break;
@@ -815,19 +951,23 @@ void handle_insert_mode_key(EditorState *state, wint_t ch) {
     }
 }
 
+
 int main(int argc, char *argv[]) {
-    #define _XOPEN_SOURCE_EXTENDED 1
-    #define NCURSES_WIDECHAR 1
-    
     setlocale(LC_ALL, ""); 
     inicializar_ncurses();
     EditorState *state = calloc(1, sizeof(EditorState));
     if (!state) { endwin(); fprintf(stderr, "Fatal: Could not allocate memory for editor state.\n"); return 1; }
-    state->mode = NORMAL; 
+    
     strcpy(state->filename, "[No Name]");
-    state->completion_active = false; 
-    state->completion_win = NULL;
+    state->mode = NORMAL; 
+    
+    // +++ INICIALIZA AS NOVAS VARIÁVEIS DE BUSCA +++
+    state->last_search[0] = '\0';
+    state->last_match_line = -1;
+    state->last_match_col = -1;
+    
     load_syntax_file(state, "c.syntax");
+
     if (argc > 1) { 
         load_file(state, argv[1]);
     } else {
@@ -843,22 +983,31 @@ int main(int argc, char *argv[]) {
         get_wch(&ch);
 
         if (state->completion_active) {
+            int win_h = 0;
+            if (state->completion_win) win_h = getmaxy(state->completion_win);
+
             switch(ch) {
                 case KEY_UP:
-                    state->selected_suggestion = (state->selected_suggestion - 1 + state->num_suggestions) % state->num_suggestions;
+                    state->selected_suggestion--;
+                    if (state->selected_suggestion < 0) {
+                        state->selected_suggestion = state->num_suggestions - 1;
+                        if(win_h > 0) {
+                           int new_top = state->num_suggestions - win_h;
+                           state->completion_scroll_top = new_top > 0 ? new_top : 0;
+                        }
+                    }
                     if (state->selected_suggestion < state->completion_scroll_top) {
                         state->completion_scroll_top = state->selected_suggestion;
                     }
                     break;
                 case KEY_DOWN:
-                    {
-                        state->selected_suggestion = (state->selected_suggestion + 1) % state->num_suggestions;
-                        int win_h = 0;
-                        if(state->completion_win) win_h = getmaxy(state->completion_win);
-                        if(win_h > 0 && state->selected_suggestion >= state->completion_scroll_top + win_h) {
-                            state->completion_scroll_top++;
-                        }
-                        if(state->selected_suggestion == 0) state->completion_scroll_top = 0;
+                    state->selected_suggestion++;
+                    if (state->selected_suggestion >= state->num_suggestions) {
+                        state->selected_suggestion = 0;
+                        state->completion_scroll_top = 0;
+                    }
+                    if (win_h > 0 && state->selected_suggestion >= state->completion_scroll_top + win_h) {
+                        state->completion_scroll_top = state->selected_suggestion - win_h + 1;
                     }
                     break;
                 case KEY_ENTER: case '\n':
@@ -875,19 +1024,21 @@ int main(int argc, char *argv[]) {
             continue; 
         }
             
-        if (ch == 27) { // Tecla ESC ou uma combinação com Alt
+        if (ch == 27) { 
             nodelay(stdscr, TRUE);
             int next_ch = getch();
             nodelay(stdscr, FALSE);
 
-            if (next_ch == ERR) { // Apenas a tecla ESC foi pressionada
+            if (next_ch == ERR) { 
                 if (state->mode == INSERT) state->mode = NORMAL;
-            } else if (next_ch == 'f' || next_ch == 'w') { // Alt+f ou Alt+w
+            } else if (next_ch == 'f' || next_ch == 'w') {
                 editor_move_to_next_word(state);
-            } else if (next_ch == 'b' || next_ch == 'q') { // Alt+b ou Alt+q
+            } else if (next_ch == 'b' || next_ch == 'q') {
                 editor_move_to_previous_word(state);
+            } else if (next_ch == KEY_DC) {
+                 editor_delete_line(state);
             }
-            continue; // Pula o resto do processamento de teclas desta iteração
+            continue; 
         }
 
         switch (state->mode) {
@@ -895,6 +1046,22 @@ int main(int argc, char *argv[]) {
                 switch (ch) {
                     case 'i': state->mode = INSERT; break;
                     case ':': state->mode = COMMAND; state->history_pos = state->history_count; state->command_buffer[0] = '\0'; state->command_pos = 0; break;
+                    // +++ ATIVA A BUSCA NO MODO NORMAL +++
+                    case KEY_CTRL_F:
+                        editor_find(state);
+                        break;
+                    case KEY_CTRL_DEL:
+                         editor_delete_line(state);
+                         break;
+                    case KEY_CTRL_K:
+                         editor_delete_line(state);
+                         break;
+                    case KEY_CTRL_D:
+                        editor_find_next(state);
+                        break;
+                    case KEY_CTRL_A:
+                        editor_find_previous(state);
+                        break;
                     case KEY_UP: if (state->current_line > 0) { state->current_line--; state->current_col = state->ideal_col; } break;
                     case KEY_DOWN: if (state->current_line < state->num_lines - 1) { state->current_line++; state->current_col = state->ideal_col; } break;
                     case KEY_LEFT: if (state->current_col > 0) state->current_col--; state->ideal_col = state->current_col; break;
@@ -949,10 +1116,11 @@ int main(int argc, char *argv[]) {
                 break;
         }
     }
+
+    endwin(); 
     if (state->completion_active) editor_end_completion(state);
     for(int i=0; i < state->history_count; i++) free(state->command_history[i]);
 
-    // +++ ADICIONE ESTE BLOCO PARA LIMPAR A MEMÓRIA DA SINTAXE +++
     for (int i = 0; i < state->num_syntax_rules; i++) {
         free(state->syntax_rules[i].word);
     }
@@ -960,6 +1128,4 @@ int main(int argc, char *argv[]) {
 
     free(state); 
     return 0;
-}
-
 }
