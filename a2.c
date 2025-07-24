@@ -13,6 +13,19 @@
 
 #define KEY_CTRL_P 16
 
+typedef enum {
+    SYNTAX_KEYWORD,
+    SYNTAX_TYPE,
+    SYNTAX_STD_FUNCTION
+} SyntaxRuleType;
+
+// Estrutura para guardar uma regra de sintaxe (uma palavra e seu tipo)
+typedef struct {
+    char *word;
+    SyntaxRuleType type;
+} SyntaxRule;
+
+
 // --- Estrutura para a tela de ajuda ---
 typedef struct {
     const char *command;
@@ -24,7 +37,6 @@ typedef struct {
     char **lines;
     int num_lines;
 } FileViewer;
-
 
 // --- Constantes para Syntax Highlighting ---
 #define NUM_C_KEYWORDS 31
@@ -74,6 +86,10 @@ typedef struct {
     char *command_history[MAX_COMMAND_HISTORY];
     int history_count;
     int history_pos;
+    //New struct to plugins//
+    char word_to_complete[100];
+    int completion_start_col;
+    int completion_scroll_top;
     // Campos para o estado do autocompletar
     bool completion_active;
     char **completion_suggestions;
@@ -82,8 +98,54 @@ typedef struct {
     WINDOW *completion_win;
     char word_to_complete[100];
     int completion_start_col;
-    int completion_scroll_top; // +++ NOVO: Para controlar a rolagem da lista
+    int completion_scroll_top;// +++ NOVO: Para controlar a rolagem da lista
+    SyntaxRule *syntax_rules;      // Array dinâmico para as regras de cor
+    int num_syntax_rules;
+
+    char **dictionary_words;       // (Vamos usar este no futuro para o autocompletar)
+    int num_dictionary_words;
 } EditorState;
+
+// Nova função para carregar regras de sintaxe de um arquivo
+void load_syntax_file(EditorState *state, const char *filename) {
+    FILE *file = fopen(filename, "r");
+    if (!file) {
+        // Se o arquivo não existir, não fazemos nada. O editor funcionará sem cores.
+        return;
+    }
+
+    char line[256];
+    while (fgets(line, sizeof(line), file)) {
+        // Ignora comentários e linhas em branco
+        if (line[0] == '#' || line[0] == '\n' || line[0] == '\r') continue;
+
+        // Remove a quebra de linha do final
+        line[strcspn(line, "\r\n")] = 0;
+
+        // Separa a linha em "TIPO" e "palavra" usando o ":" como delimitador
+        char *type_str = strtok(line, ":");
+        char *word_str = strtok(NULL, ":");
+
+        if (type_str && word_str) {
+            // Aumenta o tamanho do nosso array de regras
+            state->num_syntax_rules++;
+            state->syntax_rules = realloc(state->syntax_rules, sizeof(SyntaxRule) * state->num_syntax_rules);
+            
+            SyntaxRule *new_rule = &state->syntax_rules[state->num_syntax_rules - 1];
+            new_rule->word = strdup(word_str);
+
+            // Converte o TIPO de string para nosso enum
+            if (strcmp(type_str, "KEYWORD") == 0) {
+                new_rule->type = SYNTAX_KEYWORD;
+            } else if (strcmp(type_str, "TYPE") == 0) {
+                new_rule->type = SYNTAX_TYPE;
+            } else if (strcmp(type_str, "STD_FUNCTION") == 0) {
+                new_rule->type = SYNTAX_STD_FUNCTION;
+            }
+        }
+    }
+    fclose(file);
+}
 
 // --- Declarações de Funções ---
 void inicializar_ncurses();
@@ -342,11 +404,22 @@ void editor_redraw(EditorState *state) {
                 if (token_len > 0) {
                     char *token_ptr = &line_ptr[token_start]; int color_pair = 0;
                     if (isalnum(token_ptr[0]) || token_ptr[0] == '_') {
-                        for (int j = 0; j < NUM_C_KEYWORDS; j++) if (strlen(c_keywords[j]) == token_len && strncmp(token_ptr, c_keywords[j], token_len) == 0) { color_pair = 3; break; }
-                        if (!color_pair) for (int j = 0; j < NUM_C_TYPES; j++) if (strlen(c_types[j]) == token_len && strncmp(token_ptr, c_types[j], token_len) == 0) { color_pair = 4; break; }
-                        if (!color_pair) for (int j = 0; j < NUM_C_STD_FUNCTIONS; j++) if (strlen(c_std_functions[j]) == token_len && strncmp(token_ptr, c_std_functions[j], token_len) == 0) { color_pair = 5; break; }
-                    }
-                    if (color_pair) attron(COLOR_PAIR(color_pair));
+    // Agora temos apenas UM loop que verifica nossa lista de regras carregadas
+    		for (int j = 0; j < state->num_syntax_rules; j++) {
+        	if (strlen(state->syntax_rules[j].word) == token_len && 
+            	strncmp(token_ptr, state->syntax_rules[j].word, token_len) == 0) {
+
+            // Mapeia o tipo da regra para a cor correta
+            	switch(state->syntax_rules[j].type) {
+                case SYNTAX_KEYWORD:      color_pair = 3; break; // Amarelo
+                case SYNTAX_TYPE:         color_pair = 4; break; // Verde
+                case SYNTAX_STD_FUNCTION: color_pair = 5; break; // Azul
+            }
+            break; // Encontrou a regra, pode parar de procurar
+        }
+    }
+}
+if (color_pair) attron(COLOR_PAIR(color_pair));
                     printw("%.*s", token_len, token_ptr);
                     if (color_pair) attroff(COLOR_PAIR(color_pair));
                 }
@@ -754,7 +827,7 @@ int main(int argc, char *argv[]) {
     strcpy(state->filename, "[No Name]");
     state->completion_active = false; 
     state->completion_win = NULL;
-
+    load_syntax_file(state, "c.syntax");
     if (argc > 1) { 
         load_file(state, argv[1]);
     } else {
@@ -802,7 +875,6 @@ int main(int argc, char *argv[]) {
             continue; 
         }
             
-        // +++ CÓDIGO CORRIGIDO PARA LIDAR COM ESC E ALT +++
         if (ch == 27) { // Tecla ESC ou uma combinação com Alt
             nodelay(stdscr, TRUE);
             int next_ch = getch();
@@ -877,9 +949,17 @@ int main(int argc, char *argv[]) {
                 break;
         }
     }
-    endwin(); 
     if (state->completion_active) editor_end_completion(state);
     for(int i=0; i < state->history_count; i++) free(state->command_history[i]);
+
+    // +++ ADICIONE ESTE BLOCO PARA LIMPAR A MEMÓRIA DA SINTAXE +++
+    for (int i = 0; i < state->num_syntax_rules; i++) {
+        free(state->syntax_rules[i].word);
+    }
+    free(state->syntax_rules);
+
     free(state); 
     return 0;
+}
+
 }
