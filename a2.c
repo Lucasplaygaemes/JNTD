@@ -6,12 +6,21 @@
 #include <errno.h>
 #include <locale.h> // Para setlocale()
 #include <wchar.h>  // Para wint_t
+#include <unistd.h> // Para chdir(), getcwd()
+#include <sys/wait.h> // Para waitpid()
 
 // --- Estrutura para a tela de ajuda ---
 typedef struct {
     const char *command;
     const char *description;
 } CommandInfo;
+
+// --- Estrutura para o visualizador de arquivos ---
+typedef struct {
+    char **lines;
+    int num_lines;
+} FileViewer;
+
 
 // --- Constantes para Syntax Highlighting ---
 #define NUM_C_KEYWORDS 31
@@ -32,6 +41,7 @@ const char *c_std_functions[NUM_C_STD_FUNCTIONS] = { "printf", "scanf", "fprintf
 #define STATUS_MSG_LEN 250
 #define PAGE_JUMP 10
 #define TAB_SIZE 4
+#define MAX_COMMAND_HISTORY 50 
 
 typedef enum { NORMAL, INSERT, COMMAND } EditorMode;
 typedef struct {
@@ -39,11 +49,18 @@ typedef struct {
     int num_lines, current_line, current_col, ideal_col, top_line, left_col, command_pos;
     EditorMode mode;
     char filename[256], status_msg[STATUS_MSG_LEN], command_buffer[100];
+    char *command_history[MAX_COMMAND_HISTORY];
+    int history_count;
+    int history_pos;
 } EditorState;
 
 // --- Declarações de Funções ---
 void inicializar_ncurses();
 void display_help_screen();
+void display_output_screen(const char *title, const char *filename);
+void compile_file(EditorState *state, char* args);
+void execute_shell_command(EditorState *state);
+void add_to_command_history(EditorState *state, const char* command);
 void editor_redraw(EditorState *state);
 void load_file(EditorState *state, const char *filename);
 void save_file(EditorState *state);
@@ -66,12 +83,12 @@ void inicializar_ncurses() {
     init_pair(3, COLOR_YELLOW, COLOR_BLACK); init_pair(4, COLOR_GREEN, COLOR_BLACK);
     init_pair(5, COLOR_BLUE, COLOR_BLACK); init_pair(6, COLOR_CYAN, COLOR_BLACK);
     init_pair(7, COLOR_MAGENTA, COLOR_BLACK);
+    init_pair(8, COLOR_WHITE, COLOR_BLACK);
+    bkgd(COLOR_PAIR(8)); 
 }
 
 void adjust_viewport(EditorState *state) {
-    int rows, cols;
-    getmaxyx(stdscr, rows, cols);
-    rows -= 2;
+    int rows, cols; getmaxyx(stdscr, rows, cols); rows -= 2;
     if (state->current_line < state->top_line) state->top_line = state->current_line;
     if (state->current_line >= state->top_line + rows) state->top_line = state->current_line - rows + 1;
     if (state->current_col < state->left_col) state->left_col = state->current_col;
@@ -80,9 +97,11 @@ void adjust_viewport(EditorState *state) {
 
 void display_help_screen() {
     static const CommandInfo commands[] = {
-        {":w", "Salva o arquivo atual."}, {":w <nome>", "Salva o arquivo com um novo nome."},
+        {":w", "Salva o arquivo atual."}, {":w <nome>", "Salva com um novo nome."},
         {":q", "Sai do editor."}, {":wq", "Salva e sai."}, {":open <nome>", "Abre um arquivo."},
-        {":new", "Cria um novo arquivo em branco."}, {":help", "Mostra esta tela de ajuda."}
+        {":new", "Cria um novo arquivo em branco."}, {":help", "Mostra esta tela de ajuda."},
+        {":gcc [libs]", "Compila o arquivo atual (ex: :gcc -lm)."},
+        {"![cmd]", "Executa um comando do shell (ex: !ls -l)."}
     };
     int num_commands = sizeof(commands) / sizeof(commands[0]);
     clear(); attron(A_BOLD); mvprintw(2, 2, "--- AJUDA DO EDITOR ---"); attroff(A_BOLD);
@@ -93,8 +112,149 @@ void display_help_screen() {
     refresh(); get_wch(NULL);
 }
 
+FileViewer* create_file_viewer(const char* filename) {
+    FILE *f = fopen(filename, "r");
+    if (!f) return NULL;
+    FileViewer *viewer = malloc(sizeof(FileViewer));
+    if (!viewer) { fclose(f); return NULL; }
+    viewer->lines = NULL; viewer->num_lines = 0;
+    char line_buffer[MAX_LINE_LEN];
+    while (fgets(line_buffer, sizeof(line_buffer), f)) {
+        viewer->num_lines++;
+        viewer->lines = realloc(viewer->lines, sizeof(char*) * viewer->num_lines);
+        line_buffer[strcspn(line_buffer, "\n")] = 0;
+        viewer->lines[viewer->num_lines - 1] = strdup(line_buffer);
+    }
+    fclose(f);
+    return viewer;
+}
+
+void destroy_file_viewer(FileViewer* viewer) {
+    if (!viewer) return;
+    for (int i = 0; i < viewer->num_lines; i++) free(viewer->lines[i]);
+    free(viewer->lines);
+    free(viewer);
+}
+
+void display_output_screen(const char *title, const char *filename) {
+    FileViewer *viewer = create_file_viewer(filename);
+    if (!viewer) { if(filename) remove(filename); return; }
+    int top_line = 0;
+    wint_t ch;
+    while (1) {
+        int rows, cols; getmaxyx(stdscr, rows, cols);
+        clear();
+        attron(A_BOLD); mvprintw(1, 2, "%s", title); attroff(A_BOLD);
+        int viewable_lines = rows - 4;
+        for (int i = 0; i < viewable_lines; i++) {
+            int line_idx = top_line + i;
+            if (line_idx < viewer->num_lines) {
+                mvprintw(3 + i, 2, "%.*s", cols - 2, viewer->lines[line_idx]);
+            }
+        }
+        attron(A_REVERSE); mvprintw(rows - 2, 2, " Use as SETAS ou PAGE UP/DOWN para rolar | Pressione 'q' ou ESC para sair "); attroff(A_REVERSE);
+        refresh();
+        get_wch(&ch);
+        switch(ch) {
+            case KEY_UP: if (top_line > 0) top_line--; break;
+            case KEY_DOWN: if (top_line < viewer->num_lines - viewable_lines) top_line++; break;
+            case KEY_PPAGE: top_line -= viewable_lines; if (top_line < 0) top_line = 0; break;
+            case KEY_NPAGE: top_line += viewable_lines; if (top_line >= viewer->num_lines) top_line = viewer->num_lines - 1; break;
+            case 'q': case 27: goto end_viewer;
+        }
+    }
+end_viewer:
+    destroy_file_viewer(viewer);
+    if(filename) remove(filename);
+}
+
+void execute_shell_command(EditorState *state) {
+    char *cmd = state->command_buffer + 1;
+    if (strncmp(cmd, "cd ", 3) == 0) {
+        char *path = cmd + 3;
+        if (chdir(path) != 0) {
+            snprintf(state->status_msg, sizeof(state->status_msg), "Erro ao mudar diretório: %s", strerror(errno));
+        } else {
+            char cwd[1024];
+            if (getcwd(cwd, sizeof(cwd)) != NULL) {
+                char display_cwd[80];
+                strncpy(display_cwd, cwd, sizeof(display_cwd) - 1);
+                display_cwd[sizeof(display_cwd) - 1] = '\0';
+                snprintf(state->status_msg, sizeof(state->status_msg), "Diretório atual: %s", display_cwd);
+            }
+        }
+        return;
+    }
+    char temp_output_file[] = "/tmp/editor_shell_output.XXXXXX";
+    int fd = mkstemp(temp_output_file);
+    if(fd == -1) { snprintf(state->status_msg, sizeof(state->status_msg), "Erro ao criar arquivo temporário."); return; }
+    close(fd);
+    char full_shell_command[2048];
+    snprintf(full_shell_command, sizeof(full_shell_command), "%s > %s 2>&1", cmd, temp_output_file);
+    def_prog_mode(); endwin();
+    system(full_shell_command);
+    reset_prog_mode(); refresh();
+    FILE *f = fopen(temp_output_file, "r");
+    if(f) {
+        fseek(f, 0, SEEK_END); long size = ftell(f); fclose(f);
+        if (size > 0 && size < 96) {
+            FILE *read_f = fopen(temp_output_file, "r");
+            char buffer[STATUS_MSG_LEN] = {0};
+            size_t n = fread(buffer, 1, sizeof(buffer) - 1, read_f);
+            fclose(read_f);
+            if (n > 0 && buffer[n-1] == '\n') buffer[n-1] = '\0';
+            if(strchr(buffer, '\n') == NULL) {
+                char display_output[80];
+                strncpy(display_output, buffer, sizeof(display_output) - 1);
+                display_output[sizeof(display_output) - 1] = '\0';
+                snprintf(state->status_msg, sizeof(state->status_msg), "Saída: %s", display_output);
+                remove(temp_output_file);
+                return;
+            }
+        }
+        display_output_screen("--- SAÍDA DO COMANDO ---", temp_output_file);
+        snprintf(state->status_msg, sizeof(state->status_msg), "Comando '%s' executado.", cmd);
+    } else {
+        snprintf(state->status_msg, sizeof(state->status_msg), "Comando executado, mas sem saída.");
+        remove(temp_output_file);
+    }
+}
+
+void compile_file(EditorState *state, char* args) {
+    save_file(state);
+    if (strcmp(state->filename, "[No Name]") == 0) {
+        snprintf(state->status_msg, sizeof(state->status_msg), "Salve o arquivo com um nome antes de compilar.");
+        return;
+    }
+    char output_filename[300];
+    strncpy(output_filename, state->filename, sizeof(output_filename) - 1);
+    char *dot = strrchr(output_filename, '.'); if (dot) *dot = '\0';
+    char command[1024];
+    snprintf(command, sizeof(command), "gcc %s -o %s %s", state->filename, output_filename, args);
+    char temp_output_file[] = "/tmp/editor_compile_output.XXXXXX";
+    int fd = mkstemp(temp_output_file); if(fd == -1) return; close(fd);
+    char full_shell_command[2048];
+    snprintf(full_shell_command, sizeof(full_shell_command), "%s > %s 2>&1", command, temp_output_file);
+    def_prog_mode(); endwin();
+    int ret = system(full_shell_command);
+    reset_prog_mode(); refresh();
+    if (WIFEXITED(ret) && WEXITSTATUS(ret) == 0) {
+        char display_output_name[40];
+        strncpy(display_output_name, output_filename, sizeof(display_output_name) - 1);
+        display_output_name[sizeof(display_output_name)-1] = '\0';
+        snprintf(state->status_msg, sizeof(state->status_msg), "Compilação bem-sucedida! Executável: %s", display_output_name);
+    } else {
+        display_output_screen("--- ERROS DE COMPILAÇÃO ---", temp_output_file);
+        snprintf(state->status_msg, sizeof(state->status_msg), "Compilação falhou. Veja os erros.");
+    }
+}
+
 void editor_redraw(EditorState *state) {
     clear(); int rows, cols; getmaxyx(stdscr, rows, cols); adjust_viewport(state);
+
+    // CORREÇÃO: Força a cor padrão ANTES de desenhar o texto principal
+    attron(COLOR_PAIR(8));
+
     for (int i = 0; i < rows - 2; i++) {
         int line_idx = state->top_line + i;
         if (line_idx < state->num_lines) {
@@ -105,6 +265,8 @@ void editor_redraw(EditorState *state) {
             if (display_len > cols) display_len = cols;
             int current_pos = 0;
             while (current_pos < display_len) {
+                // Desliga a cor padrão temporariamente para aplicar a cor da sintaxe
+                attroff(COLOR_PAIR(8));
                 if (line_ptr[current_pos] == '#' || (line_ptr[current_pos] == '/' && current_pos + 1 < display_len && line_ptr[current_pos + 1] == '/')) {
                     attron(COLOR_PAIR(6)); printw("%.*s", display_len - current_pos, &line_ptr[current_pos]); attroff(COLOR_PAIR(6)); break;
                 }
@@ -128,21 +290,28 @@ void editor_redraw(EditorState *state) {
                     printw("%.*s", token_len, token_ptr);
                     if (color_pair) attroff(COLOR_PAIR(color_pair));
                 }
+                // Liga a cor padrão novamente para o resto do texto/espaços
+                attron(COLOR_PAIR(8));
             }
         }
     }
+    // CORREÇÃO: Desliga a cor padrão DEPOIS de desenhar o texto
+    attroff(COLOR_PAIR(8));
+
     attron(COLOR_PAIR(2)); move(rows - 2, 0); clrtoeol(); mvprintw(rows - 2, 0, "%s", state->status_msg); attroff(COLOR_PAIR(2));
     attron(COLOR_PAIR(1)); move(rows - 1, 0); clrtoeol();
-    if (state->mode == COMMAND) { mvprintw(rows - 1, 0, ":%s", state->command_buffer);
+    if (state->mode == COMMAND) {
+        mvprintw(rows - 1, 0, ":%s", state->command_buffer);
+        move(rows - 1, state->command_pos + 1);
     } else {
         char mode_str[20];
         switch (state->mode) { case NORMAL: strcpy(mode_str, "-- NORMAL --"); break; case INSERT: strcpy(mode_str, "-- INSERT --"); break; default: strcpy(mode_str, "--          --"); break; }
         char display_filename[40]; strncpy(display_filename, state->filename, sizeof(display_filename) - 1); display_filename[sizeof(display_filename) - 1] = '\0'; 
         mvprintw(rows - 1, 0, "%s | %s | Line %d/%d, Col %d", mode_str, display_filename, state->current_line + 1, state->num_lines, state->current_col + 1);
+        int cursor_y = state->current_line - state->top_line;
+        int cursor_x = state->current_col - state->left_col;
+        move(cursor_y, cursor_x);
     }
-    attroff(COLOR_PAIR(1));
-    if (state->mode == COMMAND) { move(rows - 1, strlen(state->command_buffer) + 1);
-    } else { int cursor_y = state->current_line - state->top_line; int cursor_x = state->current_col - state->left_col; move(cursor_y, cursor_x); }
     curs_set(1); refresh();
 }
 
@@ -268,15 +437,44 @@ void editor_move_to_previous_word(EditorState *state) {
     state->ideal_col = state->current_col;
 }
 
+void add_to_command_history(EditorState *state, const char* command) {
+    if (strlen(command) == 0) return;
+    if (state->history_count > 0 && strcmp(state->command_history[state->history_count - 1], command) == 0) return;
+    if (state->history_count < MAX_COMMAND_HISTORY) {
+        state->command_history[state->history_count++] = strdup(command);
+    } else {
+        free(state->command_history[0]);
+        for (int i = 0; i < MAX_COMMAND_HISTORY - 1; i++) {
+            state->command_history[i] = state->command_history[i + 1];
+        }
+        state->command_history[MAX_COMMAND_HISTORY - 1] = strdup(command);
+    }
+}
+
 void process_command(EditorState *state) {
-    char command[100], args[100] = "";
-    sscanf(state->command_buffer, "%s %s", command, args);
+    if (state->command_buffer[0] == '!') {
+        execute_shell_command(state);
+        add_to_command_history(state, state->command_buffer);
+        state->mode = NORMAL;
+        return;
+    }
+    add_to_command_history(state, state->command_buffer);
+    char command[100], args[1024] = "";
+    char *buffer_ptr = state->command_buffer;
+    int i = 0;
+    while(i < 99 && *buffer_ptr && !isspace(*buffer_ptr)) command[i++] = *buffer_ptr++;
+    command[i] = '\0';
+    if(isspace(*buffer_ptr)) buffer_ptr++;
+    strncpy(args, buffer_ptr, sizeof(args) - 1);
+    args[sizeof(args)-1] = '\0';
     if (strcmp(command, "q") == 0) { endwin(); exit(0); } 
     else if (strcmp(command, "w") == 0) {
         if (strlen(args) > 0) strncpy(state->filename, args, sizeof(state->filename) - 1);
         save_file(state);
     } else if (strcmp(command, "help") == 0) {
         display_help_screen();
+    } else if (strcmp(command, "gcc") == 0) {
+        compile_file(state, args);
     } else if (strcmp(command, "open") == 0) {
         if (strlen(args) > 0) load_file(state, args);
         else snprintf(state->status_msg, sizeof(state->status_msg), "Usage: :open <filename>");
@@ -319,26 +517,21 @@ int main(int argc, char *argv[]) {
         if (result != ERR) {
             if (state->mode != COMMAND) state->status_msg[0] = '\0';
             
-            // Lógica para lidar com a tecla ESC e combinações com Alt
             if (ch == 27) {
-                nodelay(stdscr, TRUE); // Não bloqueia, apenas verifica se há outra tecla
+                nodelay(stdscr, TRUE); 
                 int next_ch = getch();
-                if (next_ch == ERR) { // Foi apenas a tecla ESC
-                    if (state->mode == INSERT) state->mode = NORMAL;
-                } else if (next_ch == 'f' || next_ch == 'F') {
-                    editor_move_to_next_word(state);
-                } else if (next_ch == 'b' || next_ch == 'B') {
-                    editor_move_to_previous_word(state);
-                }
-                nodelay(stdscr, FALSE); // Volta ao modo de bloqueio normal
-                continue; // Pula o resto do loop para esta iteração
+                if (next_ch == ERR) { if (state->mode == INSERT) state->mode = NORMAL;
+                } else if (next_ch == 'w' || next_ch == 'W') { editor_move_to_next_word(state);
+                } else if (next_ch == 'q' || next_ch == 'Q') { editor_move_to_previous_word(state); }
+                nodelay(stdscr, FALSE);
+                continue;
             }
 
             switch (state->mode) {
                 case NORMAL:
                     switch (ch) {
                         case 'i': state->mode = INSERT; break;
-                        case ':': state->mode = COMMAND; state->command_buffer[0] = '\0'; state->command_pos = 0; break;
+                        case ':': state->mode = COMMAND; state->history_pos = state->history_count; state->command_buffer[0] = '\0'; state->command_pos = 0; break;
                         case KEY_UP: if (state->current_line > 0) { state->current_line--; state->current_col = state->ideal_col; } break;
                         case KEY_DOWN: if (state->current_line < state->num_lines - 1) { state->current_line++; state->current_col = state->ideal_col; } break;
                         case KEY_LEFT: if (state->current_col > 0) state->current_col--; state->ideal_col = state->current_col; break;
@@ -347,7 +540,7 @@ int main(int argc, char *argv[]) {
                         case KEY_NPAGE: case KEY_SF: for (int i = 0; i < PAGE_JUMP; i++) if (state->current_line < state->num_lines - 1) state->current_line++; state->current_col = state->ideal_col; break;
                         case KEY_HOME: state->current_col = 0; state->ideal_col = 0; break;
                         case KEY_END: { char* line = state->lines[state->current_line]; if(line) state->current_col = strlen(line); state->ideal_col = state->current_col; } break;
-                        case KEY_SDC: /* Ctrl+Delete */ editor_delete_line(state); break;
+                        case KEY_SDC: editor_delete_line(state); break;
                     }
                     break;
                 case INSERT:
@@ -363,22 +556,54 @@ int main(int argc, char *argv[]) {
                         case KEY_NPAGE: case KEY_SF: for (int i = 0; i < PAGE_JUMP; i++) if (state->current_line < state->num_lines - 1) state->current_line++; state->current_col = state->ideal_col; break;
                         case KEY_HOME: state->current_col = 0; state->ideal_col = 0; break;
                         case KEY_END: { char* line = state->lines[state->current_line]; if(line) state->current_col = strlen(line); state->ideal_col = state->current_col; } break;
-                        case KEY_SDC: /* Ctrl+Delete */ editor_delete_line(state); break;
+                        case KEY_SDC: editor_delete_line(state); break;
                         default: if (ch >= 32 && ch != 127) { editor_insert_char(state, ch); } break;
                     }
                     break;
                 case COMMAND:
-                     if (ch == 27) { state->mode = NORMAL; state->status_msg[0] = '\0';
-                    } else if (ch == '\n' || ch == KEY_ENTER) { process_command(state);
-                    } else if ((ch == KEY_BACKSPACE || ch == 127) && state->command_pos > 0) { state->command_buffer[--state->command_pos] = '\0';
-                    } else if (ch >= 32 && ch < 127 && state->command_pos < sizeof(state->command_buffer) - 1) {
-                        state->command_buffer[state->command_pos++] = (char)ch;
-                        state->command_buffer[state->command_pos] = '\0';
+                    switch (ch) {
+                        case KEY_LEFT: if (state->command_pos > 0) state->command_pos--; break;
+                        case KEY_RIGHT: if (state->command_pos < strlen(state->command_buffer)) state->command_pos++; break;
+                        case KEY_UP:
+                            if (state->history_pos > 0) {
+                                state->history_pos--;
+                                strncpy(state->command_buffer, state->command_history[state->history_pos], sizeof(state->command_buffer) - 1);
+                                state->command_pos = strlen(state->command_buffer);
+                            }
+                            break;
+                        case KEY_DOWN:
+                            if (state->history_pos < state->history_count) {
+                                state->history_pos++;
+                                if (state->history_pos == state->history_count) {
+                                    state->command_buffer[0] = '\0';
+                                } else {
+                                    strncpy(state->command_buffer, state->command_history[state->history_pos], sizeof(state->command_buffer) - 1);
+                                }
+                                state->command_pos = strlen(state->command_buffer);
+                            }
+                            break;
+                        case KEY_ENTER: case '\n': process_command(state); break;
+                        case KEY_BACKSPACE: case 127:
+                            if (state->command_pos > 0) {
+                                memmove(&state->command_buffer[state->command_pos - 1], &state->command_buffer[state->command_pos], strlen(state->command_buffer) - state->command_pos + 1);
+                                state->command_pos--;
+                            }
+                            break;
+                        default:
+                            if (ch >= 32 && ch < 127 && strlen(state->command_buffer) < sizeof(state->command_buffer) - 1) {
+                                memmove(&state->command_buffer[state->command_pos + 1], &state->command_buffer[state->command_pos], strlen(state->command_buffer) - state->command_pos + 1);
+                                state->command_buffer[state->command_pos] = (char)ch;
+                                state->command_pos++;
+                            }
+                            break;
                     }
                     break;
             }
         }
     }
-    endwin(); free(state); return 0;
+    endwin(); 
+    for(int i=0; i < state->history_count; i++) free(state->command_history[i]);
+    free(state); 
+    return 0;
 }
 
