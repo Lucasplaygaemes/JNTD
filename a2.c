@@ -742,7 +742,6 @@ void handle_insert_mode_key(EditorState *state, wint_t ch) {
     }
 }
 
-
 int main(int argc, char *argv[]) {
     #define _XOPEN_SOURCE_EXTENDED 1
     #define NCURSES_WIDECHAR 1
@@ -771,33 +770,22 @@ int main(int argc, char *argv[]) {
         get_wch(&ch);
 
         if (state->completion_active) {
-            // +++ LÓGICA DE NAVEGAÇÃO E ROLAGEM +++
-            int win_h = 0;
-            if (state->completion_win) {
-                win_h = getmaxy(state->completion_win);
-            }
-
             switch(ch) {
                 case KEY_UP:
-                    state->selected_suggestion--;
-                    if (state->selected_suggestion < 0) {
-                        state->selected_suggestion = state->num_suggestions - 1;
-                        // Rola para o final
-                        int new_top = state->num_suggestions - win_h;
-                        state->completion_scroll_top = new_top > 0 ? new_top : 0;
-                    }
+                    state->selected_suggestion = (state->selected_suggestion - 1 + state->num_suggestions) % state->num_suggestions;
                     if (state->selected_suggestion < state->completion_scroll_top) {
                         state->completion_scroll_top = state->selected_suggestion;
                     }
                     break;
                 case KEY_DOWN:
-                    state->selected_suggestion++;
-                    if (state->selected_suggestion >= state->num_suggestions) {
-                        state->selected_suggestion = 0;
-                        state->completion_scroll_top = 0; // Rola para o início
-                    }
-                    if (state->selected_suggestion >= state->completion_scroll_top + win_h) {
-                        state->completion_scroll_top = state->selected_suggestion - win_h + 1;
+                    {
+                        state->selected_suggestion = (state->selected_suggestion + 1) % state->num_suggestions;
+                        int win_h = 0;
+                        if(state->completion_win) win_h = getmaxy(state->completion_win);
+                        if(win_h > 0 && state->selected_suggestion >= state->completion_scroll_top + win_h) {
+                            state->completion_scroll_top++;
+                        }
+                        if(state->selected_suggestion == 0) state->completion_scroll_top = 0;
                     }
                     break;
                 case KEY_ENTER: case '\n':
@@ -814,9 +802,20 @@ int main(int argc, char *argv[]) {
             continue; 
         }
             
-        if (ch == 27) {
-             if (state->mode == INSERT) state->mode = NORMAL;
-             continue;
+        // +++ CÓDIGO CORRIGIDO PARA LIDAR COM ESC E ALT +++
+        if (ch == 27) { // Tecla ESC ou uma combinação com Alt
+            nodelay(stdscr, TRUE);
+            int next_ch = getch();
+            nodelay(stdscr, FALSE);
+
+            if (next_ch == ERR) { // Apenas a tecla ESC foi pressionada
+                if (state->mode == INSERT) state->mode = NORMAL;
+            } else if (next_ch == 'f' || next_ch == 'w') { // Alt+f ou Alt+w
+                editor_move_to_next_word(state);
+            } else if (next_ch == 'b' || next_ch == 'q') { // Alt+b ou Alt+q
+                editor_move_to_previous_word(state);
+            }
+            continue; // Pula o resto do processamento de teclas desta iteração
         }
 
         switch (state->mode) {
