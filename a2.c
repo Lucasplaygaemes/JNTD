@@ -104,12 +104,20 @@ void display_help_screen() {
         {"![cmd]", "Executa um comando do shell (ex: !ls -l)."}
     };
     int num_commands = sizeof(commands) / sizeof(commands[0]);
-    clear(); attron(A_BOLD); mvprintw(2, 2, "--- AJUDA DO EDITOR ---"); attroff(A_BOLD);
+    
+    attron(COLOR_PAIR(8)); // <<< CORREÇÃO: Define o par de cores padrão (branco/preto)
+    clear(); 
+    bkgd(COLOR_PAIR(8));
+
+    attron(A_BOLD); mvprintw(2, 2, "--- AJUDA DO EDITOR ---"); attroff(A_BOLD);
     for (int i = 0; i < num_commands; i++) {
         mvprintw(4 + i, 4, "%-15s: %s", commands[i].command, commands[i].description);
     }
     attron(A_REVERSE); mvprintw(6 + num_commands, 2, " Pressione qualquer tecla para voltar ao editor "); attroff(A_REVERSE);
     refresh(); get_wch(NULL);
+
+    bkgd(COLOR_PAIR(8));
+    attroff(COLOR_PAIR(8)); // <<< CORREÇÃO: Boa prática desativar o atributo ao sair.
 }
 
 FileViewer* create_file_viewer(const char* filename) {
@@ -143,7 +151,10 @@ void display_output_screen(const char *title, const char *filename) {
     wint_t ch;
     while (1) {
         int rows, cols; getmaxyx(stdscr, rows, cols);
+        attron(COLOR_PAIR(8)); // <<< CORREÇÃO: Define o par de cores padrão (branco/preto)
         clear();
+        bkgd(COLOR_PAIR(8));
+
         attron(A_BOLD); mvprintw(1, 2, "%s", title); attroff(A_BOLD);
         int viewable_lines = rows - 4;
         for (int i = 0; i < viewable_lines; i++) {
@@ -166,6 +177,8 @@ void display_output_screen(const char *title, const char *filename) {
 end_viewer:
     destroy_file_viewer(viewer);
     if(filename) remove(filename);
+    bkgd(COLOR_PAIR(8));
+    attroff(COLOR_PAIR(8)); // <<< CORREÇÃO: Boa prática desativar o atributo ao sair.
 }
 
 void execute_shell_command(EditorState *state) {
@@ -251,10 +264,7 @@ void compile_file(EditorState *state, char* args) {
 
 void editor_redraw(EditorState *state) {
     clear(); int rows, cols; getmaxyx(stdscr, rows, cols); adjust_viewport(state);
-
-    // CORREÇÃO: Força a cor padrão ANTES de desenhar o texto principal
     attron(COLOR_PAIR(8));
-
     for (int i = 0; i < rows - 2; i++) {
         int line_idx = state->top_line + i;
         if (line_idx < state->num_lines) {
@@ -265,7 +275,6 @@ void editor_redraw(EditorState *state) {
             if (display_len > cols) display_len = cols;
             int current_pos = 0;
             while (current_pos < display_len) {
-                // Desliga a cor padrão temporariamente para aplicar a cor da sintaxe
                 attroff(COLOR_PAIR(8));
                 if (line_ptr[current_pos] == '#' || (line_ptr[current_pos] == '/' && current_pos + 1 < display_len && line_ptr[current_pos + 1] == '/')) {
                     attron(COLOR_PAIR(6)); printw("%.*s", display_len - current_pos, &line_ptr[current_pos]); attroff(COLOR_PAIR(6)); break;
@@ -290,12 +299,10 @@ void editor_redraw(EditorState *state) {
                     printw("%.*s", token_len, token_ptr);
                     if (color_pair) attroff(COLOR_PAIR(color_pair));
                 }
-                // Liga a cor padrão novamente para o resto do texto/espaços
                 attron(COLOR_PAIR(8));
             }
         }
     }
-    // CORREÇÃO: Desliga a cor padrão DEPOIS de desenhar o texto
     attroff(COLOR_PAIR(8));
 
     attron(COLOR_PAIR(2)); move(rows - 2, 0); clrtoeol(); mvprintw(rows - 2, 0, "%s", state->status_msg); attroff(COLOR_PAIR(2));
@@ -312,6 +319,7 @@ void editor_redraw(EditorState *state) {
         int cursor_x = state->current_col - state->left_col;
         move(cursor_y, cursor_x);
     }
+    attroff(COLOR_PAIR(1)); // <<< CORREÇÃO PRINCIPAL: Desativa o par de cores branco/azul
     curs_set(1); refresh();
 }
 
@@ -521,8 +529,8 @@ int main(int argc, char *argv[]) {
                 nodelay(stdscr, TRUE); 
                 int next_ch = getch();
                 if (next_ch == ERR) { if (state->mode == INSERT) state->mode = NORMAL;
-                } else if (next_ch == 'w' || next_ch == 'W') { editor_move_to_next_word(state);
-                } else if (next_ch == 'q' || next_ch == 'Q') { editor_move_to_previous_word(state); }
+                } else if (next_ch == 'f' || next_ch == 'F') { editor_move_to_next_word(state);
+                } else if (next_ch == 'b' || next_ch == 'B') { editor_move_to_previous_word(state); }
                 nodelay(stdscr, FALSE);
                 continue;
             }
@@ -606,4 +614,3 @@ int main(int argc, char *argv[]) {
     free(state); 
     return 0;
 }
-
