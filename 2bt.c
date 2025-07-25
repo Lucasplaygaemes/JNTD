@@ -3,17 +3,18 @@
 #include <stdlib.h>
 #include <sys/wait.h>
 #include <time.h>
-#include <sys/stat.h> // Para stat (Linux/macOS)
+#include <sys/stat.h>
 #include <pthread.h>
-#include <unistd.h>  // Para sleep()
+#include <unistd.h>
 #include <dirent.h>
 #include <dlfcn.h>
 #include "plugin.h"
 #include <curl/curl.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include <dlfcn.h>
 #include <json-c/json.h>
+#include <termios.h> 
+#include <ctype.h>
 
 #ifdef _WIN32
 #include <windows.h> // Para Sleep()
@@ -37,6 +38,14 @@
 #define MAX_HISTORY 50
 //define o tamanho maximo do input do usario + extras como calc
 #define COMBINED_PROMPT_LEN 2048 // Já estava adequado, mas mantido para clareza
+
+#define MAX_ALIASES 128
+#define MAX_PROMPT_LEN 256
+#define MAX_OLLAMA_CMD_LEN 4096
+#define OLLAMA_BUFFER_SIZE 1024
+#define OLLAMA_MODEL "llama2"
+#define MAX_HISTORY 50
+#define COMBINED_PROMPT_LEN 2048
 char input_copy[1024];
 char dir_novo[100];
 char *path[100];
@@ -51,20 +60,21 @@ int line_number;
 const char* quiz_file = "quiz.txt";
 char time_str[26] = {0};
 int seconds;
-volatile int timer_running = 0;//indica se o timer tá ativo, 0 = inativo, 1 = ativo//
-volatile int quiz_timer_running = 0;//indica se o quiz timer está ativo//
-volatile int current_timer_seconds = 0;//armazena o tempo restante do timer//
+volatile int timer_running = 0;
+volatile int quiz_timer_running = 0;
+volatile int current_timer_seconds = 0;
 int plugin_count = 0;
 
-pthread_t timer_thread;//id da thread do timer
-pthread_t quiz_thread;//id da thread do quiz
-// Estrutura de comando
+pthread_t timer_thread;
+pthread_t quiz_thread;
+
+struct termios orig_termios;
+
 typedef struct {
     const char *key;
     const char *shell_command;
     const char *descri;
 } CmdEntry;
-
 typedef struct {
 	char *name;
 	char *command;
@@ -910,6 +920,112 @@ void rscript(const char *args) {
     }
 }
 
+
+void disable_raw_mode() {
+    tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
+}
+
+void enable_raw_mode() {
+    tcgetattr(STDIN_FILENO, &orig_termios);
+    atexit(disable_raw_mode);
+
+    struct termios raw = orig_termios;
+    raw.c_lflag &= ~(ECHO | ICANON);
+    tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
+}
+
+// +++ FUNÇÃO DE LEITURA REESCRITA PARA USAR APENAS GETCHAR() +++
+int read_command_line(char *buf, int size) {
+    int pos = 0; 
+    int len = 0; 
+    int history_pos = history_count;
+    buf[0] = '\0';
+
+    while (1) {
+        int c = getchar();
+
+        if (c == EOF || c == 4) { // EOF ou Ctrl+D
+            return -1;
+        } else if (c == '\n') { // Enter
+            printf("\n");
+            buf[len] = '\0';
+            return len;
+        } else if (c == 127 || c == 8) { // Backspace
+            if (pos > 0) {
+                memmove(&buf[pos - 1], &buf[pos], len - pos);
+                pos--;
+                len--;
+                buf[len] = '\0';
+                
+                printf("\r> %s\033[K", buf);
+                if (pos < len + 2) {
+                     printf("\r\x1b[%dC", pos + 2);
+                }
+                fflush(stdout);
+            }
+        } else if (c == '\x1b') { // Sequência de escape (setas)
+            int next1 = getchar();
+            int next2 = getchar();
+
+            if (next1 == '[') {
+                switch(next2) {
+                    case 'A': // Seta para Cima
+                        if (history_pos > 0) {
+                            history_pos--;
+                            strncpy(buf, command_history[history_pos], size - 1);
+                            len = strlen(buf);
+                            pos = len;
+                            printf("\r> %s\033[K", buf);
+                            fflush(stdout);
+                        }
+                        break;
+                    case 'B': // Seta para Baixo
+                        if (history_pos < history_count - 1) {
+                            history_pos++;
+                            strncpy(buf, command_history[history_pos], size - 1);
+                            len = strlen(buf);
+                            pos = len;
+                            printf("\r> %s\033[K", buf);
+                            fflush(stdout);
+                        } else {
+                            history_pos = history_count;
+                            pos = 0;
+                            len = 0;
+                            buf[0] = '\0';
+                            printf("\r> \033[K");
+                            fflush(stdout);
+                        }
+                        break;
+                    case 'C': // Seta para Direita
+                        if (pos < len) {
+                            pos++;
+                            printf("\x1b[C");
+                            fflush(stdout);
+                        }
+                        break;
+                    case 'D': // Seta para Esquerda
+                        if (pos > 0) {
+                            pos--;
+                            printf("\x1b[D");
+                            fflush(stdout);
+                        }
+                        break;
+                }
+            }
+        } else if (isprint(c) && len < size - 1) {
+            memmove(&buf[pos + 1], &buf[pos], len - pos + 1); // +1 para o terminador nulo
+            buf[pos] = c;
+            len++;
+            pos++;
+            
+            printf("\r> %s\033[K", buf);
+            printf("\r\x1b[%dC", pos + 2);
+            fflush(stdout);
+        }
+    }
+}
+
+
 void dispatch(const char *user_in) {
     char input_copy[128];
     strncpy(input_copy, user_in, sizeof(input_copy) - 1);
@@ -1015,27 +1131,41 @@ void dispatch(const char *user_in) {
 int main(void) {
     printf("Iniciando o JNTD...\n");
     printf("Bem vindo/a\n");
+
+    enable_raw_mode();
+
     load_plugins();
     load_aliases_from_file();
     printf("Plugins carregados: %d\n", plugin_count);
     printf("Digite um comando. Use 'help' para ver as opções ou 'sair' para terminar.\n");
-    while (printf("> "), fgets(buf, sizeof(buf), stdin) != NULL) {
-        buf[strcspn(buf, "\n")] = '\0'; // Remove newline
-        if (strcmp(buf, "sair") == 0) {
-            break;
-        } else if(strcmp(buf, ":q") == 0) {
-            break;
+
+    while (1) {
+        printf("> ");
+        fflush(stdout);
+
+        if (read_command_line(buf, sizeof(buf)) < 0) {
+            printf("\n"); // Adiciona uma quebra de linha após Ctrl+D
+            break; 
         }
-        if (buf[0] == '\0') { // Usuário apenas apertou Enter
+
+        if (buf[0] == '\0') {
             continue;
         }
+        
+        add_to_history(buf);
+
+        if (strcmp(buf, "sair") == 0 || strcmp(buf, ":q") == 0) {
+            break;
+        }
+        
         dispatch(buf);
     }
-    // Libera memória do histórico antes de sair
+    
     for (int i = 0; i < history_count; i++) {
         free(command_history[i]);
     }
-    printf("Saindo....\n");
-    // Adiciona uma pausa para evitar fechamento imediato do terminal
+
+    disable_raw_mode();
+    printf("\nSaindo....\n");
     return 0;
 }
