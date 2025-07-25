@@ -10,6 +10,12 @@ There's no such thing as "right way to use". Because you can automate things whe
 The code access the Ollama via bash, the 2B it's trained to know how and what to respond when it's questioned within the terminal, it's has been trained in a personalized dataset, that's has previous commands and interactions between she and the user and the terminal. Ex: make an .txt file that has the firts 50 firts numbers from fibonacci sequence, and it's done.
 I want in the next updates make she possible to make complex interactions with the terminal, and codes, she may be possible to execute codes, and test them by herself, so she will have the possibility to know, where, why, and how a bug it's happening, she will also be able to search for directorys that may have a bug, when something is missing.
 
+# A2!
+What's A2 you might ask? It's my own file editor. The VIM is my main file editor, and that won't change, but when you need to edit a file, or make a correction or whatever reason, the A2 will be there waiting you. It's inspired by vim. A2 isn't perfect yet but it's working.
+A2 is working well! The code now has color in the text, and have a documented way where you can study it to help you understand the code.
+A2 is now a much more complete then before, you can run linux commands just like vim, and there a new file "c.syntax" and what does that file do you might ask?
+Easy! There is the words who will be highlighted and i will add in the future a c.dict that will be a dictionary for words! and the best!
+
 # Multiplatform?
 And it's a miracle! The code is "multiplataform", not really, but the code was able to run on my pc. But it's not perfect, nothing is, i need to make some modifications so it can run nice on every platform.
 
@@ -18,13 +24,6 @@ I will make my own repository! and you ask where? In the beloved Github! I will 
 
 # Plugins?
 And the plugins parts are back, but this time isn't with good news, but i'm making a clean and revision, and unfortunetly with AI help, to debug the code. And i'm not having sucess yet haha.
-
-# A2!
-What's A2 you might ask? It's my own file editor. The VIM is my main file editor, and that won't change, but when you need to edit a file, or make a correction or whatever reason, the A2 will be there waiting you. It's inspired by vim. A2 isn't perfect yet but it's working.
-A2 is working well! The code now has color in the text, and have a documented way where you can study it to help you understand the code.
-
-A2 is now a much more complete then before, you can run linux commands just like vim, and there a new file "c.syntax" and what does that file do you might ask?
-Easy! There is the words who will be highlighted and i will add in the future a c.dict that will be a dictionary for words! and the best!
 
 # Makefile!
 Theres now a make file where you don't need to compile every single file by hand. But currently it's not working properly.
@@ -54,8 +53,6 @@ Until now i wasn't really think in security aspects, because it's a simple code,
 
 # Calculator!
 There is a calculator, it's not a scientific calculator but neither a common one, it's between the line, a frined of mine will help me improve it futurely.
-# Log!
-It's self explanatory, it's a log of the commands send by you, it will be stored in a file called "log.txt", it has the time, and the day the commands was executed, as well theres a history log, but in the code itself, so you can see the last commands, it's redoundant, so i will change it in the future.
 
 # Git!
 The git function show you the link to JNTD repository, but the last commit feature, probably just work in my pc, thats because my git is setted to JNTD, but your may not, and that's a problem that i will handle in the future.
