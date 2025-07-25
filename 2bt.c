@@ -125,7 +125,8 @@ static const CmdEntry cmds[] = {
     { "cp_di", NULL, "Um copy, use com <de qual arquivo para qual>" },
     { "alias", NULL, "Adiciona alias." },
     { "a2", NULL, "Inicia a A2, um editor de texto simples do JNTD." },
-    { "download", NULL, "Uma função de download, <use com download, depois irá pedir o nome do arquivo.>" }
+    { "download", NULL, "Uma função de download, <use com download, depois irá pedir o nome do arquivo.>" },
+    { "buscar", NULL, "Uma função para buscar coisas pelo JNTD." }
 };
 
 // Declaração antecipada das funções
@@ -802,7 +803,41 @@ void handle_ollama_interaction() {
         }
     }
 }
+// Função para buscar no google//
 
+void search_google(const char *query) {
+    if (query == NULL || query[0] == '\0') {
+        printf("Uso: buscar <termo de pesquisa>\n");
+        return;
+    }
+
+    CURL *curl = curl_easy_init();
+    if (curl) {
+        // Codifica o texto da busca para ser seguro para uma URL
+        // (Ex: "como fazer café" vira "como%20fazer%20café")
+        char *encoded_query = curl_easy_escape(curl, query, 0);
+        if (encoded_query) {
+            char url[1024];
+            char command[2048];
+
+            // Monta a URL do Google
+            snprintf(url, sizeof(url), "https://www.google.com/search?q=%s", encoded_query);
+            
+            // Monta o comando para abrir o navegador no Linux
+            // As aspas duplas garantem que a URL seja tratada como um único argumento
+            snprintf(command, sizeof(command), "xdg-open \"%s\"", url);
+            
+            printf("Abrindo navegador para buscar por: '%s'\n", query);
+            
+            // Executa o comando
+            system(command);
+
+            // Libera a memória usada pela URL codificada
+            curl_free(encoded_query);
+        }
+        curl_easy_cleanup(curl);
+    }
+}
 void display_help() {
     printf("Comandos disponíveis:\n");
     for (size_t i = 0; i < sizeof(cmds) / sizeof(cmds[0]); ++i) {
@@ -1024,9 +1059,29 @@ int read_command_line(char *buf, int size) {
         }
     }
 }
-
-
 void dispatch(const char *user_in) {
+    // +++ LÓGICA PARA EXECUTAR COMANDOS EXTERNOS COM '!' +++
+    if (user_in[0] == '!') {
+        // Pega o comando, ignorando o '!' inicial
+        const char *shell_cmd = user_in + 1;
+        
+        // Antes de executar, restauramos o terminal para o modo normal
+        disable_raw_mode();
+        printf("Executando no shell: %s\n", shell_cmd);
+        
+        // Executa o comando
+        system(shell_cmd);
+        
+        // Reativa o nosso modo raw para continuar
+        enable_raw_mode();
+        
+        // Adiciona ao histórico e log
+        add_to_history(user_in);
+        log_action("Shell Command", shell_cmd);
+        return; // Termina a função aqui, não processa como comando interno
+    }
+
+    // O resto da função continua como antes...
     char input_copy[128];
     strncpy(input_copy, user_in, sizeof(input_copy) - 1);
     input_copy[sizeof(input_copy) - 1] = '\0';
@@ -1034,9 +1089,8 @@ void dispatch(const char *user_in) {
     char *token = strtok(input_copy, " ");
     if (token == NULL) return;
     
-    char *args = strtok(NULL, ""); // Declare and initialize args here
+    char *args = strtok(NULL, "");
 
-    // Handle aliases first, as they might change the command and args
     for (int i = 0; i < alias_count; i++) {
 	    if (alias_list[i].name && strcasecmp(token, alias_list[i].name) == 0) {
 	        char new_command[256];
@@ -1045,16 +1099,14 @@ void dispatch(const char *user_in) {
 	        } else {
 	            snprintf(new_command, sizeof(new_command), "%s", alias_list[i].command);
 	        }
-	        dispatch(new_command); // Recursively call dispatch with the aliased command
+	        dispatch(new_command);
 	        return;
 	    }
     }
 
-    // Adiciona ao histórico e log
     add_to_history(user_in);
     log_action("User Input", user_in);
 
-    // Handle plugins
     for (int i = 0; i < plugin_count; i++) {
         if (strcasecmp(token, loaded_plugins[i].plugin->name) == 0) {
             execute_plugin(token, args);
@@ -1065,60 +1117,62 @@ void dispatch(const char *user_in) {
     int command_found = 0;
     for (size_t i = 0; i < sizeof(cmds) / sizeof(cmds[0]); ++i) {
         if (strcasecmp(token, cmds[i].key) == 0) {
-            command_found = 1; // Mark command as found
+            command_found = 1;
             if (strcmp(cmds[i].key, "help") == 0) {
                 display_help();
             } else if (strcasecmp(cmds[i].key, "mkdir") == 0) {
-                jntd_mkdir(args); // Passa os argumentos para mkdir
+                jntd_mkdir(args);
             } else if (strcasecmp(cmds[i].key, "2b") == 0) {
                 handle_ollama_interaction();
             } else if (strcasecmp(cmds[i].key, "cd") == 0) {
-                cd(args); // Passa os argumentos para cd
+                cd(args);
+            } else if (strcasecmp(cmds[i].key, "buscar") == 0) {
+            	search_google(args);
             } else if (strcasecmp(cmds[i].key, "git") == 0) {
                 printf("O repostorio é: https://github.com/Lucasplaygaemes/JNTD\n");
-		printf("Ultimo commit: ");
-		fflush(stdout);
-		git();
+		        printf("Ultimo commit: ");
+		        fflush(stdout);
+		        git();
             } else if (strcasecmp(cmds[i].key, "his") == 0) {
                 display_history();
-	    } else if (strcasecmp(token, "alias") == 0) {
-		    handle_alias_command(args);
-	    } else if (strcasecmp(cmds[i].key, "quiz") == 0) {
-		 func_quiz();
-	    } else if (strcasecmp(cmds[i].key, "quizale") == 0) {
-		 quiz_aleatorio();
-	    } else if (strcasecmp(cmds[i].key, "quizt") == 0) {
-		    if(args && strcasecmp(args, "cancel") == 0) {
-			    cancel_timer("quizt");
-		    } else {
-			    quiz_timer();
-		    }
-	    } else if (strcasecmp(cmds[i].key, "rscript") == 0) {
+	        } else if (strcasecmp(token, "alias") == 0) {
+		        handle_alias_command(args);
+	        } else if (strcasecmp(cmds[i].key, "quiz") == 0) {
+		        func_quiz();
+	        } else if (strcasecmp(cmds[i].key, "quizale") == 0) {
+		        quiz_aleatorio();
+	        } else if (strcasecmp(cmds[i].key, "quizt") == 0) {
+		        if(args && strcasecmp(args, "cancel") == 0) {
+			        cancel_timer("quizt");
+		        } else {
+			        quiz_timer();
+		        }
+	        } else if (strcasecmp(cmds[i].key, "rscript") == 0) {
                 rscript(args);
-	    } else if (strcasecmp(cmds[i].key, "a2") == 0) {
-		a2(args);
-	    } else if (strcasecmp(cmds[i].key, "timer") == 0) { // This was duplicated, keeping one
-		    if (args && strcasecmp(args, "cancel") == 0) {
-			    cancel_timer("timer");
-		    } else {
-			    timer();
-		    }
-	    } else if (strcasecmp(cmds[i]. key, "cp_di") == 0) {
-		copy_f_t();
-	    } else if (strcasecmp(cmds[i].key, "download") == 0) { // This was duplicated, keeping one
-		    char url[512];
-		    char nome[32];
-		    printf("Qual arquivo será baixado?. (use download url nome).\n");
-		    printf("A url: \n");
-		    scanf("%s", url);
-		    printf("O nome: \n");		    scanf("%s", nome);
-		    bool dl = download_file(url, nome);
-		    printf("Primeiro download terminou com status: %d\n", dl);
-	    } else if (cmds[i].shell_command != NULL) {
-                // Executa comandos shell definidos na tabela
+	        } else if (strcasecmp(cmds[i].key, "a2") == 0) {
+		        a2(args);
+	        } else if (strcasecmp(cmds[i].key, "timer") == 0) {
+		        if (args && strcasecmp(args, "cancel") == 0) {
+			        cancel_timer("timer");
+		        } else {
+			        timer();
+		        }
+	        } else if (strcasecmp(cmds[i]. key, "cp_di") == 0) {
+		        copy_f_t();
+	        } else if (strcasecmp(cmds[i].key, "download") == 0) {
+		        char url[512];
+		        char nome[32];
+		        printf("Qual arquivo será baixado?. (use download url nome).\n");
+		        printf("A url: \n");
+		        scanf("%s", url);
+		        printf("O nome: \n");		
+                scanf("%s", nome);
+		        bool dl = download_file(url, nome);
+		        printf("Primeiro download terminou com status: %d\n", dl);
+	        } else if (cmds[i].shell_command != NULL) {
                 system(cmds[i].shell_command);
             }
-            return; // Command handled, exit dispatch
+            return;
         }
     }
     
@@ -1127,6 +1181,7 @@ void dispatch(const char *user_in) {
 	    suggest_commands(token);
     }
 }
+
 
 int main(void) {
     printf("Iniciando o JNTD...\n");
@@ -1144,20 +1199,19 @@ int main(void) {
         fflush(stdout);
 
         if (read_command_line(buf, sizeof(buf)) < 0) {
-            printf("\n"); // Adiciona uma quebra de linha após Ctrl+D
+            printf("\n");
             break; 
         }
-
         if (buf[0] == '\0') {
             continue;
         }
-        
-        add_to_history(buf);
-
-        if (strcmp(buf, "sair") == 0 || strcmp(buf, ":q") == 0) {
+        // Adiciona ao histórico apenas se não for vazio e não for um comando de shell (já é feito no dispatch)
+        if (buf[0] != '!') {
+            add_to_history(buf);
+        }
+        if (strcmp(buf, "sair") == 0 || strcmp(buf, ":q") == 0 || strcmp(buf, ":Q") == 0) {
             break;
         }
-        
         dispatch(buf);
     }
     
