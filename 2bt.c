@@ -89,10 +89,10 @@ typedef struct {
 
 LoadedPlugin loaded_plugins[20];
 
-typedef struct MemoryStruct {
+typedef struct {
 	char *memory;
 	size_t size;
-};
+} MemoryStruct;
 
 // Definição dos comandos (declarado antes das funções que o utilizam)
 static const CmdEntry cmds[] = {
@@ -126,7 +126,8 @@ static const CmdEntry cmds[] = {
     { "alias", NULL, "Adiciona alias." },
     { "a2", NULL, "Inicia a A2, um editor de texto simples do JNTD." },
     { "download", NULL, "Uma função de download, <use com download, depois irá pedir o nome do arquivo.>" },
-    { "buscar", NULL, "Uma função para buscar coisas pelo JNTD." }
+    { "buscar", NULL, "Uma função para buscar coisas pelo JNTD." },
+    { "elinks", "elinks", "Elinks é um código que te permite fazer pesquisas na internet sem sair do terminal. Todos os direitos vão para o criador." }
 };
 
 // Declaração antecipada das funções
