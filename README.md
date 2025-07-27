@@ -16,6 +16,9 @@ A2 is working well! The code now has color in the text, and have a documented wa
 A2 is now a much more complete then before, you can run linux commands just like vim, and there a new file "c.syntax" and what does that file do you might ask?
 Easy! There is the words who will be highlighted and i will add in the future a c.dict that will be a dictionary for words! and the best!
 
+# Awrit!
+Awrit is a miracle! You can use a browser fully in terminal, just with awrit + Kitty, kitty is a marvelous terminal. I don't own any of those programs, every right goes to the respective owners.
+
 # Multiplatform?
 And it's a miracle! The code is "multiplataform", not really, but the code was able to run on my pc. But it's not perfect, nothing is, i need to make some modifications so it can run nice on every platform.
 
