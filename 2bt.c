@@ -127,7 +127,8 @@ static const CmdEntry cmds[] = {
     { "a2", NULL, "Inicia a A2, um editor de texto simples do JNTD." },
     { "download", NULL, "Uma função de download, <use com download, depois irá pedir o nome do arquivo.>" },
     { "buscar", NULL, "Uma função para buscar coisas pelo JNTD." },
-    { "elinks", "elinks", "Elinks é um código que te permite fazer pesquisas na internet sem sair do terminal. Todos os direitos vão para o criador." }
+    { "elinks", "elinks", "Elinks é um código que te permite fazer pesquisas na internet sem sair do terminal. Todos os direitos vão para o criador." },
+    { "awrit", "awrit", "Awrit é um codigo que te permite usar o Chorimium pelo TERMINAL! Isso, sem que você saia dele, Todos os direitos vão para o craidor," }
 };
 
 // Declaração antecipada das funções
