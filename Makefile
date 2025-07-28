@@ -17,7 +17,7 @@ LDFLAGS =
 # -ljson-c: For the JSON parsing library
 # -pthread: For POSIX threads (used for timers)
 # -ldl: For dynamically loading plugins (.so files)
-LDLIBS = -lcurl -ljson-c -pthread -ldl
+LDLIBS = -lcurl -pthread -ldl
 
 # --- TARGETS ---
 

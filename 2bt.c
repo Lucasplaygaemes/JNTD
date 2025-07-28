@@ -12,7 +12,6 @@
 #include <curl/curl.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include <json-c/json.h>
 #include <termios.h> 
 #include <ctype.h>
 
