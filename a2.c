@@ -130,7 +130,7 @@ void load_syntax_file(EditorState *state, const char *filename);
 FileViewer* create_file_viewer(const char* filename);
 void destroy_file_viewer(FileViewer* viewer);
 void editor_find(EditorState *state); // +++ NOVA FUNÇÃO DE BUSCA +++
-
+void search_google(const char *query);
 
 // Declarações de Funções do Autocompletar
 void editor_start_completion(EditorState *state);
@@ -138,12 +138,12 @@ void editor_end_completion(EditorState *state);
 void editor_draw_completion_win(EditorState *state);
 void editor_apply_completion(EditorState *state);
 void add_suggestion(EditorState *state, const char *suggestion);
-// --- Definições das Funções ---
 
+// --- Definições das Funções ---
 void inicializar_ncurses() {
     initscr(); cbreak(); noecho(); keypad(stdscr, TRUE);
     start_color();
-    init_pair(1, COLOR_WHITE, COLOR_BLUE); init_pair(2, COLOR_YELLOW, COLOR_BLACK);
+    init_pair(1, COLOR_BLACK, COLOR_BLUE); init_pair(2, COLOR_YELLOW, COLOR_BLACK);
     init_pair(3, COLOR_YELLOW, COLOR_BLACK); init_pair(4, COLOR_GREEN, COLOR_BLACK);
     init_pair(5, COLOR_BLUE, COLOR_BLACK); init_pair(6, COLOR_CYAN, COLOR_BLACK);
     init_pair(7, COLOR_MAGENTA, COLOR_BLACK);
@@ -283,6 +283,7 @@ void editor_find_next(EditorState *state) {
     }
     snprintf(state->status_msg, sizeof(state->status_msg), "Nenhuma outra ocorrência de: %s", state->last_search);
 }
+
 void editor_find_previous(EditorState *state) {
     if (state->last_search[0] == '\0') {
         snprintf(state->status_msg, sizeof(state->status_msg), "Nenhum termo para buscar. Use Ctrl+F primeiro.");
@@ -489,6 +490,19 @@ void compile_file(EditorState *state, char* args) {
     }
 }
 
+// Helper function to calculate visual column (character count) from byte offset
+int get_visual_col(const char *line, int byte_col) {
+    if (!line) return 0;
+    int visual_col = 0;
+    for (int i = 0; i < byte_col; i++) {
+        // Count bytes that are not UTF-8 continuation bytes.
+        if (((unsigned char)line[i] & 0xC0) != 0x80) {
+            visual_col++;
+        }
+    }
+    return visual_col;
+}
+
 void editor_redraw(EditorState *state) {
     erase();
     int rows, cols; 
@@ -574,14 +588,17 @@ void editor_redraw(EditorState *state) {
         char mode_str[20];
         switch (state->mode) { case NORMAL: strcpy(mode_str, "-- NORMAL --"); break; case INSERT: strcpy(mode_str, "-- INSERT --"); break; default: strcpy(mode_str, "--          --"); break; }
         char display_filename[40]; strncpy(display_filename, state->filename, sizeof(display_filename) - 1); display_filename[sizeof(display_filename) - 1] = '\0'; 
-        mvprintw(rows - 1, 0, "%s | %s | Line %d/%d, Col %d", mode_str, display_filename, state->current_line + 1, state->num_lines, state->current_col + 1);
+        int visual_col = get_visual_col(state->lines[state->current_line], state->current_col);
+        mvprintw(rows - 1, 0, "%s | %s | Line %d/%d, Col %d", mode_str, display_filename, state->current_line + 1, state->num_lines, visual_col + 1);
     }
-    attroff(COLOR_PAIR(1)); 
+    attroff(COLOR_PAIR(3)); 
     
     if (state->mode == COMMAND) {
         move(rows - 1, state->command_pos + 1);
     } else {
-        move(state->current_line - state->top_line, state->current_col - state->left_col);
+        int visual_cursor_x = get_visual_col(state->lines[state->current_line], state->current_col);
+        int visual_left_offset = get_visual_col(state->lines[state->current_line], state->left_col);
+        move(state->current_line - state->top_line, visual_cursor_x - visual_left_offset);
     }
 
     wnoutrefresh(stdscr);
@@ -644,23 +661,46 @@ void editor_handle_backspace(EditorState *state) {
     if (state->current_col == 0 && state->current_line == 0) return;
     if (state->current_col > 0) {
         char *line = state->lines[state->current_line];
+        if (!line) return;
         int line_len = strlen(line);
-        memmove(&line[state->current_col - 1], &line[state->current_col], line_len - state->current_col + 1);
-        state->current_col--; 
+
+        // Find the start of the UTF-8 character before the cursor
+        int prev_char_start = state->current_col - 1;
+        while (prev_char_start > 0 && (line[prev_char_start] & 0xC0) == 0x80) {
+            prev_char_start--;
+        }
+
+        // Remove the character by moving the rest of the line
+        memmove(&line[prev_char_start], &line[state->current_col], line_len - state->current_col + 1);
+        
+        state->current_col = prev_char_start;
         state->ideal_col = state->current_col;
-    } else {
+    } else { // At the beginning of a line
         if (state->current_line == 0) return;
         int prev_line_idx = state->current_line - 1;
-        char *prev_line = state->lines[prev_line_idx]; char *current_line_ptr = state->lines[state->current_line];
+        char *prev_line = state->lines[prev_line_idx]; 
+        char *current_line_ptr = state->lines[state->current_line];
         if (!prev_line || !current_line_ptr) return;
-        int prev_len = strlen(prev_line); int current_len = strlen(current_line_ptr);
-        char *new_prev_line = realloc(prev_line, prev_len + current_len + 1); if (!new_prev_line) return;
+        
+        int prev_len = strlen(prev_line);
+        int current_len = strlen(current_line_ptr);
+        
+        char *new_prev_line = realloc(prev_line, prev_len + current_len + 1); 
+        if (!new_prev_line) return;
+        
         memcpy(new_prev_line + prev_len, current_line_ptr, current_len + 1);
         state->lines[prev_line_idx] = new_prev_line;
+        
         free(current_line_ptr);
-        for (int i = state->current_line; i < state->num_lines - 1; i++) state->lines[i] = state->lines[i + 1];
-        state->num_lines--; state->lines[state->num_lines] = NULL;
-        state->current_line--; state->current_col = prev_len; state->ideal_col = state->current_col;
+        for (int i = state->current_line; i < state->num_lines - 1; i++) {
+            state->lines[i] = state->lines[i + 1];
+        }
+        state->num_lines--; 
+        state->lines[state->num_lines] = NULL;
+        
+        state->current_line--; 
+        state->current_col = prev_len; 
+        state->ideal_col = state->current_col;
     }
 }
 
@@ -1064,8 +1104,25 @@ int main(int argc, char *argv[]) {
                         break;
                     case KEY_UP: if (state->current_line > 0) { state->current_line--; state->current_col = state->ideal_col; } break;
                     case KEY_DOWN: if (state->current_line < state->num_lines - 1) { state->current_line++; state->current_col = state->ideal_col; } break;
-                    case KEY_LEFT: if (state->current_col > 0) state->current_col--; state->ideal_col = state->current_col; break;
-                    case KEY_RIGHT: { char* line = state->lines[state->current_line]; int line_len = line ? strlen(line) : 0; if (state->current_col < line_len) state->current_col++; state->ideal_col = state->current_col; } break;
+                    case KEY_LEFT:
+                        if (state->current_col > 0) {
+                            state->current_col--;
+                            while (state->current_col > 0 && (state->lines[state->current_line][state->current_col] & 0xC0) == 0x80) {
+                                state->current_col--;
+                            }
+                        }
+                        state->ideal_col = state->current_col;
+                        break;
+                    case KEY_RIGHT: {
+                        char* line = state->lines[state->current_line];
+                        if (line && state->current_col < strlen(line)) {
+                            state->current_col++;
+                            while (line[state->current_col] != '\0' && (line[state->current_col] & 0xC0) == 0x80) {
+                                state->current_col++;
+                            }
+                        }
+                        state->ideal_col = state->current_col;
+                        } break;
                     case KEY_PPAGE: case KEY_SR: for (int i = 0; i < PAGE_JUMP; i++) if (state->current_line > 0) state->current_line--; state->current_col = state->ideal_col; break;
                     case KEY_NPAGE: case KEY_SF: for (int i = 0; i < PAGE_JUMP; i++) if (state->current_line < state->num_lines - 1) state->current_line++; state->current_col = state->ideal_col; break;
                     case KEY_HOME: state->current_col = 0; state->ideal_col = 0; break;
