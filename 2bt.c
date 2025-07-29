@@ -272,7 +272,7 @@ void save_aliases_to_file() {
 	fclose(file);
 }
 
-
+//Função para executar os plugins
 void execute_plugin(const char* name, const char* args) {
     printf("Executando plugin: %s com argumentos: %s\n", name, args);
     for (int i = 0; i < plugin_count; i++) {
@@ -303,7 +303,7 @@ static size_t write_data(void *ptr, size_t size, size_t nmemb, void *stream) {
 	return written;
 
 }
-
+//Função para fazer o download da função//
 bool download_file(char *url, char *filename) {
 	bool sucess = true;
 
@@ -351,6 +351,7 @@ bool download_file(char *url, char *filename) {
     return sucess;
 }
 
+//Função que faz copia entre arquvios de texto.
 int copy_f_t() {
 	FILE *fptr1, *fptr2;
 	char filename[100];
@@ -379,7 +380,6 @@ int copy_f_t() {
 	return 0;
 }
 
-// int main(void); // This is a forward declaration for a main function that does not exist.
 // Função para verificar segurança de comandos
 int is_safe_command(const char *cmd) {
     for (size_t i = 0; i < sizeof(cmds) / sizeof(cmds[0]); ++i) {
