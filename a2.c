@@ -148,7 +148,7 @@ void inicializar_ncurses() {
     init_pair(5, COLOR_BLUE, COLOR_BLACK); init_pair(6, COLOR_CYAN, COLOR_BLACK);
     init_pair(7, COLOR_MAGENTA, COLOR_BLACK);
     init_pair(8, COLOR_WHITE, COLOR_BLACK);
-    init_pair(9, COLOR_WHITE, COLOR_MAGENTA);
+    init_pair(9, COLOR_BLACK, COLOR_MAGENTA);
     bkgd(COLOR_PAIR(8)); 
 }
 
