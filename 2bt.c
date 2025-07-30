@@ -69,18 +69,23 @@ pthread_t quiz_thread;
 
 struct termios orig_termios;
 
+//Estrutura dos comandos//
 typedef struct {
     const char *key;
     const char *shell_command;
     const char *descri;
 } CmdEntry;
+
+//Estrutura dos Alias
 typedef struct {
 	char *name;
 	char *command;
 } Alias;
+
 Alias alias_list[MAX_ALIASES];
 int alias_count = 0;
 
+//Estrutura dos plugins//
 typedef struct {
         void *handle;
         Plugin *plugin;
@@ -88,6 +93,7 @@ typedef struct {
 
 LoadedPlugin loaded_plugins[20];
 
+//Estrutura de memoria
 typedef struct {
 	char *memory;
 	size_t size;
@@ -196,6 +202,7 @@ void load_plugins() {
     closedir(dir);
 }
 
+//Pré Declaracão do save_aliases_to_file
 void save_aliases_to_file();
 
 void handle_alias_command(const char *args) {
