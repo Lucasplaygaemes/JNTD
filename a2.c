@@ -99,7 +99,6 @@ typedef struct {
     char **dictionary_words;
     int num_dictionary_words;
     
-    // +++ NOVOS CAMPOS PARA A BUSCA +++
     char last_search[100];
     int last_match_line;
     int last_match_col;
@@ -163,7 +162,7 @@ char* trim_whitespace(char *str) {
 
     return str;
 }
-
+//Função para carregar arquivo de syntax//
 void load_syntax_file(EditorState *state, const char *filename) {
     FILE *file = fopen(filename, "r");
     if (!file) return;
@@ -213,6 +212,7 @@ void adjust_viewport(EditorState *state) {
     if (state->current_col >= state->left_col + cols) state->left_col = state->current_col - cols + 1;
 }
 
+//Função para mostrar a tela de ajuda//
 void display_help_screen() {
     static const CommandInfo commands[] = {
         {":w", "Salva o arquivo atual."}, {":w <nome>", "Salva com um novo nome."},
@@ -238,6 +238,7 @@ void display_help_screen() {
     attroff(COLOR_PAIR(8));
 }
 
+//Função para criar o display de arquivo//
 FileViewer* create_file_viewer(const char* filename) {
     FILE *f = fopen(filename, "r");
     if (!f) return NULL;
@@ -255,6 +256,7 @@ FileViewer* create_file_viewer(const char* filename) {
     return viewer;
 }
 
+//Função para achar o proximo objeto//
 void editor_find_next(EditorState *state) {
     if (state->last_search[0] == '\0') {
         snprintf(state->status_msg, sizeof(state->status_msg), "Nenhum termo para buscar. Use Ctrl+F primeiro.");
@@ -284,6 +286,7 @@ void editor_find_next(EditorState *state) {
     snprintf(state->status_msg, sizeof(state->status_msg), "Nenhuma outra ocorrência de: %s", state->last_search);
 }
 
+//Econtrar a ultima ocorrencia//
 void editor_find_previous(EditorState *state) {
     if (state->last_search[0] == '\0') {
         snprintf(state->status_msg, sizeof(state->status_msg), "Nenhum termo para buscar. Use Ctrl+F primeiro.");
@@ -323,7 +326,7 @@ void editor_find_previous(EditorState *state) {
     snprintf(state->status_msg, sizeof(state->status_msg), "Nenhuma outra ocorrência de: %s", state->last_search);
 }
 
-
+//Função para buscar uma palavra//
 void editor_find(EditorState *state) {
     char query[100] = {0};
     int query_pos = 0;
