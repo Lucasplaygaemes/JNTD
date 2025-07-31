@@ -16,6 +16,10 @@ A2 is working well! The code now has color in the text, and have a documented wa
 A2 is now a much more complete then before, you can run linux commands just like vim, and there a new file "c.syntax" and what does that file do you might ask?
 Easy! There is the words who will be highlighted and i will add in the future a c.dict that will be a dictionary for words! and the best!
 
+# Projects?
+JNTD is my main project for a while now, but i have other projects in mind, my favorite programming language is C, and that's clear, but, i would love somethings that are not native in C, i'm not a c developer,
+but i will make changes haha.
+
 # Awrit!
 Awrit is a miracle! You can use a browser fully in terminal, just with awrit + Kitty, kitty is a marvelous terminal. I don't own any of those programs, every right goes to the respective owners.
 
@@ -24,11 +28,6 @@ And it's a miracle! The code is "multiplataform", not really, but the code was a
 
 # Repository!
 I will make my own repository! and you ask where? In the beloved Github! I will make the repository folder here, on github, it's not the best, but it's what i can do for now. Just like you can download the files from the linux with one command from a repository, any important file will be in the repository.
-
-
-# Projects?
-JNTD is my main project for a while now, but i have other projects in mind, my favorite programming language is C, and that's clear, but, i would love somethings that are not native in C, i'm not a c developer,
-but i will make changes haha.
 
 # Plugins?
 And the plugins parts are back, but this time isn't with good news, but i'm making a clean and revision, and unfortunetly with AI help, to debug the code. And i'm not having sucess yet haha.
