@@ -18,7 +18,7 @@ Easy! There is the words who will be highlighted and i will add in the future a 
 
 # Projects?
 JNTD is my main project for a while now, but i have other projects in mind, my favorite programming language is C, and that's clear, but, i would love somethings that are not native in C, i'm not a c developer,
-but i will make changes haha.
+but i will make changes haha. I have other projects in mind, some of then i can add in JNTD, but other i can't, i will make then public once i feel they're good enough.
 
 # Awrit!
 Awrit is a miracle! You can use a browser fully in terminal, just with awrit + Kitty, kitty is a marvelous terminal. I don't own any of those programs, every right goes to the respective owners.
