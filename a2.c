@@ -13,6 +13,8 @@
 #include <sys/wait.h>
 #include <stdbool.h>
 #include <dirent.h>
+#include <sys/stat.h>
+#include <time.h>
 
 // --- Definições do Editor ---
 #define MAX_LINES 4098
@@ -70,12 +72,13 @@ typedef struct {
 HeaderDef known_headers[] = {
     {"<stdio.h>", stdio_h_symbols, sizeof(stdio_h_symbols) / sizeof(char*)},
     {"<stdlib.h>", stdlib_h_symbols, sizeof(stdlib_h_symbols) / sizeof(char*)},
-    {"<string.h>", string_h_symbols, sizeof(string_h_symbols) / sizeof(char*)}};
+    {"<string.h>", string_h_symbols, sizeof(string_h_symbols) / sizeof(char*)}
+};
 
 int num_known_headers = sizeof(known_headers) / sizeof(HeaderDef);
 
 const char* editor_commands[] = {
-    "w", "q", "wq", "open", "new", "help", "gcc"
+    "w", "q", "wq", "open", "new", "help", "gcc", "rc"
 };
 int num_editor_commands = sizeof(editor_commands) / sizeof(char*);
 
@@ -109,6 +112,9 @@ typedef struct {
     int last_match_line;
     int last_match_col;
 
+    bool buffer_modified;
+    time_t last_file_mod_time;
+
 } EditorState;
 
 // --- Declarações de Funções ---
@@ -137,6 +143,8 @@ FileViewer* create_file_viewer(const char* filename);
 void destroy_file_viewer(FileViewer* viewer);
 void editor_find(EditorState *state); // +++ NOVA FUNÇÃO DE BUSCA +++
 void search_google(const char *query);
+void reload_file(EditorState *state);
+void check_external_modification(EditorState *state);
 
 // Declarações de Funções do Autocompletar
 void editor_start_file_completion(EditorState *state);
@@ -171,6 +179,15 @@ char* trim_whitespace(char *str) {
 
     return str;
 }
+
+time_t get_file_mod_time(const char *filename) {
+    struct stat attr;
+    if (stat(filename, &attr) == 0) {
+        return attr.st_mtime;
+    }
+    return 0;
+}
+
 //Função para carregar arquivo de syntax//
 void load_syntax_file(EditorState *state, const char *filename) {
     FILE *file = fopen(filename, "r");
@@ -224,11 +241,16 @@ void adjust_viewport(EditorState *state) {
 //Função para mostrar a tela de ajuda//
 void display_help_screen() {
     static const CommandInfo commands[] = {
-        {":w", "Salva o arquivo atual."}, {":w <nome>", "Salva com um novo nome."},
-        {":q", "Sai do editor."}, {":wq", "Salva e sai."}, {":open <nome>", "Abre um arquivo."},
-        {":new", "Cria um novo arquivo em branco."}, {":help", "Mostra esta tela de ajuda."},
+        {":w", "Salva o arquivo atual."},
+        {":w <nome>", "Salva com um novo nome."},
+        {":q", "Sai do editor."},
+        {":wq", "Salva e sai."},
+        {":open <nome>", "Abre um arquivo."},
+        {":new", "Cria um novo arquivo em branco."},
+        {":help", "Mostra esta tela de ajuda."},
         {":gcc [libs]", "Compila o arquivo atual (ex: :gcc -lm)."},
-        {"![cmd]", "Executa um comando do shell (ex: !ls -l)."}
+        {"![cmd]", "Executa um comando do shell (ex: !ls -l)."},
+        {":rc", "Recarrega o arquivo atual."}
     };
     int num_commands = sizeof(commands) / sizeof(commands[0]);
     
@@ -601,7 +623,7 @@ void editor_redraw(EditorState *state) {
         switch (state->mode) { case NORMAL: strcpy(mode_str, "-- NORMAL --"); break; case INSERT: strcpy(mode_str, "-- INSERT --"); break; default: strcpy(mode_str, "--          --"); break; }
         char display_filename[40]; strncpy(display_filename, state->filename, sizeof(display_filename) - 1); display_filename[sizeof(display_filename) - 1] = '\0'; 
         int visual_col = get_visual_col(state->lines[state->current_line], state->current_col);
-        mvprintw(rows - 1, 0, "%s | %s | Line %d/%d, Col %d", mode_str, display_filename, state->current_line + 1, state->num_lines, visual_col + 1);
+        mvprintw(rows - 1, 0, "%s | %s%s | Line %d/%d, Col %d", mode_str, display_filename, state->buffer_modified ? "*" : "", state->current_line + 1, state->num_lines, visual_col + 1);
     }
     attroff(COLOR_PAIR(3)); 
     
@@ -645,6 +667,8 @@ void load_file(EditorState *state, const char *filename) {
     }
     if (state->num_lines == 0) { state->lines[0] = calloc(1, 1); state->num_lines = 1; }
     state->current_line = 0; state->current_col = 0; state->ideal_col = 0; state->top_line = 0; state->left_col = 0;
+    state->buffer_modified = false;
+    state->last_file_mod_time = get_file_mod_time(state->filename);
 }
 
 void save_file(EditorState *state) {
@@ -654,6 +678,8 @@ void save_file(EditorState *state) {
         for (int i = 0; i < state->num_lines; i++) if (state->lines[i]) fprintf(file, "%s\n", state->lines[i]);
         fclose(file); char display_filename[40]; strncpy(display_filename, state->filename, sizeof(display_filename) - 1); display_filename[sizeof(display_filename) - 1] = '\0';
         snprintf(state->status_msg, sizeof(state->status_msg), "\"%s\" written", display_filename);
+        state->buffer_modified = false;
+        state->last_file_mod_time = get_file_mod_time(state->filename);
     } else { snprintf(state->status_msg, sizeof(state->status_msg), "Error saving: %s", strerror(errno)); }
 }
 
@@ -667,6 +693,7 @@ void editor_handle_enter(EditorState *state) {
     for (int i = state->num_lines; i > state->current_line + 1; i--) state->lines[i] = state->lines[i - 1];
     state->num_lines++; state->lines[state->current_line + 1] = new_line;
     state->current_line++; state->current_col = 0; state->ideal_col = 0;
+    state->buffer_modified = true;
 }
 
 void editor_handle_backspace(EditorState *state) {
@@ -714,6 +741,7 @@ void editor_handle_backspace(EditorState *state) {
         state->current_col = prev_len; 
         state->ideal_col = state->current_col;
     }
+    state->buffer_modified = true;
 }
 
 void editor_insert_char(EditorState *state, wint_t ch) {
@@ -737,6 +765,7 @@ void editor_insert_char(EditorState *state, wint_t ch) {
     state->current_col += char_len; 
     state->ideal_col = state->current_col;
     new_line[line_len + char_len] = '\0';
+    state->buffer_modified = true;
 }
 
 void editor_delete_line(EditorState *state) {
@@ -756,6 +785,7 @@ void editor_delete_line(EditorState *state) {
         state->current_line = state->num_lines - 1;
     }
     state->current_col = 0; state->ideal_col = 0;
+    state->buffer_modified = true;
 }
 
 void editor_move_to_next_word(EditorState *state) {
@@ -787,6 +817,79 @@ void add_to_command_history(EditorState *state, const char* command) {
     }
 }
 
+void editor_reload_file(EditorState *state) {
+    if (strcmp(state->filename, "[No Name]") == 0) {
+        snprintf(state->status_msg, sizeof(state->status_msg), "No file name to reload.");
+        return;
+    }
+
+    time_t on_disk_mod_time = get_file_mod_time(state->filename);
+
+    if (state->buffer_modified && on_disk_mod_time != 0 && on_disk_mod_time != state->last_file_mod_time) {
+        snprintf(state->status_msg, sizeof(state->status_msg), "File on disk changed! (S)ave, (L)oad, or (C)ancel?");
+        editor_redraw(state);
+        wint_t ch;
+        get_wch(&ch);
+        switch (tolower(ch)) {
+            case 's':
+                save_file(state);
+                break;
+            case 'l':
+                load_file(state, state->filename);
+                break;
+            case 'c':
+            default:
+                snprintf(state->status_msg, sizeof(state->status_msg), "Reload cancelled.");
+                break;
+        }
+    } else {
+        load_file(state, state->filename);
+        snprintf(state->status_msg, sizeof(state->status_msg), "File reloaded.");
+    }
+}
+
+void check_external_modification(EditorState *state) {
+    if (strcmp(state->filename, "[No Name]") == 0 || state->last_file_mod_time == 0) {
+        return;
+    }
+
+    time_t on_disk_mod_time = get_file_mod_time(state->filename);
+
+    if (on_disk_mod_time != 0 && on_disk_mod_time != state->last_file_mod_time) {
+        if (state->buffer_modified) {
+            snprintf(state->status_msg, sizeof(state->status_msg), "Warning: File on disk has changed! (S)ave, (L)oad, or (C)ancel?");
+        } else {
+            snprintf(state->status_msg, sizeof(state->status_msg), "File on disk has changed. Reload? (Y/N)");
+        }
+        editor_redraw(state);
+        wint_t ch;
+        get_wch(&ch);
+        if (state->buffer_modified) {
+             switch (tolower(ch)) {
+                case 's':
+                    save_file(state);
+                    break;
+                case 'l':
+                    load_file(state, state->filename);
+                    break;
+                default:
+                    // User cancelled, update the time to avoid repeated messages for this change
+                    state->last_file_mod_time = on_disk_mod_time;
+                    snprintf(state->status_msg, sizeof(state->status_msg), "Action cancelled. In-memory version kept.");
+                    break;
+            }
+        } else {
+            if (tolower(ch) == 'y') {
+                load_file(state, state->filename);
+            } else {
+                // User doesn't want to reload, update the time to avoid repeated messages
+                state->last_file_mod_time = on_disk_mod_time;
+                 snprintf(state->status_msg, sizeof(state->status_msg), "Reload cancelled.");
+            }
+        }
+    }
+}
+
 void process_command(EditorState *state) {
     if (state->command_buffer[0] == '!') {
         execute_shell_command(state);
@@ -811,6 +914,8 @@ void process_command(EditorState *state) {
         display_help_screen();
     } else if (strcmp(command, "gcc") == 0) {
         compile_file(state, args);
+    } else if (strcmp(command, "rc") == 0) {
+        editor_reload_file(state);
     } else if (strcmp(command, "open") == 0) {
         if (strlen(args) > 0) load_file(state, args);
         else snprintf(state->status_msg, sizeof(state->status_msg), "Usage: :open <filename>");
@@ -928,7 +1033,7 @@ void editor_start_completion(EditorState *state) {
     state->num_suggestions = 0;
     state->completion_suggestions = NULL;
 
-    const char *delimiters = " \t\n\r`~!@#$%^&*()-=+[]{}|\\;:'\",.<>/?";
+    const char *delimiters = " \t\n\r`~!@#$%^&*()-=+[]{}|\\;:'\".,<>/?";
     for (int i = 0; i < state->num_lines; i++) {
         char *line_copy = strdup(state->lines[i]);
         if (!line_copy) continue;
@@ -1091,6 +1196,12 @@ void handle_insert_mode_key(EditorState *state, wint_t ch) {
         case KEY_CTRL_K:
             editor_delete_line(state);
             break;
+        case KEY_CTRL_D:
+            editor_find_next(state);
+        case KEY_CTRL_A:
+            editor_find_previous(state);
+        case KEY_CTRL_F:
+            editor_find(state);
         case KEY_ENTER: case '\n': editor_handle_enter(state); break;
         case KEY_BACKSPACE: case 127: case 8: editor_handle_backspace(state); break;
         case '\t':
@@ -1115,7 +1226,7 @@ void handle_insert_mode_key(EditorState *state, wint_t ch) {
 void handle_command_mode_key(EditorState *state, wint_t ch) {
     switch (ch) {
         case KEY_CTRL_P:
-        case '	':
+        case '\t':
             if (strncmp(state->command_buffer, "open ", 5) == 0) {
                 editor_start_file_completion(state);
             } else {
@@ -1174,6 +1285,8 @@ int main(int argc, char *argv[]) {
     state->last_search[0] = '\0';
     state->last_match_line = -1;
     state->last_match_col = -1;
+    state->buffer_modified = false;
+    state->last_file_mod_time = 0;
     
     load_syntax_file(state, "c.syntax");
 
@@ -1187,6 +1300,7 @@ int main(int argc, char *argv[]) {
 
     while (1) {
         ensure_cursor_in_bounds(state);
+        check_external_modification(state);
         editor_redraw(state);
         wint_t ch;
         get_wch(&ch);
