@@ -12,6 +12,7 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <stdbool.h>
+#include <dirent.h>
 
 // --- Definições do Editor ---
 #define MAX_LINES 4098
@@ -69,11 +70,16 @@ typedef struct {
 HeaderDef known_headers[] = {
     {"<stdio.h>", stdio_h_symbols, sizeof(stdio_h_symbols) / sizeof(char*)},
     {"<stdlib.h>", stdlib_h_symbols, sizeof(stdlib_h_symbols) / sizeof(char*)},
-    {"<string.h>", string_h_symbols, sizeof(string_h_symbols) / sizeof(char*)}
-};
+    {"<string.h>", string_h_symbols, sizeof(string_h_symbols) / sizeof(char*)}};
 
 int num_known_headers = sizeof(known_headers) / sizeof(HeaderDef);
 
+const char* editor_commands[] = {
+    "w", "q", "wq", "open", "new", "help", "gcc"
+};
+int num_editor_commands = sizeof(editor_commands) / sizeof(char*);
+
+typedef enum { COMPLETION_NONE, COMPLETION_TEXT, COMPLETION_COMMAND, COMPLETION_FILE } CompletionMode;
 typedef enum { NORMAL, INSERT, COMMAND } EditorMode;
 typedef struct {
     char *lines[MAX_LINES];
@@ -84,7 +90,7 @@ typedef struct {
     int history_count;
     int history_pos;
     // Campos para o estado do autocompletar
-    bool completion_active;
+    CompletionMode completion_mode;
     char **completion_suggestions;
     int num_suggestions;
     int selected_suggestion;
@@ -125,6 +131,7 @@ void process_command(EditorState *state);
 void ensure_cursor_in_bounds(EditorState *state);
 void adjust_viewport(EditorState *state);
 void handle_insert_mode_key(EditorState *state, wint_t ch);
+void handle_command_mode_key(EditorState *state, wint_t ch);
 void load_syntax_file(EditorState *state, const char *filename);
 FileViewer* create_file_viewer(const char* filename);
 void destroy_file_viewer(FileViewer* viewer);
@@ -132,6 +139,8 @@ void editor_find(EditorState *state); // +++ NOVA FUNÇÃO DE BUSCA +++
 void search_google(const char *query);
 
 // Declarações de Funções do Autocompletar
+void editor_start_file_completion(EditorState *state);
+void editor_start_command_completion(EditorState *state);
 void editor_start_completion(EditorState *state);
 void editor_end_completion(EditorState *state);
 void editor_draw_completion_win(EditorState *state);
@@ -606,7 +615,7 @@ void editor_redraw(EditorState *state) {
 
     wnoutrefresh(stdscr);
 
-    if (state->completion_active) {
+    if (state->completion_mode != COMPLETION_NONE) {
         editor_draw_completion_win(state);
     } else {
        curs_set(1);
@@ -836,6 +845,72 @@ void add_suggestion(EditorState *state, const char *suggestion) {
     state->completion_suggestions[state->num_suggestions - 1] = strdup(suggestion);
 }
 
+void editor_start_file_completion(EditorState *state) {
+    char *space = strchr(state->command_buffer, ' ');
+    if (!space) return;
+
+    char *prefix = space + 1;
+    int prefix_len = strlen(prefix);
+
+    if (state->completion_suggestions) {
+        for (int i = 0; i < state->num_suggestions; i++) free(state->completion_suggestions[i]);
+        free(state->completion_suggestions);
+        state->completion_suggestions = NULL;
+    }
+    state->num_suggestions = 0;
+
+    DIR *d;
+    struct dirent *dir;
+    d = opendir(".");
+    if (d) {
+        while ((dir = readdir(d)) != NULL) {
+            if (strncmp(dir->d_name, prefix, prefix_len) == 0) {
+                add_suggestion(state, dir->d_name);
+            }
+        }
+        closedir(d);
+    }
+
+    if (state->num_suggestions > 0) {
+        state->completion_mode = COMPLETION_FILE;
+        state->selected_suggestion = 0;
+        state->completion_scroll_top = 0;
+        strncpy(state->word_to_complete, prefix, sizeof(state->word_to_complete) - 1);
+        state->word_to_complete[sizeof(state->word_to_complete) - 1] = '\0';
+        state->completion_start_col = prefix - state->command_buffer;
+    }
+}
+
+void editor_start_command_completion(EditorState *state) {
+    if (state->completion_mode != COMPLETION_NONE) return;
+
+    char* buffer = state->command_buffer;
+    int len = strlen(buffer);
+    if (len == 0) return;
+
+    if (state->completion_suggestions) {
+        for (int i = 0; i < state->num_suggestions; i++) free(state->completion_suggestions[i]);
+        free(state->completion_suggestions);
+        state->completion_suggestions = NULL;
+    }
+    state->num_suggestions = 0;
+
+    for (int i = 0; i < num_editor_commands; i++) {
+        if (strncmp(editor_commands[i], buffer, len) == 0) {
+            add_suggestion(state, editor_commands[i]);
+        }
+    }
+
+    if (state->num_suggestions > 0) {
+        state->completion_mode = COMPLETION_COMMAND;
+        state->selected_suggestion = 0;
+        state->completion_scroll_top = 0;
+        strncpy(state->word_to_complete, buffer, sizeof(state->word_to_complete) - 1);
+        state->word_to_complete[sizeof(state->word_to_complete) - 1] = '\0';
+        state->completion_start_col = 0;
+    }
+}
+
 void editor_start_completion(EditorState *state) {
     char* line = state->lines[state->current_line];
     if (!line) return;
@@ -882,14 +957,14 @@ void editor_start_completion(EditorState *state) {
     }
 
     if (state->num_suggestions > 0) {
-        state->completion_active = true;
+        state->completion_mode = COMPLETION_TEXT;
         state->selected_suggestion = 0;
         state->completion_scroll_top = 0;
     }
 }
 
 void editor_end_completion(EditorState *state) {
-    state->completion_active = false;
+    state->completion_mode = COMPLETION_NONE;
     if (state->completion_win) {
         delwin(state->completion_win);
         state->completion_win = NULL;
@@ -904,25 +979,45 @@ void editor_end_completion(EditorState *state) {
 }
 
 void editor_apply_completion(EditorState *state) {
-    if (!state->completion_active || state->num_suggestions == 0) return;
+    if (state->completion_mode == COMPLETION_NONE || state->num_suggestions == 0) return;
 
     const char* selected = state->completion_suggestions[state->selected_suggestion];
-    int prefix_len = strlen(state->word_to_complete);
-    int selected_len = strlen(selected);
-    
-    char* line = state->lines[state->current_line];
-    int line_len = strlen(line);
-    
-    char* new_line = malloc(line_len - prefix_len + selected_len + 1);
 
-    strncpy(new_line, line, state->completion_start_col);
-    strcpy(new_line + state->completion_start_col, selected);
-    strcpy(new_line + state->completion_start_col + selected_len, line + state->current_col);
+    if (state->completion_mode == COMPLETION_TEXT) {
+        int prefix_len = strlen(state->word_to_complete);
+        int selected_len = strlen(selected);
+        
+        char* line = state->lines[state->current_line];
+        int line_len = strlen(line);
+        
+        char* new_line = malloc(line_len - prefix_len + selected_len + 1);
 
-    free(state->lines[state->current_line]);
-    state->lines[state->current_line] = new_line;
-    state->current_col = state->completion_start_col + selected_len;
-    state->ideal_col = state->current_col;
+        strncpy(new_line, line, state->completion_start_col);
+        strcpy(new_line + state->completion_start_col, selected);
+        strcpy(new_line + state->completion_start_col + selected_len, line + state->current_col);
+
+        free(state->lines[state->current_line]);
+        state->lines[state->current_line] = new_line;
+        state->current_col = state->completion_start_col + selected_len;
+        state->ideal_col = state->current_col;
+    } else if (state->completion_mode == COMPLETION_COMMAND) {
+        strncpy(state->command_buffer, selected, sizeof(state->command_buffer) - 1);
+        state->command_buffer[sizeof(state->command_buffer) - 1] = '\0';
+        state->command_pos = strlen(state->command_buffer);
+        if (strcmp(selected, "q") != 0 && strcmp(selected, "wq") != 0 && strcmp(selected, "new") != 0 && strcmp(selected, "help") != 0) {
+            if (state->command_pos < sizeof(state->command_buffer) - 2) {
+                state->command_buffer[state->command_pos++] = ' ';
+                state->command_buffer[state->command_pos] = '\0';
+            }
+        }
+    } else if (state->completion_mode == COMPLETION_FILE) {
+        char *space = strchr(state->command_buffer, ' ');
+        if (space) {
+            *(space + 1) = '\0'; // Truncate after space
+            strncat(state->command_buffer, selected, sizeof(state->command_buffer) - strlen(state->command_buffer) - 1);
+            state->command_pos = strlen(state->command_buffer);
+        }
+    }
 
     editor_end_completion(state);
 }
@@ -937,24 +1032,42 @@ void editor_draw_completion_win(EditorState *state) {
     int rows, cols;
     getmaxyx(stdscr, rows, cols);
 
-    int cursor_screen_y = state->current_line - state->top_line;
-    int max_h = rows - 2 - (cursor_screen_y + 1); 
-    if (max_h < 3) max_h = 3; 
-    if (max_h > 15) max_h = 15;
+    int win_h, win_w, win_y, win_x;
 
-    int win_h = state->num_suggestions < max_h ? state->num_suggestions : max_h;
-    int win_w = max_len + 2; 
-    
-    int win_y = cursor_screen_y + 1;
-    int win_x = state->completion_start_col - state->left_col;
-    
-    if (win_x + win_w >= cols) win_x = cols - win_w;
-    if (win_y < 0) win_y = 0;
-    if (win_x < 0) win_x = 0;
+    if (state->completion_mode == COMPLETION_TEXT) {
+        int cursor_screen_y = state->current_line - state->top_line;
+        int max_h = rows - 2 - (cursor_screen_y + 1);
+        if (max_h < 3) max_h = 3;
+        if (max_h > 15) max_h = 15;
 
-    if(state->completion_win) delwin(state->completion_win); 
+        win_h = state->num_suggestions < max_h ? state->num_suggestions : max_h;
+        win_w = max_len + 2;
+
+        win_y = cursor_screen_y + 1;
+        win_x = state->completion_start_col - state->left_col;
+
+        if (win_x + win_w >= cols) win_x = cols - win_w;
+        if (win_y < 0) win_y = 0;
+        if (win_x < 0) win_x = 0;
+
+    } else if (state->completion_mode == COMPLETION_COMMAND || state->completion_mode == COMPLETION_FILE) {
+        int max_h = rows - 2;
+        if (max_h < 3) max_h = 3;
+        if (max_h > 15) max_h = 15;
+
+        win_h = state->num_suggestions < max_h ? state->num_suggestions : max_h;
+        win_w = max_len + 2;
+
+        win_y = rows - 2 - win_h;
+        if (win_y < 0) win_y = 0;
+        win_x = 1;
+    } else {
+        return;
+    }
+
+    if(state->completion_win) delwin(state->completion_win);
     state->completion_win = newwin(win_h, win_w, win_y, win_x);
-    wbkgd(state->completion_win, COLOR_PAIR(9)); 
+    wbkgd(state->completion_win, COLOR_PAIR(9));
 
     for (int i = 0; i < win_h; i++) {
         int suggestion_idx = state->completion_scroll_top + i;
@@ -964,9 +1077,9 @@ void editor_draw_completion_win(EditorState *state) {
             if (suggestion_idx == state->selected_suggestion) wattroff(state->completion_win, A_REVERSE);
         }
     }
-    
+
     wnoutrefresh(state->completion_win);
-    curs_set(0); 
+    curs_set(0);
 }
 
 void handle_insert_mode_key(EditorState *state, wint_t ch) {
@@ -980,7 +1093,12 @@ void handle_insert_mode_key(EditorState *state, wint_t ch) {
             break;
         case KEY_ENTER: case '\n': editor_handle_enter(state); break;
         case KEY_BACKSPACE: case 127: case 8: editor_handle_backspace(state); break;
-        case '\t': for (int i = 0; i < TAB_SIZE; i++) editor_insert_char(state, ' '); break;
+        case '\t':
+            editor_start_completion(state);
+            if (state->completion_mode != COMPLETION_TEXT) {
+                for (int i = 0; i < TAB_SIZE; i++) editor_insert_char(state, ' ');
+            }
+            break;
         case KEY_UP: if (state->current_line > 0) { state->current_line--; state->current_col = state->ideal_col; } break;
         case KEY_DOWN: if (state->current_line < state->num_lines - 1) { state->current_line++; state->current_col = state->ideal_col; } break;
         case KEY_LEFT: if (state->current_col > 0) state->current_col--; state->ideal_col = state->current_col; break;
@@ -994,6 +1112,53 @@ void handle_insert_mode_key(EditorState *state, wint_t ch) {
     }
 }
 
+void handle_command_mode_key(EditorState *state, wint_t ch) {
+    switch (ch) {
+        case KEY_CTRL_P:
+        case '	':
+            if (strncmp(state->command_buffer, "open ", 5) == 0) {
+                editor_start_file_completion(state);
+            } else {
+                editor_start_command_completion(state);
+            }
+            break;
+
+        case KEY_LEFT: if (state->command_pos > 0) state->command_pos--; break;
+        case KEY_RIGHT: if (state->command_pos < strlen(state->command_buffer)) state->command_pos++; break;
+        case KEY_UP:
+            if (state->history_pos > 0) {
+                state->history_pos--;
+                strncpy(state->command_buffer, state->command_history[state->history_pos], sizeof(state->command_buffer) - 1);
+                state->command_pos = strlen(state->command_buffer);
+            }
+            break;
+        case KEY_DOWN:
+            if (state->history_pos < state->history_count) {
+                state->history_pos++;
+                if (state->history_pos == state->history_count) {
+                    state->command_buffer[0] = '\0';
+                } else {
+                    strncpy(state->command_buffer, state->command_history[state->history_pos], sizeof(state->command_buffer) - 1);
+                }
+                state->command_pos = strlen(state->command_buffer);
+            }
+            break;
+        case KEY_ENTER: case '\n': process_command(state); break;
+        case KEY_BACKSPACE: case 127: case 8:
+            if (state->command_pos > 0) {
+                memmove(&state->command_buffer[state->command_pos - 1], &state->command_buffer[state->command_pos], strlen(state->command_buffer) - state->command_pos + 1);
+                state->command_pos--;
+            }
+            break;
+        default:
+            if (iswprint(ch) && strlen(state->command_buffer) < sizeof(state->command_buffer) - 1) {
+                memmove(&state->command_buffer[state->command_pos + 1], &state->command_buffer[state->command_pos], strlen(state->command_buffer) - state->command_pos + 1);
+                state->command_buffer[state->command_pos] = (char)ch;
+                state->command_pos++;
+            }
+            break;
+    }
+}
 
 int main(int argc, char *argv[]) {
     setlocale(LC_ALL, ""); 
@@ -1003,6 +1168,7 @@ int main(int argc, char *argv[]) {
     
     strcpy(state->filename, "[No Name]");
     state->mode = NORMAL; 
+    state->completion_mode = COMPLETION_NONE;
     
     // +++ INICIALIZA AS NOVAS VARIÁVEIS DE BUSCA +++
     state->last_search[0] = '\0';
@@ -1025,7 +1191,7 @@ int main(int argc, char *argv[]) {
         wint_t ch;
         get_wch(&ch);
 
-        if (state->completion_active) {
+        if (state->completion_mode != COMPLETION_NONE) {
             int win_h = 0;
             if (state->completion_win) win_h = getmaxy(state->completion_win);
 
@@ -1043,6 +1209,7 @@ int main(int argc, char *argv[]) {
                         state->completion_scroll_top = state->selected_suggestion;
                     }
                     break;
+                case '\t':
                 case KEY_DOWN:
                     state->selected_suggestion++;
                     if (state->selected_suggestion >= state->num_suggestions) {
@@ -1061,7 +1228,11 @@ int main(int argc, char *argv[]) {
                     break;
                 default: 
                     editor_end_completion(state);
-                    if (state->mode == INSERT) handle_insert_mode_key(state, ch);
+                    if (state->mode == INSERT) {
+                        handle_insert_mode_key(state, ch);
+                    } else if (state->mode == COMMAND) {
+                        handle_command_mode_key(state, ch);
+                    }
                     break;
             }
             continue; 
@@ -1137,48 +1308,13 @@ int main(int argc, char *argv[]) {
                 handle_insert_mode_key(state, ch);
                 break;
             case COMMAND:
-                switch (ch) {
-                    case KEY_LEFT: if (state->command_pos > 0) state->command_pos--; break;
-                    case KEY_RIGHT: if (state->command_pos < strlen(state->command_buffer)) state->command_pos++; break;
-                    case KEY_UP:
-                        if (state->history_pos > 0) {
-                            state->history_pos--;
-                            strncpy(state->command_buffer, state->command_history[state->history_pos], sizeof(state->command_buffer) - 1);
-                            state->command_pos = strlen(state->command_buffer);
-                        }
-                        break;
-                    case KEY_DOWN:
-                        if (state->history_pos < state->history_count) {
-                            state->history_pos++;
-                            if (state->history_pos == state->history_count) {
-                                state->command_buffer[0] = '\0';
-                            } else {
-                                strncpy(state->command_buffer, state->command_history[state->history_pos], sizeof(state->command_buffer) - 1);
-                            }
-                            state->command_pos = strlen(state->command_buffer);
-                        }
-                        break;
-                    case KEY_ENTER: case '\n': process_command(state); break;
-                    case KEY_BACKSPACE: case 127:
-                        if (state->command_pos > 0) {
-                            memmove(&state->command_buffer[state->command_pos - 1], &state->command_buffer[state->command_pos], strlen(state->command_buffer) - state->command_pos + 1);
-                            state->command_pos--;
-                        }
-                        break;
-                    default:
-                        if (ch >= 32 && ch < 127 && strlen(state->command_buffer) < sizeof(state->command_buffer) - 1) {
-                            memmove(&state->command_buffer[state->command_pos + 1], &state->command_buffer[state->command_pos], strlen(state->command_buffer) - state->command_pos + 1);
-                            state->command_buffer[state->command_pos] = (char)ch;
-                            state->command_pos++;
-                        }
-                        break;
-                }
+                handle_command_mode_key(state, ch);
                 break;
         }
     }
 
     endwin(); 
-    if (state->completion_active) editor_end_completion(state);
+    if (state->completion_mode != COMPLETION_NONE) editor_end_completion(state);
     for(int i=0; i < state->history_count; i++) free(state->command_history[i]);
 
     for (int i = 0; i < state->num_syntax_rules; i++) {
