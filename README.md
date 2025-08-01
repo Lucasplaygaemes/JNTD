@@ -39,7 +39,7 @@ Theres now a make file where you don't need to compile every single file by hand
 I'm going to add a new file, soon, called documentation. Why's that? Simple, the code is written by me, and i really want other people to contribuite on it, so i will make a documentation. So whoever want to add something, make it own plugin, Or anything like will be able because he can read the docs. I will need AI help to implement in the whole code, but i will revise it all by myself. Just forgot to say, the documentation will be in english too.
 
 # Tip's?
-I would be really gratefull if you want to improve the code, it's always open to commits. and if you want you can contact me via my email. I will put it somewhere here. My email is lucasmoura27271@gmail.com, and if you need to say something with me, we can chat by email.
+I would be really gratefull if you want to improve the code, it's always open to commits. and if you want you can contact me via my email. My email is lucasmoura27271@gmail.com, and if you need to say something with me, we can chat by email.
 
 # Plugins!
 That's a cool things, you can add plugin on it, just put it on the plugins folder. The correct documentantion will be uploaded to how to add one. For now, i haven't make any new plugins, because i'm using fuctions that ware already implemented. The plugin function is now almost 100% working, just a little of adjustment need to be done.
