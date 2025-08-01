@@ -18,6 +18,27 @@ So i will add a new file, Features, and the name again is selfexplanatory. When 
 I'm want to make big updates for the code, it has some upgrades that need to be done. But i may need to change to much of the code, and also need to optimize it. So i will make slow changes in the code, i'm thinking in making headers files to make it smaller.
 I'm making modifications, implementing more secure features, and the next big update is....
 
+# A2!
+After a long time a i'm updating the features, A2 has a lot of functions.
+
+## Cursor Movment.
+You can go "skipping" words with ALT + W to go foward, and Q backwards.
+The arrows let you move one line in the desire direction, but PgUp and Down scrool 10 lines, that can be changed, as well the SHIFT + UP or DOWN make the sam movment.
+The TAB key it's equal to 4 spaces, that also can be changed.
+
+## Base commands.
+The basic commands are:
+Open <name> open a file.
+new <name> creates a file with the desired name.
+save <name> to save as new file, if nothing is inputted, the file is saved with the same name.
+rc reloads a file to the buffer.
+gcc <libralys> compile a file without you exiting the code.
+wq save and quit the file.                                                                                                                                                                                                
+## Functions                                                                                                                                                                                    
+There are some common fuctions that you would expect in a normal ide and text editor.                                                                                                           
+CTRL + P to complete a word, it can use the own code as a dictionary and from others file like the c.syntax.                                                                                    
+c.syntax? Yeah, that's a file where there a lot of key words in c, and some of headers files, other's words can be added to it.                                                                 
+CTRL + F it's a search function that let you search in the code, with using ALT D to pass to the next word and A to the last, all of the shortcuts can be changed.                                                             
 # The internet!
 My next big update, is the internet, i want to add curl, or any way to download something from the internet, it will be hard, but i will do it. I think. I was making a bit more resarch and, it's look hard, but i want to implemeant curl, as soon as possible.
 
