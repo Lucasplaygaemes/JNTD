@@ -1198,8 +1198,10 @@ void handle_insert_mode_key(EditorState *state, wint_t ch) {
             break;
         case KEY_CTRL_D:
             editor_find_next(state);
+	    break;
         case KEY_CTRL_A:
             editor_find_previous(state);
+	    break;
         case KEY_CTRL_F:
             editor_find(state);
         case KEY_ENTER: case '\n': editor_handle_enter(state); break;
