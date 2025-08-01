@@ -11,8 +11,7 @@ The code access the Ollama via bash, the 2B it's trained to know how and what to
 I want in the next updates make she possible to make complex interactions with the terminal, and codes, she may be possible to execute codes, and test them by herself, so she will have the possibility to know, where, why, and how a bug it's happening, she will also be able to search for directorys that may have a bug, when something is missing.
 
 # A2!
-What's A2 you might ask? It's my own file editor. The VIM is my main file editor, and that won't change, but when you need to edit a file, or make a correction or whatever reason, the A2 will be there waiting you. It's inspired by vim. A2 isn't perfect yet but it's working.
-A2 is working well! The code now has color in the text, and have a documented way where you can study it to help you understand the code.
+What's A2 you might ask? It's my own file editor. The VIM is my main file editor, and that won't change, but when you need to edit a file, or make a correction or whatever reason, the A2 will be there waiting you. It's inspired by vim. A2 isn't perfect yet, but it's working and A2 is working well! The code now has color in the text, and have a documented way where you can study it to help you understand the code.
 A2 is now a much more complete then before, you can run linux commands just like vim, and there a new file "c.syntax" and what does that file do you might ask?
 Easy! There is the words who will be highlighted and i will add in the future a c.dict that will be a dictionary for words! and the best!
 
