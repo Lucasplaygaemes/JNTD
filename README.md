@@ -41,7 +41,7 @@ I'm going to add a new file, soon, called documentation. Why's that? Simple, the
 I would be really gratefull if you want to improve the code, it's always open to commits. and if you want you can contact me via my email. My email is lucasmoura27271@gmail.com, and if you need to say something with me, we can chat by email.
 
 # Plugins!
-That's a cool things, you can add plugin on it, just put it on the plugins folder. The correct documentantion will be uploaded to how to add one. For now, i haven't make any new plugins, because i'm using fuctions that ware already implemented. The plugin function is now almost 100% working, just a little of adjustment need to be done.
+You can make you own plugins to JNTD, there is a example of plugins in the plugin folder. The same file is well documented about how you can make your own.
 
 # Repository!
 Well, for now, don't suit me making a online repository for "3" plugins. So i'm using this repository, as a repository! It's simple, i think, the official plugins will be here.
