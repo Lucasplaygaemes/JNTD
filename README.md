@@ -43,9 +43,6 @@ I would be really gratefull if you want to improve the code, it's always open to
 # Plugins!
 That's a cool things, you can add plugin on it, just put it on the plugins folder. The correct documentantion will be uploaded to how to add one. For now, i haven't make any new plugins, because i'm using fuctions that ware already implemented. The plugin function is now almost 100% working, just a little of adjustment need to be done.
 
-# Curl!
-The curl function is now working. The curl functions is also working parially, i have already made a way to download it, i'm just trying to implemente it right. The code will have a improved function to download files. And will make my own repository with plugins to it.
-
 # Repository!
 Well, for now, don't suit me making a online repository for "3" plugins. So i'm using this repository, as a repository! It's simple, i think, the official plugins will be here.
 Any important file or plugin can and will be possible to download from this repository.
