@@ -15,6 +15,9 @@ What's A2 you might ask? It's my own file editor. The VIM is my main file editor
 A2 is now a much more complete then before, you can run linux commands just like vim, and there a new file "c.syntax" and what does that file do you might ask?
 Easy! There is the words who will be highlighted and i will add in the future a c.dict that will be a dictionary for words! and the best!
 
+# Dependencies?
+Until this moment, i'm only using C, but not just default C libralys, so i will make a file to install dependecies on some systems, which are the one i know, and how to install.
+
 # Projects?
 JNTD is my main project for a while now, but i have other projects in mind, my favorite programming language is C, and that's clear, but, i would love somethings that are not native in C, i'm not a c developer,
 but i will make changes haha. I have other projects in mind, some of then i can add in JNTD, but other i can't, i will make then public once i feel they're good enough.
