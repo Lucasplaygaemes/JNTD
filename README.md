@@ -57,8 +57,5 @@ Until now i wasn't really think in security aspects, because it's a simple code,
 # Calculator!
 There is a calculator, it's not a scientific calculator but neither a common one, it's between the line, a frined of mine will help me improve it futurely.
 
-# TODO!
-Now we have the TODO funcionality, where you can define things, and be remembered when the defined times comes, as you can set it to 0, it's saved in todos.txt. and you can check if one is gone to expire today, and list everyone.
-
 # Languages?
 As you may noticed, all the README is in english, the commits are in english and Portuguese, and the functions are in portuguese as well. And i need to decide in which one i will make the whole code, i'm thinking in making a copy of it, and just changing the words from pt to en, and let it in a folder apart, if you want to add it in a another language just commit it in a new folder with that language. I will add only the languages that i know, that will be 3, maybe 4, Portuguese, English, Espanish and Japanese.
