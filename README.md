@@ -52,7 +52,7 @@ As you may notice, the README file is getting big, and i can't list every new th
 So i will add a new file, Features, and the name again is selfexplanatory. When a big update or change be made, it will be showed in README for 5~10 days in maximum. In the features file will have all that already is on the readme, and what's not.
 
 # Security?
-Until now i wasn't really think in security aspects, because it's a simple code, not much is an issue, thing's like C don't having a garbage collector, and another aspects, but as all good code, mine need to have at least a bit o security. So i'm already implemented some of it, but not much, like, 2b can't run any comands as her like, only the ones that also availble to JNTD. I'm making changes in the ones where they use the system funtcion, but not all can be easily replaced. Not for now, i make my best to do some security improvements.
+C isn't the best and most secure language ever, most of it because of the programmer, i'm in that list, i'm trying to make it secure, the most of functions are at least a bit secure, and some are a lot.
 
 # Calculator!
 There is a calculator, it's not a scientific calculator but neither a common one, it's between the line, a frined of mine will help me improve it futurely.
