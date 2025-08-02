@@ -32,7 +32,7 @@ I will make my own repository! and you ask where? In the beloved Github! I will 
 And the plugins parts are back, but this time isn't with good news, but i'm making a clean and revision, and unfortunetly with AI help, to debug the code. And i'm not having sucess yet haha.
 
 # Makefile!
-Theres now a make file where you don't need to compile every single file by hand. But currently it's not working properly.
+The make file compile and make every thing necessary to JNTD, a2 will be added in it.
 
 # Documentation!
 I'm going to add a new file, soon, called documentation. Why's that? Simple, the code is written by me, and i really want other people to contribuite on it, so i will make a documentation. So whoever want to add something, make it own plugin, Or anything like will be able because he can read the docs. I will need AI help to implement in the whole code, but i will revise it all by myself. Just forgot to say, the documentation will be in english too.
