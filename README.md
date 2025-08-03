@@ -15,6 +15,9 @@ What's A2 you might ask? It's my own file editor. The VIM is my main file editor
 A2 is now a much more complete then before, you can run linux commands just like vim, and there a new file "c.syntax" and what does that file do you might ask?
 Easy! There is the words who will be highlighted and i will add in the future a c.dict that will be a dictionary for words! and the best!
 
+# Dependencies?
+Until this moment, i'm only using C, but not just default C libralys, so i will make a file to install dependecies on some systems, which are the one i know, and how to install.
+
 # Projects?
 JNTD is my main project for a while now, but i have other projects in mind, my favorite programming language is C, and that's clear, but, i would love somethings that are not native in C, i'm not a c developer,
 but i will make changes haha. I have other projects in mind, some of then i can add in JNTD, but other i can't, i will make then public once i feel they're good enough.
@@ -32,7 +35,7 @@ I will make my own repository! and you ask where? In the beloved Github! I will 
 And the plugins parts are back, but this time isn't with good news, but i'm making a clean and revision, and unfortunetly with AI help, to debug the code. And i'm not having sucess yet haha.
 
 # Makefile!
-Theres now a make file where you don't need to compile every single file by hand. But currently it's not working properly.
+The make file compile and make every thing necessary to JNTD, a2 will be added in it.
 
 # Documentation!
 I'm going to add a new file, soon, called documentation. Why's that? Simple, the code is written by me, and i really want other people to contribuite on it, so i will make a documentation. So whoever want to add something, make it own plugin, Or anything like will be able because he can read the docs. I will need AI help to implement in the whole code, but i will revise it all by myself. Just forgot to say, the documentation will be in english too.
@@ -41,10 +44,7 @@ I'm going to add a new file, soon, called documentation. Why's that? Simple, the
 I would be really gratefull if you want to improve the code, it's always open to commits. and if you want you can contact me via my email. My email is lucasmoura27271@gmail.com, and if you need to say something with me, we can chat by email.
 
 # Plugins!
-That's a cool things, you can add plugin on it, just put it on the plugins folder. The correct documentantion will be uploaded to how to add one. For now, i haven't make any new plugins, because i'm using fuctions that ware already implemented. The plugin function is now almost 100% working, just a little of adjustment need to be done.
-
-# Curl!
-The curl function is now working. The curl functions is also working parially, i have already made a way to download it, i'm just trying to implemente it right. The code will have a improved function to download files. And will make my own repository with plugins to it.
+You can make you own plugins to JNTD, there is a example of plugins in the plugin folder. The same file is well documented about how you can make your own.
 
 # Repository!
 Well, for now, don't suit me making a online repository for "3" plugins. So i'm using this repository, as a repository! It's simple, i think, the official plugins will be here.
@@ -55,19 +55,10 @@ As you may notice, the README file is getting big, and i can't list every new th
 So i will add a new file, Features, and the name again is selfexplanatory. When a big update or change be made, it will be showed in README for 5~10 days in maximum. In the features file will have all that already is on the readme, and what's not.
 
 # Security?
-Until now i wasn't really think in security aspects, because it's a simple code, not much is an issue, thing's like C don't having a garbage collector, and another aspects, but as all good code, mine need to have at least a bit o security. So i'm already implemented some of it, but not much, like, 2b can't run any comands as her like, only the ones that also availble to JNTD. I'm making changes in the ones where they use the system funtcion, but not all can be easily replaced. Not for now, i make my best to do some security improvements.
+C isn't the best and most secure language ever, most of it because of the programmer, i'm in that list, i'm trying to make it secure, the most of functions are at least a bit secure, and some are a lot.
 
 # Calculator!
 There is a calculator, it's not a scientific calculator but neither a common one, it's between the line, a frined of mine will help me improve it futurely.
 
-# Git!
-The git function show you the link to JNTD repository, but the last commit feature, probably just work in my pc, thats because my git is setted to JNTD, but your may not, and that's a problem that i will handle in the future.
-
-# TODO!
-Now we have the TODO funcionality, where you can define things, and be remembered when the defined times comes, as you can set it to 0, it's saved in todos.txt. and you can check if one is gone to expire today, and list everyone.
-
 # Languages?
-As you may noticed, all the README is in english, the commits are in english and Portuguese, and the functions are in portuguese as well. And i need to decide in which one i will make the whole code, i'm thinking in making a copy of it, and just changing the words from pt to en, and let it in a folder apart, if you want to add it in a another language just commit it in a new folder with that language. I will add only the languages that i know, that will be 3, maybe 4, Portuguese, English, Espanish and Japanese.
-
-# Unwanted Delay.
-Unfortunately my system has corrupted. I wasn't able to fully recover it, but i was able to recover the most valuable files. However, i'm need to reconfigure my whole system, and i don't think it will take a long time, but if the updates got decrement for the next week, i'm sorry.
+As you may noticed, all the README is in english, the commits are in english and Portuguese, and the functions are in portuguese as well. And i need to decide in which one i will make the whole code, so there is the folder en, where is the code with everything in english and explanations as well. The code will have 4 default languages, Brazilian Portuguese, English, Japanese, and maybe Spanish.
