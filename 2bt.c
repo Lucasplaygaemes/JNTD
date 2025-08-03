@@ -139,6 +139,8 @@ static const CmdEntry cmds[] = {
 // Declaração antecipada das funções
 void dispatch(const char *user_in);
 void handle_ollama_interaction();
+void enable_raw_mode();
+void disable_raw_mode();
 
 void display_help();
 void log_action(const char *action, const char *details);
@@ -281,15 +283,20 @@ void save_aliases_to_file() {
 
 //Função para executar os plugins
 void execute_plugin(const char* name, const char* args) {
-    printf("Executando plugin: %s com argumentos: %s\n", name, args);
     for (int i = 0; i < plugin_count; i++) {
         if (strcmp(name, loaded_plugins[i].plugin->name) == 0) {
-            // Aqui você chamaria a função real do plugin
-	    loaded_plugins[i].plugin->execute(args);
-	    return;
+            // Desativa o modo raw para que o plugin possa usar I/O padrão
+            disable_raw_mode(); 
+            
+            printf("Executando plugin: %s com argumentos: %s\n", name, args ? args : "");
+            loaded_plugins[i].plugin->execute(args);
+            
+            // Reativa o modo raw para o shell principal
+            enable_raw_mode(); 
+            return;
         }
     }
-    printf("plugin não econtrado\n");
+    printf("Plugin '%s' não encontrado.\n", name);
 }
 
 typedef struct {
