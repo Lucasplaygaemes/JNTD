@@ -141,7 +141,6 @@ void dispatch(const char *user_in);
 void handle_ollama_interaction();
 void enable_raw_mode();
 void disable_raw_mode();
-
 void display_help();
 void log_action(const char *action, const char *details);
 int is_safe_command(const char *cmd);
@@ -156,6 +155,7 @@ void *timer_background(void *arg);
 void *quiz_timer_background(void *arg);
 void load_plugins();
 void execute_plugin(const char* name, const char* args);
+void save_aliases_to_file();
 
 //implementação dos plugins, sempre antes do dispatch//
 void load_plugins() {
@@ -203,9 +203,6 @@ void load_plugins() {
     }
     closedir(dir);
 }
-
-//Pré Declaracão do save_aliases_to_file
-void save_aliases_to_file();
 
 void handle_alias_command(const char *args) {
 	if (!args || strlen(args) == 0) {
@@ -317,6 +314,7 @@ static size_t write_data(void *ptr, size_t size, size_t nmemb, void *stream) {
 	return written;
 
 }
+
 //Função para fazer o download da função//
 bool download_file(char *url, char *filename) {
 	bool sucess = true;
@@ -500,7 +498,6 @@ void quiz_timer() {
 }
 
 //função para cancelar timers
-
 void cancel_timer(const char *type) {
 	if (strcmp(type, "timer") == 0) {
 		if (timer_running) {
@@ -606,7 +603,6 @@ int contar_linhas() {
 	return linhaslin;
 }
 
-
 void a2(const char *cmd_args) {
 	pid_t pid = fork();
 	int status;
@@ -665,6 +661,7 @@ void git() {
         }
     }
 }
+
 char* read_speci_line(int line_number) {
     FILE *quiz_f = fopen("quiz.txt", "r");
     if (quiz_f == NULL) {
@@ -696,6 +693,7 @@ char* read_speci_line(int line_number) {
     }
     return result;
 }
+
 //Função para sugerir comandos com base em um texto parcial
 void suggest_commands(const char *partial) {
 	int found = 0;
@@ -731,6 +729,7 @@ char* read_random_line() {
     }
     return result;
 }
+
 // Função para logging de ações
 void log_action(const char *action, const char *details) {
     FILE *log_file = fopen("jntd_log.txt", "a");
@@ -818,8 +817,8 @@ void handle_ollama_interaction() {
         }
     }
 }
-// Função para buscar no google//
 
+// Função para buscar no google//
 void search_google(const char *query) {
     if (query == NULL || query[0] == '\0') {
         printf("Uso: buscar <termo de pesquisa>\n");
@@ -984,7 +983,6 @@ void enable_raw_mode() {
     tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
 }
 
-// +++ FUNÇÃO DE LEITURA REESCRITA PARA USAR APENAS GETCHAR() +++
 int read_command_line(char *buf, int size) {
     int pos = 0; 
     int len = 0; 
@@ -1074,9 +1072,10 @@ int read_command_line(char *buf, int size) {
         }
     }
 }
+
 void dispatch(const char *user_in) {
-    // +++ LÓGICA PARA EXECUTAR COMANDOS EXTERNOS COM '!' +++
-    if (user_in[0] == '!') {
+        
+        if (user_in[0] == '!') {
         // Pega o comando, ignorando o '!' inicial
         const char *shell_cmd = user_in + 1;
         
@@ -1096,7 +1095,6 @@ void dispatch(const char *user_in) {
         return; // Termina a função aqui, não processa como comando interno
     }
 
-    // O resto da função continua como antes...
     char input_copy[128];
     strncpy(input_copy, user_in, sizeof(input_copy) - 1);
     input_copy[sizeof(input_copy) - 1] = '\0';
@@ -1224,7 +1222,7 @@ int main(void) {
         if (buf[0] != '!') {
             add_to_history(buf);
         }
-        if (strcmp(buf, "sair") == 0 || strcmp(buf, ":q") == 0 || strcmp(buf, ":Q") == 0) {
+        if (strcmp(buf, "exit") == 0 || strcmp(buf, ":q") == 0 || strcmp(buf, ":Q") == 0) {
             break;
         }
         dispatch(buf);
