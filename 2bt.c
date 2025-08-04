@@ -117,6 +117,9 @@ static const CmdEntry cmds[] = {
     { "cl", "clear", "Limpa o terminal" },
     { "git", NULL, "Mostra o link para Github do repositorio, além da ultima commit, mas a commit não funciona sempre. Pois depende do git do sistema, que pode estar ligado a outro repo." },
     { "mkdir", NULL, "Cria um novo diretorio sem nome, nomea-lo será adicionado" },
+    { "cp", NULL, "Copia arquivos e diretorios, use: cp <origem> <destino>." },
+    { "rm", NULL, "Remove arquivos ou diretorio, use rm <alvo>. ATENÇÃO, se o arquivo ou a pasta não foram removidos com o comando padrão, use rm -rf <nome>, assim ele apagará também todas as subpastas." },
+    { "mv", NULL, "Move o arquivos ou renomeia arquivos e diretorios, use: <origem> <destino>." },
     { "rscript", NULL, "Roda um script pré definido, coloque cada comando em uma linha" },
     { "sl", "sl", "Easter Egg." },
     { "cd", NULL, "O comando cd, você troca de diretorio, use cd <destino>." },
@@ -1135,6 +1138,17 @@ void dispatch(const char *user_in) {
                 display_help();
             } else if (strcasecmp(cmds[i].key, "mkdir") == 0) {
                 jntd_mkdir(args);
+            } else if (strcasecmp(cmds[i].key, "cp") == 0 || strcasecmp(cmds[i].key, "rm") == 0 || strcasecmp(cmds[i].key, "mv") == 0) {
+                if (args) {
+                    char shell_command[512];
+                    snprintf(shell_command, sizeof(shell_command), "%s %s", cmds[i].key, args);
+                    disable_raw_mode();
+                    printf("Executando: %s\n", shell_command);
+                    system(shell_command);
+                    enable_raw_mode();
+            }  else {
+                    printf("Erro, Faltando argumento. Uso %s <argumento>\n", cmds[i].key);
+                    }
             } else if (strcasecmp(cmds[i].key, "2b") == 0) {
                 handle_ollama_interaction();
             } else if (strcasecmp(cmds[i].key, "cd") == 0) {
@@ -1179,11 +1193,11 @@ void dispatch(const char *user_in) {
 		        printf("A url: \n");
 		        scanf("%s", url);
 		        printf("O nome: \n");		
-                scanf("%s", nome);
+                        scanf("%s", nome);
 		        bool dl = download_file(url, nome);
 		        printf("Primeiro download terminou com status: %d\n", dl);
 	        } else if (cmds[i].shell_command != NULL) {
-                system(cmds[i].shell_command);
+                        system(cmds[i].shell_command);
             }
             return;
         }
@@ -1194,7 +1208,6 @@ void dispatch(const char *user_in) {
 	    suggest_commands(token);
     }
 }
-
 
 int main(void) {
     printf("Iniciando o JNTD...\n");
