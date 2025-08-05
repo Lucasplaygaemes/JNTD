@@ -722,14 +722,44 @@ void save_file(EditorState *state) {
 
 void editor_handle_enter(EditorState *state) {
     if (state->num_lines >= MAX_LINES) return;
-    char *current_line = state->lines[state->current_line]; if (!current_line) return;
-    int line_len = strlen(current_line); int col = state->current_col; if (col > line_len) col = line_len;
-    char *rest_of_line = &current_line[col]; char *new_line = strdup(rest_of_line); if (!new_line) return;
-    current_line[col] = '\0';
-    char* resized_line = realloc(current_line, col + 1); if (resized_line) state->lines[state->current_line] = resized_line;
-    for (int i = state->num_lines; i > state->current_line + 1; i--) state->lines[i] = state->lines[i - 1];
-    state->num_lines++; state->lines[state->current_line + 1] = new_line;
-    state->current_line++; state->current_col = 0; state->ideal_col = 0;
+    char *current_line_ptr = state->lines[state->current_line];
+    if (!current_line_ptr) return;
+
+    // Find the indentation of the current line.
+    int indent_len = 0;
+    while (current_line_ptr[indent_len] != '\0' && isspace(current_line_ptr[indent_len])) {
+        indent_len++;
+    }
+
+    // Get the part of the line after the cursor.
+    int line_len = strlen(current_line_ptr);
+    int col = state->current_col;
+    if (col > line_len) col = line_len;
+    char *rest_of_line = &current_line_ptr[col];
+
+    // Create the new line with indentation.
+    int rest_len = strlen(rest_of_line);
+    char *new_line_content = malloc(indent_len + rest_len + 1);
+    if (!new_line_content) return;
+    strncpy(new_line_content, current_line_ptr, indent_len);
+    strcpy(new_line_content + indent_len, rest_of_line);
+
+    // Truncate the current line at the cursor position.
+    current_line_ptr[col] = '\0';
+    char* resized_line = realloc(current_line_ptr, col + 1);
+    if (resized_line) state->lines[state->current_line] = resized_line;
+
+    // Insert the new line into the buffer.
+    for (int i = state->num_lines; i > state->current_line + 1; i--) {
+        state->lines[i] = state->lines[i - 1];
+    }
+    state->num_lines++;
+    state->lines[state->current_line + 1] = new_line_content;
+
+    // Move cursor to the new line, after the indentation.
+    state->current_line++;
+    state->current_col = indent_len;
+    state->ideal_col = indent_len;
     state->buffer_modified = true;
 }
 
