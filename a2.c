@@ -133,11 +133,11 @@ void editor_insert_char(EditorState *state, wint_t ch);
 void editor_delete_line(EditorState *state);
 void editor_move_to_next_word(EditorState *state);
 void editor_move_to_previous_word(EditorState *state);
-void process_command(EditorState *state);
+void process_command(EditorState *state, bool *should_exit);
 void ensure_cursor_in_bounds(EditorState *state);
 void adjust_viewport(EditorState *state);
 void handle_insert_mode_key(EditorState *state, wint_t ch);
-void handle_command_mode_key(EditorState *state, wint_t ch);
+void handle_command_mode_key(EditorState *state, wint_t ch, bool *should_exit);
 void load_syntax_file(EditorState *state, const char *filename);
 FileViewer* create_file_viewer(const char* filename);
 void destroy_file_viewer(FileViewer* viewer);
@@ -154,6 +154,8 @@ void editor_end_completion(EditorState *state);
 void editor_draw_completion_win(EditorState *state);
 void editor_apply_completion(EditorState *state);
 void add_suggestion(EditorState *state, const char *suggestion);
+void save_last_line(const char *filename, int line);
+int load_last_line(const char *filename);
 
 // --- Definições das Funções ---
 void inicializar_ncurses() {
@@ -443,6 +445,8 @@ end_viewer:
     attroff(COLOR_PAIR(8));
 }
 
+
+
 void execute_shell_command(EditorState *state) {
     char *cmd = state->command_buffer + 1;
     if (strncmp(cmd, "cd ", 3) == 0) {
@@ -495,6 +499,7 @@ void execute_shell_command(EditorState *state) {
     }
 }
 
+
 void compile_file(EditorState *state, char* args) {
     save_file(state);
     if (strcmp(state->filename, "[No Name]") == 0) {
@@ -536,6 +541,31 @@ int get_visual_col(const char *line, int byte_col) {
     }
     return visual_col;
 }
+
+
+void save_last_line(const char *filename, int line) {
+    char pos_filename[256];
+    snprintf(pos_filename, sizeof(pos_filename), "%s.pos", filename);
+    FILE *f = fopen(pos_filename, "w");
+    if (f) {
+        fprintf(f, "%d", line);
+        fclose(f);
+    }
+}
+
+int load_last_line(const char *filename) {
+    char pos_filename[256];
+    snprintf(pos_filename, sizeof(pos_filename), "%s.pos", filename);
+    FILE *f = fopen(pos_filename, "r");
+    if (f) {
+        int line = 0;
+        fscanf(f, "%d", &line);
+        fclose(f);
+        return line;
+    }
+    return 0;
+}
+
 
 void editor_redraw(EditorState *state) {
     erase();
@@ -666,7 +696,14 @@ void load_file(EditorState *state, const char *filename) {
         } else { snprintf(state->status_msg, sizeof(state->status_msg), "Error opening file: %s", strerror(errno)); }
     }
     if (state->num_lines == 0) { state->lines[0] = calloc(1, 1); state->num_lines = 1; }
-    state->current_line = 0; state->current_col = 0; state->ideal_col = 0; state->top_line = 0; state->left_col = 0;
+    state->current_line = load_last_line(filename);
+    if (state->current_line >= state->num_lines) {
+        state->current_line = state->num_lines > 0 ? state->num_lines - 1 : 0;
+    }
+    if (state->current_line < 0) {
+        state->current_line = 0;
+    }
+    state->current_col = 0; state->ideal_col = 0; state->top_line = 0; state->left_col = 0;
     state->buffer_modified = false;
     state->last_file_mod_time = get_file_mod_time(state->filename);
 }
@@ -890,7 +927,7 @@ void check_external_modification(EditorState *state) {
     }
 }
 
-void process_command(EditorState *state) {
+void process_command(EditorState *state, bool *should_exit) {
     if (state->command_buffer[0] == '!') {
         execute_shell_command(state);
         add_to_command_history(state, state->command_buffer);
@@ -906,8 +943,16 @@ void process_command(EditorState *state) {
     if(isspace(*buffer_ptr)) buffer_ptr++;
     strncpy(args, buffer_ptr, sizeof(args) - 1);
     args[sizeof(args)-1] = '\0';
-    if (strcmp(command, "q") == 0) { endwin(); exit(0); } 
-    else if (strcmp(command, "w") == 0) {
+
+    if (strcmp(command, "q") == 0) {
+        if (state->buffer_modified) {
+            snprintf(state->status_msg, sizeof(state->status_msg), "Warning: Unsaved changes! Use :q! to force quit.");
+            return;
+        }
+        *should_exit = true;
+    } else if (strcmp(command, "q!") == 0) {
+        *should_exit = true;
+    } else if (strcmp(command, "w") == 0) {
         if (strlen(args) > 0) strncpy(state->filename, args, sizeof(state->filename) - 1);
         save_file(state);
     } else if (strcmp(command, "help") == 0) {
@@ -924,8 +969,12 @@ void process_command(EditorState *state) {
         state->num_lines = 1; state->lines[0] = calloc(1, 1); strcpy(state->filename, "[No Name]");
         state->current_line = 0; state->current_col = 0; state->ideal_col = 0; state->top_line = 0; state->left_col = 0;
         snprintf(state->status_msg, sizeof(state->status_msg), "New file opened.");
-    } else if (strcmp(command, "wq") == 0) { save_file(state); endwin(); exit(0); } 
-    else { snprintf(state->status_msg, sizeof(state->status_msg), "Unknown command: %s", command); }
+    } else if (strcmp(command, "wq") == 0) {
+        save_file(state);
+        *should_exit = true;
+    } else {
+        snprintf(state->status_msg, sizeof(state->status_msg), "Unknown command: %s", command);
+    }
     state->mode = NORMAL;
 }
 
@@ -1225,7 +1274,7 @@ void handle_insert_mode_key(EditorState *state, wint_t ch) {
     }
 }
 
-void handle_command_mode_key(EditorState *state, wint_t ch) {
+void handle_command_mode_key(EditorState *state, wint_t ch, bool *should_exit) {
     switch (ch) {
         case KEY_CTRL_P:
         case '\t':
@@ -1256,7 +1305,7 @@ void handle_command_mode_key(EditorState *state, wint_t ch) {
                 state->command_pos = strlen(state->command_buffer);
             }
             break;
-        case KEY_ENTER: case '\n': process_command(state); break;
+        case KEY_ENTER: case '\n': process_command(state, should_exit); break;
         case KEY_BACKSPACE: case 127: case 8:
             if (state->command_pos > 0) {
                 memmove(&state->command_buffer[state->command_pos - 1], &state->command_buffer[state->command_pos], strlen(state->command_buffer) - state->command_pos + 1);
@@ -1292,15 +1341,36 @@ int main(int argc, char *argv[]) {
     
     load_syntax_file(state, "c.syntax");
 
-    if (argc > 1) { 
+    if (argc > 1) {
         load_file(state, argv[1]);
+        if (argc > 2) {
+            // Subtrai 1 para converter de 1-based (usuário) para 0-based (interno)
+            state->current_line = atoi(argv[2]) - 1;
+            if (state->current_line >= state->num_lines) {
+                state->current_line = state->num_lines - 1;
+            }
+            if (state->current_line < 0) {
+                state->current_line = 0;
+            }
+            state->ideal_col = 0;
+        } else {
+            // Se nenhum número de linha for fornecido, carrega a última salva
+            state->current_line = load_last_line(state->filename);
+             if (state->current_line >= state->num_lines) {
+                state->current_line = state->num_lines > 0 ? state->num_lines - 1 : 0;
+            }
+            if (state->current_line < 0) {
+                state->current_line = 0;
+            }
+        }
     } else {
         state->lines[0] = calloc(1, 1);
         if (!state->lines[0]) { endwin(); free(state); fprintf(stderr, "Memory allocation failed\n"); return 1; }
         state->num_lines = 1;
     }
 
-    while (1) {
+    bool should_exit = false;
+    while (!should_exit) {
         ensure_cursor_in_bounds(state);
         check_external_modification(state);
         editor_redraw(state);
@@ -1347,7 +1417,7 @@ int main(int argc, char *argv[]) {
                     if (state->mode == INSERT) {
                         handle_insert_mode_key(state, ch);
                     } else if (state->mode == COMMAND) {
-                        handle_command_mode_key(state, ch);
+                        handle_command_mode_key(state, ch, &should_exit);
                     }
                     break;
             }
@@ -1424,9 +1494,13 @@ int main(int argc, char *argv[]) {
                 handle_insert_mode_key(state, ch);
                 break;
             case COMMAND:
-                handle_command_mode_key(state, ch);
+                handle_command_mode_key(state, ch, &should_exit);
                 break;
         }
+    }
+
+    if (state->filename[0] != '[') {
+        save_last_line(state->filename, state->current_line);
     }
 
     endwin(); 
@@ -1439,5 +1513,5 @@ int main(int argc, char *argv[]) {
     free(state->syntax_rules);
 
     free(state); 
-    return 0;
+    return state->current_line;
 }
