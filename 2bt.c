@@ -14,6 +14,7 @@
 #include <stdbool.h>
 #include <termios.h> 
 #include <ctype.h>
+#include "plugin_todo.c"
 
 #ifdef _WIN32
 #include <windows.h> // Para Sleep()
@@ -1212,7 +1213,8 @@ void dispatch(const char *user_in) {
 int main(void) {
     printf("Iniciando o JNTD...\n");
     printf("Bem vindo/a\n");
-
+    printf("Checado TODOs\n");
+    check_todos();
     enable_raw_mode();
 
     load_plugins();
