@@ -37,7 +37,10 @@
 //define o tamanho maximo do historico de comando
 #define MAX_HISTORY 50
 //define o tamanho maximo do input do usario + extras como calc
-#define COMBINED_PROMPT_LEN 2048 // Já estava adequado, mas mantido para clareza
+#define COMBINED_PROMPT_LEN 2048
+//define o tamanho maximo do ctrl + z
+#defoine MAX_UNDO_LEVELS 100
+
 
 #define MAX_ALIASES 128
 #define MAX_PROMPT_LEN 256
@@ -64,6 +67,10 @@ volatile int timer_running = 0;
 volatile int quiz_timer_running = 0;
 volatile int current_timer_seconds = 0;
 int plugin_count = 0;
+char *undo_stack[MAX_HISTORY];
+int undo_count = 0;
+char *redo_stack[MAX_UNDO_LEVELS]
+int redo_count = 0;
 
 pthread_t timer_thread;
 pthread_t quiz_thread;
@@ -526,11 +533,6 @@ void *timer_background(void *arg) {
 	timer_running = 1;
 	printf("\rTimer iniciado em segundo plano: %d segundos\n", seconds);
 	while (current_timer_seconds > 0 && timer_running) {
-		// int horas = current_timer_seconds / 3600;
-		// int minutos = (current_timer_seconds % 3600) / 60;
-		// int segundos = current_timer_seconds % 60;
-		//printf("\rTimer: %02d:%02d:%02d\n", horas, minutos, segundos);
-		//fflush(stdout);
 		#ifdef _WIN32
 		sleep(1000);// 1 segundo no windows//
 		#else
@@ -987,11 +989,54 @@ void enable_raw_mode() {
     tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
 }
 
-int read_command_line(char *buf, int size) {
-    int pos = 0; 
+//Função para limpar o redo_stack, muito importante!
+void clear_redo_stack() {
+    for (int i = 0; i < redo_count; i++) {
+        free(redo_stack[i]);
+     }
+     redo_count = 0;
+}
+
+void push_undo(const char *state) {
+    if (undo_count >= MAX_UNDO_LEVELS) {
+
+                free(undo_stack[0]);
+        for (int i = 1; i < MAX_UNDO_LEVELS; i++) {
+            undo_stack[i - 1] = undo_stack[i];
+         }
+         undo_count--;
+    }
+    undo_stack[undo_count++] = strdup(state);
+}
+
+void push_redo(const char *state) {
+    if (redo_count > MAX_UNDO_LEVELS) {
+        printf("O buffer está cheio");
+        return;
+    }
+    redo_stack[redo_count++] = strdup(state);
+}
+
+char *pop_undo() {
+    if (undo_count == 0) return NULL;
+    return undo_stack[--undo_stack];
+}
+
+char *pop_redo() {
+    if (redo_count == 0) return NULL;
+    return redo_stack[--redo_count];
+} 
+
+void read_command_line(char *buf, int size) {
+    int pos = 0;    
     int len = 0; 
     int history_pos = history_count;
     buf[0] = '\0';
+
+    for (int i = 0; i < undo_count; i++) free(undo_stack[i]);
+    undo_count = 0;
+    clear_reado_stack();
+    push_undo(buf);
 
     while (1) {
         int c = getchar();
@@ -1002,6 +1047,17 @@ int read_command_line(char *buf, int size) {
             printf("\n");
             buf[len] = '\0';
             return len;
+        } else if (c == 26) {
+            char *undone_state = pop_undo();
+            if (undone_state != NULL) {
+                push_redo(buf);
+                strcpy(buf, undone_state);
+                free(undone_state);
+                len = strlen(buf);
+                pos = len;
+                printf("\r> %s\033[K", buf);
+                fflush(stdout);
+            }
         } else if (c == 127 || c == 8) { // Backspace
             if (pos > 0) {
                 memmove(&buf[pos - 1], &buf[pos], len - pos);
