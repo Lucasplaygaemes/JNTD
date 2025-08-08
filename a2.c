@@ -1,3 +1,4 @@
+#define MAX_UNDO_LEVELS 100
 #define _XOPEN_SOURCE_EXTENDED 1
 #define NCURSES_WIDECHAR 1
 
@@ -31,6 +32,16 @@
 #define KEY_CTRL_D 4
 #define KEY_CTRL_A 1
 
+typedef struct {
+    char **lines;
+    int num_lines;
+    int current_line;
+    int current_col;
+    int ideal_col;
+    int top_line;
+    int left_col;
+} EditorSnapshot;
+
 // Enum para os tipos de sintaxe que definimos no arquivo .syntax
 typedef enum {
     SYNTAX_KEYWORD,
@@ -43,7 +54,6 @@ typedef struct {
     char *word;
     SyntaxRuleType type;
 } SyntaxRule;
-
 
 // --- Estrutura para a tela de ajuda ---
 typedef struct {
@@ -62,6 +72,8 @@ typedef struct {
 const char* stdio_h_symbols[] = {"printf", "scanf", "fprintf", "sprintf", "sscanf", "fopen", "fclose", "fgetc", "fgets", "fputc", "fputs", "fread", "fwrite", "fseek", "ftell", "rewind", "remove", "rename", "tmpfile", "tmpnam", "setvbuf", "setbuf", "ferror", "feof", "clearerr", "perror", "FILE", "EOF", "NULL", "SEEK_SET", "SEEK_CUR", "SEEK_END"};
 const char* stdlib_h_symbols[] = {"malloc", "calloc", "realloc", "free", "atoi", "atof", "atol", "strtod", "strtol", "strtoul", "rand", "srand", "system", "exit", "getenv", "abs", "labs", "div", "ldiv", "qsort", "bsearch", "EXIT_SUCCESS", "EXIT_FAILURE", "RAND_MAX"};
 const char* string_h_symbols[] = {"strcpy", "strncpy", "strcat", "strncat", "strcmp", "strncmp", "strchr", "strrchr", "strlen", "strspn", "strcspn", "strpbrk", "strstr", "strtok", "memset", "memcpy", "memmove", "memcmp", "memchr", "strerror"};
+
+
 
 typedef struct {
     const char* header_name;
@@ -101,7 +113,7 @@ typedef struct {
     char word_to_complete[100];
     int completion_start_col;
     int completion_scroll_top;
-
+    
     // Campos para sintaxe dinâmica
     SyntaxRule *syntax_rules;
     int num_syntax_rules;
@@ -114,7 +126,12 @@ typedef struct {
 
     bool buffer_modified;
     time_t last_file_mod_time;
-
+    
+    EditorSnapshot *undo_stack[MAX_UNDO_LEVELS];
+    int undo_count;
+    EditorSnapshot *redo_stack[MAX_UNDO_LEVELS];
+    int redo_count;
+    
 } EditorState;
 
 // --- Declarações de Funções ---
@@ -125,7 +142,8 @@ void compile_file(EditorState *state, char* args);
 void execute_shell_command(EditorState *state);
 void add_to_command_history(EditorState *state, const char* command);
 void editor_redraw(EditorState *state);
-void load_file(EditorState *state, const char *filename);
+void 
+load_file(EditorState *state, const char *filename);
 void save_file(EditorState *state);
 void editor_handle_enter(EditorState *state);
 void editor_handle_backspace(EditorState *state);
@@ -677,6 +695,117 @@ void editor_redraw(EditorState *state) {
 }
 
 
+// --- Funções de Snapshot e Undo/Redo ---
+
+// Libera a memória de um único snapshot.
+void free_snapshot(EditorSnapshot *snapshot) {
+    if (!snapshot) return;
+    for (int i = 0; i < snapshot->num_lines; i++) {
+        free(snapshot->lines[i]);
+    }
+    free(snapshot->lines);
+    free(snapshot);
+}
+
+// Cria uma cópia profunda do estado atual do editor.
+EditorSnapshot* create_snapshot(EditorState *state) {
+    EditorSnapshot *snapshot = malloc(sizeof(EditorSnapshot));
+    if (!snapshot) return NULL;
+
+    snapshot->lines = malloc(sizeof(char*) * state->num_lines);
+    if (!snapshot->lines) { free(snapshot); return NULL; }
+
+    for (int i = 0; i < state->num_lines; i++) {
+        snapshot->lines[i] = strdup(state->lines[i]);
+    }
+
+    snapshot->num_lines = state->num_lines;
+    snapshot->current_line = state->current_line;
+    snapshot->current_col = state->current_col;
+    snapshot->ideal_col = state->ideal_col;
+    snapshot->top_line = state->top_line;
+    snapshot->left_col = state->left_col;
+
+    return snapshot;
+}
+
+// Restaura o estado do editor a partir de um snapshot.
+void restore_from_snapshot(EditorState *state, EditorSnapshot *snapshot) {
+    // Libera as linhas atuais do editor
+    for (int i = 0; i < state->num_lines; i++) {
+        free(state->lines[i]);
+    }
+
+    // Restaura os valores do snapshot
+    state->num_lines = snapshot->num_lines;
+    for (int i = 0; i < state->num_lines; i++) {
+        state->lines[i] = snapshot->lines[i]; // Assume a posse da linha
+    }
+
+    state->current_line = snapshot->current_line;
+    state->current_col = snapshot->current_col;
+    state->ideal_col = snapshot->ideal_col;
+    state->top_line = snapshot->top_line;
+    state->left_col = snapshot->left_col;
+
+    // Libera o contêiner do snapshot, mas não as linhas que agora estão no estado
+    free(snapshot->lines);
+    free(snapshot);
+}
+
+// Limpa a pilha de refazer. Chamado sempre que uma nova ação é executada.
+void clear_redo_stack(EditorState *state) {
+    for (int i = 0; i < state->redo_count; i++) {
+        free_snapshot(state->redo_stack[i]);
+    }
+    state->redo_count = 0;
+}
+
+// Adiciona o estado atual à pilha de desfazer.
+void push_undo(EditorState *state) {
+    if (state->undo_count >= MAX_UNDO_LEVELS) {
+        free_snapshot(state->undo_stack[0]);
+        for (int i = 1; i < MAX_UNDO_LEVELS; i++) {
+            state->undo_stack[i - 1] = state->undo_stack[i];
+        }
+        state->undo_count--;
+    }
+    state->undo_stack[state->undo_count++] = create_snapshot(state);
+}
+
+// Função principal de Desfazer
+void do_undo(EditorState *state) {
+    if (state->undo_count <= 1) return; // Não pode desfazer o estado inicial
+
+    // O estado que estamos prestes a substituir será enviado para a pilha de refazer.
+    if (state->redo_count < MAX_UNDO_LEVELS) {
+        state->redo_stack[state->redo_count++] = create_snapshot(state);
+    }
+
+    // Pega o último estado da pilha de desfazer
+    EditorSnapshot *undo_snap = state->undo_stack[--state->undo_count];
+    
+    // Restaura o editor a partir desse snapshot
+    restore_from_snapshot(state, undo_snap);
+    state->buffer_modified = true;
+}
+
+// Função principal de Refazer
+void do_redo(EditorState *state) {
+    if (state->redo_count == 0) return;
+
+    // Pega da pilha de refazer
+    EditorSnapshot *redo_snap = state->redo_stack[--state->redo_count];
+
+    // Adiciona o estado atual à pilha de desfazer
+    push_undo(state);
+
+    // Restaura o estado do editor
+    restore_from_snapshot(state, redo_snap);
+    state->buffer_modified = true;
+}
+
+   
 void load_file(EditorState *state, const char *filename) {
     for (int i = 0; i < state->num_lines; i++) { if(state->lines[i]) free(state->lines[i]); state->lines[i] = NULL; }
     state->num_lines = 0; strncpy(state->filename, filename, sizeof(state->filename) - 1); state->filename[sizeof(state->filename) - 1] = '\0';
@@ -721,6 +850,8 @@ void save_file(EditorState *state) {
 }
 
 void editor_handle_enter(EditorState *state) {
+    push_undo(state);
+    clear_redo_stack(state);
     if (state->num_lines >= MAX_LINES) return;
     char *current_line_ptr = state->lines[state->current_line];
     if (!current_line_ptr) return;
@@ -764,6 +895,8 @@ void editor_handle_enter(EditorState *state) {
 }
 
 void editor_handle_backspace(EditorState *state) {
+    push_undo(state);
+    clear_redo_stack(state);
     if (state->current_col == 0 && state->current_line == 0) return;
     if (state->current_col > 0) {
         char *line = state->lines[state->current_line];
@@ -812,6 +945,8 @@ void editor_handle_backspace(EditorState *state) {
 }
 
 void editor_insert_char(EditorState *state, wint_t ch) {
+    push_undo(state);
+    clear_redo_stack(state);
     if (state->current_line >= state->num_lines) return;
     char *line = state->lines[state->current_line];
     if (!line) { line = calloc(1, 1); if (!line) return; state->lines[state->current_line] = line; }
@@ -836,6 +971,8 @@ void editor_insert_char(EditorState *state, wint_t ch) {
 }
 
 void editor_delete_line(EditorState *state) {
+    push_undo(state);
+    clear_redo_stack(state);
     if (state->num_lines <= 1 && state->current_line == 0) {
         free(state->lines[0]);
         state->lines[0] = calloc(1, 1);
@@ -995,7 +1132,8 @@ void process_command(EditorState *state, bool *should_exit) {
         if (strlen(args) > 0) load_file(state, args);
         else snprintf(state->status_msg, sizeof(state->status_msg), "Usage: :open <filename>");
     } else if (strcmp(command, "new") == 0) {
-        for (int i = 0; i < state->num_lines; i++) { if(state->lines[i]) free(state->lines[i]); state->lines[i] = NULL; }
+        for (int i = 0; i < state->num_lines; i++) { if(state->lines[i]) 
+        free(state->lines[i]); state->lines[i] = NULL; }
         state->num_lines = 1; state->lines[0] = calloc(1, 1); strcpy(state->filename, "[No Name]");
         state->current_line = 0; state->current_col = 0; state->ideal_col = 0; state->top_line = 0; state->left_col = 0;
         snprintf(state->status_msg, sizeof(state->status_msg), "New file opened.");
@@ -1362,12 +1500,14 @@ int main(int argc, char *argv[]) {
     state->mode = NORMAL; 
     state->completion_mode = COMPLETION_NONE;
     
-    // +++ INICIALIZA AS NOVAS VARIÁVEIS DE BUSCA +++
     state->last_search[0] = '\0';
     state->last_match_line = -1;
     state->last_match_col = -1;
     state->buffer_modified = false;
     state->last_file_mod_time = 0;
+    state->undo_count = 0;
+    state->redo_count = 0;
+    push_undo(state);
     
     load_syntax_file(state, "c.syntax");
 
@@ -1461,6 +1601,10 @@ int main(int argc, char *argv[]) {
 
             if (next_ch == ERR) { 
                 if (state->mode == INSERT) state->mode = NORMAL;
+            } else if (next_ch == 'z' || next_ch == 'Z') {
+                do_undo(state);
+            } else if (next_ch == 'y' || next_ch == 'Y') {
+                do_redo(state);
             } else if (next_ch == 'f' || next_ch == 'w') {
                 editor_move_to_next_word(state);
             } else if (next_ch == 'b' || next_ch == 'q') {
@@ -1536,6 +1680,9 @@ int main(int argc, char *argv[]) {
     endwin(); 
     if (state->completion_mode != COMPLETION_NONE) editor_end_completion(state);
     for(int i=0; i < state->history_count; i++) free(state->command_history[i]);
+
+    for (int i = 0; i < state->undo_count; i++) free_snapshot(state->undo_stack[i]);
+    for (int i = 0; i < state->redo_count; i++) free_snapshot(state->redo_stack[i]);
 
     for (int i = 0; i < state->num_syntax_rules; i++) {
         free(state->syntax_rules[i].word);
