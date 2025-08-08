@@ -856,41 +856,55 @@ void editor_handle_enter(EditorState *state) {
     char *current_line_ptr = state->lines[state->current_line];
     if (!current_line_ptr) return;
 
-    // Find the indentation of the current line.
-    int indent_len = 0;
-    while (current_line_ptr[indent_len] != '\0' && isspace(current_line_ptr[indent_len])) {
-        indent_len++;
+    // Encontra a indentação da linha atual.
+    int base_indent_len = 0;
+    while (current_line_ptr[base_indent_len] != '\0' && isspace(current_line_ptr[base_indent_len])) {
+        base_indent_len++;
     }
 
-    // Get the part of the line after the cursor.
+    // Verifica se um recuo extra deve ser adicionado.
+    int extra_indent = 0;
+    int last_char_pos = state->current_col - 1;
+    while (last_char_pos >= 0 && isspace(current_line_ptr[last_char_pos])) {
+        last_char_pos--;
+    }
+    if (last_char_pos >= 0 && current_line_ptr[last_char_pos] == '{') {
+        extra_indent = TAB_SIZE;
+    }
+
+    int new_indent_len = base_indent_len + extra_indent;
+
+    // Pega o resto da linha após o cursor.
     int line_len = strlen(current_line_ptr);
     int col = state->current_col;
     if (col > line_len) col = line_len;
     char *rest_of_line = &current_line_ptr[col];
 
-    // Create the new line with indentation.
+    // Cria a nova linha com a indentação calculada.
     int rest_len = strlen(rest_of_line);
-    char *new_line_content = malloc(indent_len + rest_len + 1);
+    char *new_line_content = malloc(new_indent_len + rest_len + 1);
     if (!new_line_content) return;
-    strncpy(new_line_content, current_line_ptr, indent_len);
-    strcpy(new_line_content + indent_len, rest_of_line);
+    for (int i = 0; i < new_indent_len; i++) {
+        new_line_content[i] = ' ';
+    }
+    strcpy(new_line_content + new_indent_len, rest_of_line);
 
-    // Truncate the current line at the cursor position.
+    // Trunca a linha atual na posição do cursor.
     current_line_ptr[col] = '\0';
     char* resized_line = realloc(current_line_ptr, col + 1);
     if (resized_line) state->lines[state->current_line] = resized_line;
 
-    // Insert the new line into the buffer.
+    // Insere a nova linha no buffer.
     for (int i = state->num_lines; i > state->current_line + 1; i--) {
         state->lines[i] = state->lines[i - 1];
     }
     state->num_lines++;
     state->lines[state->current_line + 1] = new_line_content;
 
-    // Move cursor to the new line, after the indentation.
+    // Move o cursor para a nova linha, após a indentação.
     state->current_line++;
-    state->current_col = indent_len;
-    state->ideal_col = indent_len;
+    state->current_col = new_indent_len;
+    state->ideal_col = new_indent_len;
     state->buffer_modified = true;
 }
 
