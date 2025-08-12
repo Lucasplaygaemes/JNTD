@@ -26,7 +26,6 @@
 #define MAX_COMMAND_HISTORY 50 
 #define AUTO_SAVE_INTERVAL 1 // Segundos
 #define AUTO_SAVE_EXTENSION ".sv"
- 
 
 #define KEY_CTRL_P 16
 #define KEY_CTRL_DEL 520
@@ -98,7 +97,17 @@ const char* editor_commands[] = {
 int num_editor_commands = sizeof(editor_commands) / sizeof(char*);
 
 typedef enum { COMPLETION_NONE, COMPLETION_TEXT, COMPLETION_COMMAND, COMPLETION_FILE } CompletionMode;
+
 typedef enum { NORMAL, INSERT, COMMAND } EditorMode;
+
+typedef enum {
+    RECOVER_FROM_SV,
+    RECOVER_OPEN_ORIGINAL,
+    RECOVER_DIFF,
+    RECOVER_IGNORE,
+    RECOVER_ABORT
+} FileRecoveryChoice;
+
 typedef struct {
     char *lines[MAX_LINES];
     int num_lines, current_line, current_col, ideal_col, top_line, left_col, command_pos;
@@ -146,8 +155,7 @@ void compile_file(EditorState *state, char* args);
 void execute_shell_command(EditorState *state);
 void add_to_command_history(EditorState *state, const char* command);
 void editor_redraw(EditorState *state);
-void 
-load_file(EditorState *state, const char *filename);
+void load_file(EditorState *state, const char *filename);
 // Adicione esta função para salvar automaticamente
 void auto_save(EditorState *state) {
     if (strcmp(state->filename, "[No Name]") == 0) return;
@@ -187,6 +195,11 @@ void search_google(const char *query);
 void reload_file(EditorState *state);
 void check_external_modification(EditorState *state);
 
+// Funções para recuperação de arquivo
+void handle_file_recovery(EditorState *state, const char *original_filename, const char *sv_filename);
+void run_and_display_command(const char* command, const char* title);
+void load_file_core(EditorState *state, const char *filename);
+
 // Declarações de Funções do Autocompletar
 void editor_start_file_completion(EditorState *state);
 void editor_start_command_completion(EditorState *state);
@@ -209,6 +222,91 @@ void inicializar_ncurses() {
     init_pair(8, COLOR_WHITE, COLOR_BLACK);
     init_pair(9, COLOR_BLACK, COLOR_MAGENTA);
     bkgd(COLOR_PAIR(8)); 
+}
+
+FileRecoveryChoice display_recovery_prompt(EditorState *state) {
+    snprintf(state->status_msg, sizeof(state->status_msg),
+             "Recuperação: (R)ecuperar .sv | (O)riginal | (D)iff | (I)gnorar | (Q)uit");
+    editor_redraw(state);
+
+    while (1) {
+        wint_t ch;
+        get_wch(&ch);
+        ch = tolower(ch);
+        switch (ch) {
+            case 'r':
+            case 'R': return RECOVER_FROM_SV;
+            case 'o':
+            case 'O': return RECOVER_OPEN_ORIGINAL;
+            case 'd': 
+            case 'D': return RECOVER_DIFF;
+            case 'i': 
+            case 'I': return RECOVER_IGNORE;
+            case 27:  // Tecla ESC
+            case 'q':
+            case 'Q': return RECOVER_ABORT;
+        }
+    }
+}
+
+// Executa um comando e mostra a saída em tela cheia
+void run_and_display_command(const char* command, const char* title) {
+    char temp_output_file[] = "/tmp/editor_cmd_output.XXXXXX";
+    int fd = mkstemp(temp_output_file);
+    if (fd == -1) return;
+    close(fd);
+
+    char full_shell_command[2048];
+    snprintf(full_shell_command, sizeof(full_shell_command), "%s > %s 2>&1", command, temp_output_file);
+
+    def_prog_mode();
+    endwin();
+    system(full_shell_command);
+    reset_prog_mode();
+    refresh();
+
+    display_output_screen(title, temp_output_file);
+}
+
+void handle_file_recovery(EditorState *state, const char *original_filename, const char *sv_filename) {
+    while (1) {
+        FileRecoveryChoice choice = display_recovery_prompt(state);
+
+        switch (choice) {
+            case RECOVER_DIFF: {
+                char diff_command[1024];
+                snprintf(diff_command, sizeof(diff_command), "diff -u --color=always %s %s", original_filename, sv_filename);
+                run_and_display_command(diff_command, "--- DIFERENÇAS ---");
+                break; // Loop again to show prompt
+            }
+            case RECOVER_FROM_SV:
+                load_file_core(state, sv_filename); // Use core function
+                strncpy(state->filename, original_filename, sizeof(state->filename) - 1);
+                state->buffer_modified = true;
+                remove(sv_filename);
+                snprintf(state->status_msg, sizeof(state->status_msg), "Recuperado de %s. Salve para confirmar.", sv_filename);
+                return;
+
+            case RECOVER_OPEN_ORIGINAL:
+                remove(sv_filename); // Remove before loading
+                load_file_core(state, original_filename);
+                snprintf(state->status_msg, sizeof(state->status_msg), "Arquivo de recuperação ignorado e removido.");
+                return;
+
+            case RECOVER_IGNORE:
+                load_file_core(state, original_filename); // Use core function
+                snprintf(state->status_msg, sizeof(state->status_msg), "Arquivo de recuperação mantido.");
+                return;
+
+            case RECOVER_ABORT:
+                state->status_msg[0] = '\0';
+                // To prevent an empty screen, we load a new empty file
+                state->num_lines = 1;
+                state->lines[0] = calloc(1, 1);
+                strcpy(state->filename, "[No Name]");
+                return;
+        }
+    }
 }
 
 char* trim_whitespace(char *str) {
@@ -828,26 +926,39 @@ void do_redo(EditorState *state) {
     state->buffer_modified = true;
 }
 
-   
-void load_file(EditorState *state, const char *filename) {
+// Contém a lógica principal de carregamento de arquivo, para ser reutilizada.
+void load_file_core(EditorState *state, const char *filename) {
     for (int i = 0; i < state->num_lines; i++) { if(state->lines[i]) free(state->lines[i]); state->lines[i] = NULL; }
-    state->num_lines = 0; strncpy(state->filename, filename, sizeof(state->filename) - 1); state->filename[sizeof(state->filename) - 1] = '\0';
+    state->num_lines = 0;
+    strncpy(state->filename, filename, sizeof(state->filename) - 1);
+    state->filename[sizeof(state->filename) - 1] = '\0';
+
     FILE *file = fopen(filename, "r");
     if (file) {
         char line[MAX_LINE_LEN];
         while (fgets(line, sizeof(line), file) && state->num_lines < MAX_LINES) {
-            line[strcspn(line, "\n\r")] = 0; state->lines[state->num_lines] = strdup(line);
+            line[strcspn(line, "\n\r")] = 0;
+            state->lines[state->num_lines] = strdup(line);
             if (!state->lines[state->num_lines]) { fclose(file); return; }
             state->num_lines++;
         }
-        fclose(file); snprintf(state->status_msg, sizeof(state->status_msg), "\"%s\" loaded", filename);
+        fclose(file);
+        snprintf(state->status_msg, sizeof(state->status_msg), "\"%s\" loaded", filename);
     } else {
         if (errno == ENOENT) {
-            state->lines[0] = calloc(1, 1); if (!state->lines[0]) return;
-            state->num_lines = 1; snprintf(state->status_msg, sizeof(state->status_msg), "New file: \"%s\"", filename);
-        } else { snprintf(state->status_msg, sizeof(state->status_msg), "Error opening file: %s", strerror(errno)); }
+            state->lines[0] = calloc(1, 1);
+            if (!state->lines[0]) return;
+            state->num_lines = 1;
+            snprintf(state->status_msg, sizeof(state->status_msg), "New file: \"%s\"", filename);
+        } else {
+            snprintf(state->status_msg, sizeof(state->status_msg), "Error opening file: %s", strerror(errno));
+        }
     }
-    if (state->num_lines == 0) { state->lines[0] = calloc(1, 1); state->num_lines = 1; }
+
+    if (state->num_lines == 0) {
+        state->lines[0] = calloc(1, 1);
+        state->num_lines = 1;
+    }
     state->current_line = load_last_line(filename);
     if (state->current_line >= state->num_lines) {
         state->current_line = state->num_lines > 0 ? state->num_lines - 1 : 0;
@@ -855,9 +966,26 @@ void load_file(EditorState *state, const char *filename) {
     if (state->current_line < 0) {
         state->current_line = 0;
     }
-    state->current_col = 0; state->ideal_col = 0; state->top_line = 0; state->left_col = 0;
+    state->current_col = 0;
+    state->ideal_col = 0;
+    state->top_line = 0;
+    state->left_col = 0;
     state->buffer_modified = false;
     state->last_file_mod_time = get_file_mod_time(state->filename);
+}
+   
+void load_file(EditorState *state, const char *filename) {    // Não execute a lógica de recuperação para o próprio arquivo .sv    
+	if (strstr(filename, AUTO_SAVE_EXTENSION) == NULL) {
+		char sv_filename[256];
+		snprintf(sv_filename, sizeof(sv_filename), "%s%s", filename, AUTO_SAVE_EXTENSION);
+		struct stat st;
+		if (stat(sv_filename, &st) == 0) {
+		// Arquivo .sv encontrado, inicie o processo de recuperação.
+		handle_file_recovery(state, filename, sv_filename);
+		return; // A função de recuperação cuidará do carregamento.
+		}    // Se não houver arquivo de recuperação, apenas carregue o arquivo solicitado.
+	}
+	load_file_core(state, filename);
 }
 
 void save_file(EditorState *state) {
@@ -1659,25 +1787,29 @@ int main(int argc, char *argv[]) {
             continue; 
         }
             
-        if (ch == 27) { 
-            nodelay(stdscr, TRUE);
-            int next_ch = getch();
-            nodelay(stdscr, FALSE);
+        if (ch == 27) {
+            // In INSERT mode, ESC always returns to NORMAL mode.
+            // In other modes, it can be a prefix for Alt+key sequences.
+            if (state->mode == INSERT) {
+                state->mode = NORMAL;
+            } else {
+                nodelay(stdscr, TRUE);
+                int next_ch = getch();
+                nodelay(stdscr, FALSE);
 
-            if (next_ch == ERR) { 
-                if (state->mode == INSERT) state->mode = NORMAL;
-            } else if (next_ch == 'z' || next_ch == 'Z') {
-                do_undo(state);
-            } else if (next_ch == 'y' || next_ch == 'Y') {
-                do_redo(state);
-            } else if (next_ch == 'f' || next_ch == 'w') {
-                editor_move_to_next_word(state);
-            } else if (next_ch == 'b' || next_ch == 'q') {
-                editor_move_to_previous_word(state);
-            } else if (next_ch == KEY_DC) {
-                 editor_delete_line(state);
+                if (next_ch != ERR) {
+                    if (next_ch == 'z' || next_ch == 'Z') {
+                        do_undo(state);
+                    } else if (next_ch == 'y' || next_ch == 'Y') {
+                        do_redo(state);
+                    } else if (next_ch == 'f' || next_ch == 'w') {
+                        editor_move_to_next_word(state);
+                    } else if (next_ch == 'b' || next_ch == 'q') {
+                        editor_move_to_previous_word(state);
+                    }
+                }
             }
-            continue; 
+            continue;
         }
 
         switch (state->mode) {
