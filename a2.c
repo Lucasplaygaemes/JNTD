@@ -156,25 +156,6 @@ void execute_shell_command(EditorState *state);
 void add_to_command_history(EditorState *state, const char* command);
 void editor_redraw(EditorState *state);
 void load_file(EditorState *state, const char *filename);
-// Adicione esta função para salvar automaticamente
-void auto_save(EditorState *state) {
-    if (strcmp(state->filename, "[No Name]") == 0) return;
-    if (!state->buffer_modified) return;
-
-    char auto_save_filename[256];
-    snprintf(auto_save_filename, sizeof(auto_save_filename), "%s%s", state->filename, AUTO_SAVE_EXTENSION);
-
-    FILE *file = fopen(auto_save_filename, "w");
-    if (file) {
-        for (int i = 0; i < state->num_lines; i++) {
-            if (state->lines[i]) {
-                fprintf(file, "%s\n", state->lines[i]);
-            }
-        }
-        fclose(file);
-    }
-}
-
 void save_file(EditorState *state);
 void editor_handle_enter(EditorState *state);
 void editor_handle_backspace(EditorState *state);
@@ -221,7 +202,28 @@ void inicializar_ncurses() {
     init_pair(7, COLOR_MAGENTA, COLOR_BLACK);
     init_pair(8, COLOR_WHITE, COLOR_BLACK);
     init_pair(9, COLOR_BLACK, COLOR_MAGENTA);
-    bkgd(COLOR_PAIR(8)); 
+    init_pair(10, COLOR_GREEN, COLOR_BLACK);
+    init_pair(11, COLOR_RED, COLOR_BLACK);
+    bkgd(COLOR_PAIR(8));
+}
+
+// Adicione esta função para salvar automaticamente
+void auto_save(EditorState *state) {
+    if (strcmp(state->filename, "[No Name]") == 0) return;
+    if (!state->buffer_modified) return;
+
+    char auto_save_filename[256];
+    snprintf(auto_save_filename, sizeof(auto_save_filename), "%s%s", state->filename, AUTO_SAVE_EXTENSION);
+
+    FILE *file = fopen(auto_save_filename, "w");
+    if (file) {
+        for (int i = 0; i < state->num_lines; i++) {
+            if (state->lines[i]) {
+                fprintf(file, "%s\n", state->lines[i]);
+            }
+        }
+        fclose(file);
+    }
 }
 
 FileRecoveryChoice display_recovery_prompt(EditorState *state) {
@@ -265,17 +267,17 @@ void run_and_display_command(const char* command, const char* title) {
     reset_prog_mode();
     refresh();
 
+    
     display_output_screen(title, temp_output_file);
 }
 
 void handle_file_recovery(EditorState *state, const char *original_filename, const char *sv_filename) {
     while (1) {
         FileRecoveryChoice choice = display_recovery_prompt(state);
-
         switch (choice) {
             case RECOVER_DIFF: {
                 char diff_command[1024];
-                snprintf(diff_command, sizeof(diff_command), "diff -u --color=always %s %s", original_filename, sv_filename);
+                snprintf(diff_command, sizeof(diff_command), "git diff %s %s", original_filename, sv_filename);
                 run_and_display_command(diff_command, "--- DIFERENÇAS ---");
                 break; // Loop again to show prompt
             }
@@ -393,6 +395,7 @@ void display_help_screen() {
         {"![cmd]", "Executa um comando do shell (ex: !ls -l)."},
         {":rc", "Recarrega o arquivo atual."}
     };
+    
     int num_commands = sizeof(commands) / sizeof(commands[0]);
     
     attron(COLOR_PAIR(8));
@@ -400,9 +403,17 @@ void display_help_screen() {
     bkgd(COLOR_PAIR(8));
 
     attron(A_BOLD); mvprintw(2, 2, "--- AJUDA DO EDITOR ---"); attroff(A_BOLD);
+    
     for (int i = 0; i < num_commands; i++) {
-        mvprintw(4 + i, 4, "%-15s: %s", commands[i].command, commands[i].description);
+        move(4 + i, 4);
+        
+        attron(COLOR_PAIR(3) | A_BOLD);
+        printw("%-15s", commands[i].command);
+        attroff(COLOR_PAIR(3) | A_BOLD);
+        
+        printw(": %s", commands[i].description);
     }
+    
     attron(A_REVERSE); mvprintw(6 + num_commands, 2, " Pressione qualquer tecla para voltar ao editor "); attroff(A_REVERSE);
     refresh(); get_wch(NULL);
 
@@ -563,7 +574,19 @@ void display_output_screen(const char *title, const char *filename) {
         for (int i = 0; i < viewable_lines; i++) {
             int line_idx = top_line + i;
             if (line_idx < viewer->num_lines) {
-                mvprintw(3 + i, 2, "%.*s", cols - 2, viewer->lines[line_idx]);
+                char *line = viewer->lines[line_idx];
+                int color_pair = 8;
+                
+                if (line[0] == '+') {
+                    color_pair = 10;
+                } else if (line[0] == '-') {
+                    color_pair = 11;
+                } else if (line[0] == '@' && line[1] == '@') {
+                    color_pair = 6;
+               }
+               attron(COLOR_PAIR(color_pair));
+               mvprintw(3 + i, 2, "%.*s", cols -2, line);
+               attroff(COLOR_PAIR(color_pair));
             }
         }
         attron(A_REVERSE); mvprintw(rows - 2, 2, " Use as SETAS ou PAGE UP/DOWN para rolar | Pressione 'q' ou ESC para sair "); attroff(A_REVERSE);
@@ -583,8 +606,6 @@ void display_output_screen(const char *title, const char *filename) {
     bkgd(COLOR_PAIR(8));
     attroff(COLOR_PAIR(8));
 }
-
-
 
 void execute_shell_command(EditorState *state) {
     char *cmd = state->command_buffer + 1;
@@ -981,7 +1002,8 @@ void load_file(EditorState *state, const char *filename) {    // Não execute a 
 		struct stat st;
 		if (stat(sv_filename, &st) == 0) {
 		// Arquivo .sv encontrado, inicie o processo de recuperação.
-		handle_file_recovery(state, filename, sv_filename);
+		
+  handle_file_recovery(state, filename, sv_filename);
 		return; // A função de recuperação cuidará do carregamento.
 		}    // Se não houver arquivo de recuperação, apenas carregue o arquivo solicitado.
 	}
