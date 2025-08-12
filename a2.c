@@ -171,7 +171,7 @@ void handle_command_mode_key(EditorState *state, wint_t ch, bool *should_exit);
 void load_syntax_file(EditorState *state, const char *filename);
 FileViewer* create_file_viewer(const char* filename);
 void destroy_file_viewer(FileViewer* viewer);
-void editor_find(EditorState *state); // +++ NOVA FUNÇÃO DE BUSCA +++
+void editor_find(EditorState *state);
 void search_google(const char *query);
 void reload_file(EditorState *state);
 void check_external_modification(EditorState *state);
@@ -269,6 +269,15 @@ void run_and_display_command(const char* command, const char* title) {
 
     
     display_output_screen(title, temp_output_file);
+}
+
+void diff_command(EditorState *state, const char *original_filename, const char *sv_filename) {
+    char filename1[256];
+    char filename2[256];
+    char diff_command[1024]
+    snprintf(diff_command, sizeof(diff_command), "git diff %s %s", filename1, filename2);
+    run_and_display_command(diff_command, " --- Difference ---");
+    break;
 }
 
 void handle_file_recovery(EditorState *state, const char *original_filename, const char *sv_filename) {
@@ -384,16 +393,17 @@ void adjust_viewport(EditorState *state) {
 //Função para mostrar a tela de ajuda//
 void display_help_screen() {
     static const CommandInfo commands[] = {
-        {":w", "Salva o arquivo atual."},
-        {":w <nome>", "Salva com um novo nome."},
-        {":q", "Sai do editor."},
-        {":wq", "Salva e sai."},
-        {":open <nome>", "Abre um arquivo."},
-        {":new", "Cria um novo arquivo em branco."},
-        {":help", "Mostra esta tela de ajuda."},
-        {":gcc [libs]", "Compila o arquivo atual (ex: :gcc -lm)."},
-        {"![cmd]", "Executa um comando do shell (ex: !ls -l)."},
-        {":rc", "Recarrega o arquivo atual."}
+        {":w", "Save the current file."},
+        {":w <name>", "Save with a new name."},
+        {":q", "Exit."},
+        {":wq", "Save and exit"},
+        {":open <name>", "Open a file"},
+        {":new", "Creates a blank file."},
+        {":help", "Show this help screen"},
+        {":gcc [libs]", "Compile the current file, (ex: :gcc -lm)."},
+        {"![cmd]", "Execute a command in the shell, (ex: !ls -l)."},
+        {":rc", "Reload the current file."},
+        {":diff", "Show the difference between 2 files, <ex: (diff a2.c a1.c),"}
     };
     
     int num_commands = sizeof(commands) / sizeof(commands[0]);
@@ -733,7 +743,7 @@ void editor_redraw(EditorState *state) {
     getmaxyx(stdscr, rows, cols); 
     adjust_viewport(state);
 
-    const char *delimiters = " \t\r\n,;()[]{}<>=+-*/%&|!^<>.`\"'";
+    const char *delimiters = " \t\r\n,;()[]{}<>=+-*/%&|\"\"!^<>.`\"'";
 
     for (int i = 0; i < rows - 2; i++) {
         int line_idx = state->top_line + i;
@@ -810,8 +820,14 @@ void editor_redraw(EditorState *state) {
         mvprintw(rows - 1, 0, ":%s", state->command_buffer);
     } else {
         char mode_str[20];
-        switch (state->mode) { case NORMAL: strcpy(mode_str, "-- NORMAL --"); break; case INSERT: strcpy(mode_str, "-- INSERT --"); break; default: strcpy(mode_str, "--          --"); break; }
-        char display_filename[40]; strncpy(display_filename, state->filename, sizeof(display_filename) - 1); display_filename[sizeof(display_filename) - 1] = '\0'; 
+        switch (state->mode) { 
+            case NORMAL: strcpy(mode_str, "-- NORMAL --"); break; 
+            case INSERT: strcpy(mode_str, "-- INSERT --"); break;
+            default: strcpy(mode_str, "--          --"); break;
+             }
+        char display_filename[40];
+        strncpy(display_filename, state->filename, sizeof(display_filename) - 1);
+        display_filename[sizeof(display_filename) - 1] = '\0'; 
         int visual_col = get_visual_col(state->lines[state->current_line], state->current_col);
         mvprintw(rows - 1, 0, "%s | %s%s | Line %d/%d, Col %d", mode_str, display_filename, state->buffer_modified ? "*" : "", state->current_line + 1, state->num_lines, visual_col + 1);
     }
@@ -836,9 +852,7 @@ void editor_redraw(EditorState *state) {
     doupdate();
 }
 
-
 // --- Funções de Snapshot e Undo/Redo ---
-
 // Libera a memória de um único snapshot.
 void free_snapshot(EditorSnapshot *snapshot) {
     if (!snapshot) return;
@@ -1300,6 +1314,7 @@ void check_external_modification(EditorState *state) {
     }
 }
 
+//Função para processar comandos 
 void process_command(EditorState *state, bool *should_exit) {
     if (state->command_buffer[0] == '!') {
         execute_shell_command(state);
@@ -1363,7 +1378,6 @@ void ensure_cursor_in_bounds(EditorState *state) {
 }
 
 // --- Funções do Autocompletar ---
-
 void add_suggestion(EditorState *state, const char *suggestion) {
     for (int i = 0; i < state->num_suggestions; i++) {
         if (strcmp(state->completion_suggestions[i], suggestion) == 0) return;
