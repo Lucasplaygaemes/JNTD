@@ -15,8 +15,16 @@ What's A2 you might ask? It's my own file editor. The VIM is my main file editor
 A2 is now a much more complete then before, you can run linux commands just like vim, and there a new file "c.syntax" and what does that file do you might ask?
 Easy! There is the words who will be highlighted and i will add in the future a c.dict that will be a dictionary for words! and the best!
 
+# Necessity creates opportunity
+My pc left me down, i was making updates to enchace of the issue #14, and because of that, i have lost all the progress from the code, so, i gonna make a new enchancement, a auto-saver.
+It's gonna save the file every minute, in a file.sv that you can then reload with the last modifications, it's gonna be deleted everytime you sucessfuly save a file, inspired by Vim.
+
 # CTRL Z Y!
-This is nice function, but is hard to implement.
+This is nice function, but it was hard to implement even though it really common in text editors and IDE's.
+
+# Multiplatform (again)?
+I'm now proudly using FREE BSD, and isn't really nothing special from other linux distros, even though it's not linux. Will use it for some time.
+Probably won't be my main OS, but knowing it was all made in C, give it's a special place in my heart.
 
 # Issues!
 I'm already doing it, and from now on i will add issues always i have a bug or something i need to fix, to improve terminal workflow, i'm using gh and git, because yet gh don't replace git for me.
