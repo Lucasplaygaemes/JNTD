@@ -24,6 +24,9 @@
 #define PAGE_JUMP 10
 #define TAB_SIZE 4
 #define MAX_COMMAND_HISTORY 50 
+#define AUTO_SAVE_INTERVAL 1 // Segundos
+#define AUTO_SAVE_EXTENSION ".sv"
+ 
 
 #define KEY_CTRL_P 16
 #define KEY_CTRL_DEL 520
@@ -131,6 +134,7 @@ typedef struct {
     int undo_count;
     EditorSnapshot *redo_stack[MAX_UNDO_LEVELS];
     int redo_count;
+    time_t last_auto_save_time;
     
 } EditorState;
 
@@ -144,6 +148,25 @@ void add_to_command_history(EditorState *state, const char* command);
 void editor_redraw(EditorState *state);
 void 
 load_file(EditorState *state, const char *filename);
+// Adicione esta função para salvar automaticamente
+void auto_save(EditorState *state) {
+    if (strcmp(state->filename, "[No Name]") == 0) return;
+    if (!state->buffer_modified) return;
+
+    char auto_save_filename[256];
+    snprintf(auto_save_filename, sizeof(auto_save_filename), "%s%s", state->filename, AUTO_SAVE_EXTENSION);
+
+    FILE *file = fopen(auto_save_filename, "w");
+    if (file) {
+        for (int i = 0; i < state->num_lines; i++) {
+            if (state->lines[i]) {
+                fprintf(file, "%s\n", state->lines[i]);
+            }
+        }
+        fclose(file);
+    }
+}
+
 void save_file(EditorState *state);
 void editor_handle_enter(EditorState *state);
 void editor_handle_backspace(EditorState *state);
@@ -456,7 +479,7 @@ void display_output_screen(const char *title, const char *filename) {
             case 'q': case 27: goto end_viewer;
         }
     }
-end_viewer:
+    end_viewer:
     destroy_file_viewer(viewer);
     if(filename) remove(filename);
     bkgd(COLOR_PAIR(8));
@@ -838,15 +861,34 @@ void load_file(EditorState *state, const char *filename) {
 }
 
 void save_file(EditorState *state) {
-    if (strcmp(state->filename, "[No Name]") == 0) { strncpy(state->status_msg, "No file name. Use :w <filename>", sizeof(state->status_msg) - 1); return; }
+    if (strcmp(state->filename, "[No Name]") == 0) { 
+        strncpy(state->status_msg, "No file name. Use :w <filename>", sizeof(state->status_msg) - 1); 
+        return; 
+    }
+    
     FILE *file = fopen(state->filename, "w");
     if (file) {
-        for (int i = 0; i < state->num_lines; i++) if (state->lines[i]) fprintf(file, "%s\n", state->lines[i]);
-        fclose(file); char display_filename[40]; strncpy(display_filename, state->filename, sizeof(display_filename) - 1); display_filename[sizeof(display_filename) - 1] = '\0';
+        for (int i = 0; i < state->num_lines; i++) {
+            if (state->lines[i]) {
+                fprintf(file, "%s\n", state->lines[i]);
+            }
+        }
+        fclose(file); 
+        
+        // Apagar o arquivo de auto salvamento se existir
+        char auto_save_filename[256];
+        snprintf(auto_save_filename, sizeof(auto_save_filename), "%s%s", state->filename, AUTO_SAVE_EXTENSION);
+        remove(auto_save_filename);
+        
+        char display_filename[40]; 
+        strncpy(display_filename, state->filename, sizeof(display_filename) - 1); 
+        display_filename[sizeof(display_filename) - 1] = '\0';
         snprintf(state->status_msg, sizeof(state->status_msg), "\"%s\" written", display_filename);
         state->buffer_modified = false;
         state->last_file_mod_time = get_file_mod_time(state->filename);
-    } else { snprintf(state->status_msg, sizeof(state->status_msg), "Error saving: %s", strerror(errno)); }
+    } else { 
+        snprintf(state->status_msg, sizeof(state->status_msg), "Error saving: %s", strerror(errno)); 
+    }
 }
 
 void editor_handle_enter(EditorState *state) {
@@ -1522,6 +1564,7 @@ int main(int argc, char *argv[]) {
     state->undo_count = 0;
     state->redo_count = 0;
     push_undo(state);
+    state->last_auto_save_time = time(NULL); // Inicialize o tempo
     
     load_syntax_file(state, "c.syntax");
 
@@ -1557,6 +1600,14 @@ int main(int argc, char *argv[]) {
     while (!should_exit) {
         ensure_cursor_in_bounds(state);
         check_external_modification(state);
+        
+        // Verifique se é hora de salvar automaticamente
+        time_t now = time(NULL);
+        if (now - state->last_auto_save_time >= AUTO_SAVE_INTERVAL) {
+            auto_save(state);
+            state->last_auto_save_time = now;
+        }
+        
         editor_redraw(state);
         wint_t ch;
         get_wch(&ch);
