@@ -144,7 +144,8 @@ typedef struct {
     EditorSnapshot *redo_stack[MAX_UNDO_LEVELS];
     int redo_count;
     time_t last_auto_save_time;
-    
+    bool auto_indent_on_newline;
+    bool paste_mode;
 } EditorState;
 
 // --- Declarações de Funções ---
@@ -409,7 +410,9 @@ void display_help_screen() {
         {":gcc [libs]", "Compile the current file, (ex: :gcc -lm)."},
         {"![cmd]", "Execute a command in the shell, (ex: !ls -l)."},
         {":rc", "Reload the current file."},
-        {":diff", "Show the difference between 2 files, <ex: (diff a2.c a1.c),"}
+        {":diff", "Show the difference between 2 files, <ex: (diff a2.c a1.c),"},
+        {":set paste", "Enable paste mode to prevent auto-indent on paste."},
+        {":set nopaste", "Disable paste mode and re-enable auto-indent."}
     };
     
     int num_commands = sizeof(commands) / sizeof(commands[0]);
@@ -1087,15 +1090,22 @@ void editor_handle_enter(EditorState *state) {
 
     // Verifica se um recuo extra deve ser adicionado.
     int extra_indent = 0;
-    int last_char_pos = state->current_col - 1;
-    while (last_char_pos >= 0 && isspace(current_line_ptr[last_char_pos])) {
-        last_char_pos--;
-    }
-    if (last_char_pos >= 0 && current_line_ptr[last_char_pos] == '{') {
-        extra_indent = TAB_SIZE;
+    if (state->auto_indent_on_newline && !state->paste_mode) { // Only apply extra indent if auto-indent is enabled
+        int last_char_pos = state->current_col - 1;
+        while (last_char_pos >= 0 && isspace(current_line_ptr[last_char_pos])) {
+            last_char_pos--;
+        }
+        if (last_char_pos >= 0 && current_line_ptr[last_char_pos] == '{') {
+            extra_indent = TAB_SIZE;
+        }
     }
 
     int new_indent_len = base_indent_len + extra_indent;
+
+    // Se estiver no modo de colagem, não adicione nenhuma indentação nova.
+    if (state->paste_mode) {
+        new_indent_len = 0;
+    }
 
     // Pega o resto da linha após o cursor.
     int line_len = strlen(current_line_ptr);
@@ -1380,6 +1390,21 @@ void process_command(EditorState *state, bool *should_exit) {
         *should_exit = true;
     } else if (strcmp(command, "diff") == 0) {
         diff_command(state, args);
+    } else if (strcmp(command, "set") == 0) {
+        if (strcmp(args, "paste") == 0) {
+            state->paste_mode = true;
+            state->auto_indent_on_newline = false;
+            snprintf(state->status_msg, sizeof(state->status_msg), "-- PASTE MODE ON --");
+        } else if (strcmp(args, "nopaste") == 0) {
+            state->paste_mode = false;
+            state->auto_indent_on_newline = true;
+            snprintf(state->status_msg, sizeof(state->status_msg), "-- PASTE MODE OFF --");
+        } else {
+            snprintf(state->status_msg, sizeof(state->status_msg), "Argumento desconhecido para set: %s", args);
+        }
+    } else if (strcmp(command, "toggle_auto_indent") == 0) {
+        state->auto_indent_on_newline = !state->auto_indent_on_newline;
+        snprintf(state->status_msg, sizeof(state->status_msg), "Auto-indent on newline: %s", state->auto_indent_on_newline ? "ON" : "OFF");
     } else {
         snprintf(state->status_msg, sizeof(state->status_msg), "Unknown command: %s", command);
     }
@@ -1748,6 +1773,8 @@ int main(int argc, char *argv[]) {
     state->redo_count = 0;
     push_undo(state);
     state->last_auto_save_time = time(NULL); // Inicialize o tempo
+    state->auto_indent_on_newline = true;
+    state->paste_mode = false;
     
     load_syntax_file(state, "c.syntax");
 
