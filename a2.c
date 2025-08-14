@@ -228,7 +228,7 @@ void auto_save(EditorState *state) {
 
 FileRecoveryChoice display_recovery_prompt(EditorState *state) {
     snprintf(state->status_msg, sizeof(state->status_msg),
-             "Recuperação: (R)ecuperar .sv | (O)riginal | (D)iff | (I)gnorar | (Q)uit");
+             "Recovering: (R)ecoverr .sv | (O)riginal | (D)iff | (I)gnore | (Q)uit");
     editor_redraw(state);
 
     while (1) {
@@ -271,13 +271,20 @@ void run_and_display_command(const char* command, const char* title) {
     display_output_screen(title, temp_output_file);
 }
 
-void diff_command(EditorState *state, const char *original_filename, const char *sv_filename) {
-    char filename1[256];
-    char filename2[256];
-    char diff_command[1024]
-    snprintf(diff_command, sizeof(diff_command), "git diff %s %s", filename1, filename2);
-    run_and_display_command(diff_command, " --- Difference ---");
-    break;
+void diff_command(EditorState *state, const char *args) {
+    char filename1[256] = {0};
+    char filename2[256] = {0};
+
+    // Extrai os dois nomes de arquivo dos argumentos
+    if (sscanf(args, "%255s %255s", filename1, filename2) != 2) {
+        snprintf(state->status_msg, sizeof(state->status_msg), "Uso: :diff <arquivo1> <arquivo2>");
+        return;
+    }
+
+    char diff_cmd_str[1024];
+    // Usa --no-index para comparar arquivos que não estão na árvore git
+    snprintf(diff_cmd_str, sizeof(diff_cmd_str), "git diff --no-index -- %s %s", filename1, filename2);
+    run_and_display_command(diff_cmd_str, "--- Diferenças ---");
 }
 
 void handle_file_recovery(EditorState *state, const char *original_filename, const char *sv_filename) {
@@ -380,7 +387,6 @@ void load_syntax_file(EditorState *state, const char *filename) {
     }
     fclose(file);
 }
-
 
 void adjust_viewport(EditorState *state) {
     int rows, cols; getmaxyx(stdscr, rows, cols); rows -= 2;
@@ -607,6 +613,18 @@ void display_output_screen(const char *title, const char *filename) {
             case KEY_DOWN: if (top_line < viewer->num_lines - viewable_lines) top_line++; break;
             case KEY_PPAGE: top_line -= viewable_lines; if (top_line < 0) top_line = 0; break;
             case KEY_NPAGE: top_line += viewable_lines; if (top_line >= viewer->num_lines) top_line = viewer->num_lines - 1; break;
+            case KEY_SR: // Shift + Seta para Cima
+                top_line -= PAGE_JUMP;
+                if (top_line < 0) top_line = 0;
+                break;
+            case KEY_SF: // Shift + Seta para Baixo
+                if (top_line < viewer->num_lines - viewable_lines) {
+                    top_line += PAGE_JUMP;
+                    if (top_line > viewer->num_lines - viewable_lines) {
+                        top_line = viewer->num_lines - viewable_lines;
+                    }
+                }
+                break;
             case 'q': case 27: goto end_viewer;
         }
     }
@@ -711,7 +729,6 @@ int get_visual_col(const char *line, int byte_col) {
     }
     return visual_col;
 }
-
 
 void save_last_line(const char *filename, int line) {
     char pos_filename[256];
@@ -1361,6 +1378,8 @@ void process_command(EditorState *state, bool *should_exit) {
     } else if (strcmp(command, "wq") == 0) {
         save_file(state);
         *should_exit = true;
+    } else if (strcmp(command, "diff") == 0) {
+        diff_command(state, args);
     } else {
         snprintf(state->status_msg, sizeof(state->status_msg), "Unknown command: %s", command);
     }
