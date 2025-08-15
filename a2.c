@@ -226,7 +226,6 @@ void auto_save(EditorState *state) {
         fclose(file);
     }
 }
-
 FileRecoveryChoice display_recovery_prompt(EditorState *state) {
     snprintf(state->status_msg, sizeof(state->status_msg),
              "Recovering: (R)ecoverr .sv | (O)riginal | (D)iff | (I)gnore | (Q)uit");
