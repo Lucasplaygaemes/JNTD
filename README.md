@@ -47,9 +47,6 @@ Awrit is a miracle! You can use a browser fully in terminal, just with awrit + K
 # Multiplatform?
 And it's a miracle! The code is "multiplataform", not really, but the code was able to run on my pc. But it's not perfect, nothing is, i need to make some modifications so it can run nice on every platform.
 
-# Repository!
-I will make my own repository! and you ask where? In the beloved Github! I will make the repository folder here, on github, it's not the best, but it's what i can do for now. Just like you can download the files from the linux with one command from a repository, any important file will be in the repository.
-
 # Plugins?
 And the plugins parts are back, but this time isn't with good news, but i'm making a clean and revision, and unfortunetly with AI help, to debug the code. And i'm not having sucess yet haha.
 
@@ -65,19 +62,12 @@ I would be really gratefull if you want to improve the code, it's always open to
 # Plugins!
 You can make you own plugins to JNTD, there is a example of plugins in the plugin folder. The same file is well documented about how you can make your own.
 
-# Repository!
-Well, for now, don't suit me making a online repository for "3" plugins. So i'm using this repository, as a repository! It's simple, i think, the official plugins will be here.
-Any important file or plugin can and will be possible to download from this repository.
-
 # Readme?
 As you may notice, the README file is getting big, and i can't list every new thing neither any changes that i will make in this code.
 So i will add a new file, Features, and the name again is selfexplanatory. When a big update or change be made, it will be showed in README for 5~10 days in maximum. In the features file will have all that already is on the readme, and what's not.
 
-# Security?
-C isn't the best and most secure language ever, most of it because of the programmer, i'm in that list, i'm trying to make it secure, the most of functions are at least a bit secure, and some are a lot.
-
 # Calculator!
-There is a calculator, it's not a scientific calculator but neither a common one, it's between the line, a frined of mine will help me improve it futurely.
+There is a calculator, it's not a scientific calculator but neither a common one, it's between the line, a friend of mine will help me improve it futurely.
 
 # Languages?
 As you may noticed, all the README is in english, the commits are in english and Portuguese, and the functions are in portuguese as well. And i need to decide in which one i will make the whole code, so there is the folder en, where is the code with everything in english and explanations as well. The code will have 4 default languages, Brazilian Portuguese, English, Japanese, and maybe Spanish.
