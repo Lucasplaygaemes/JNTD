@@ -6,14 +6,14 @@ The objective of this code is let me integrate my own LLM with my system, i have
 # How to use?
 There's no such thing as "right way to use". Because you can automate things when and how you want, but you should make changes on it according to your needings. There are pre defined commands that you can see on the help part, you can change the code by yourself, have a good idea, want it on the code? make a submission and if it's good, i merge it.
 
-# How it work's?
+# How it work's? w
 The code access the Ollama via bash, the 2B it's trained to know how and what to respond when it's questioned within the terminal, it's has been trained in a personalized dataset, that's has previous commands and interactions between she and the user and the terminal. Ex: make an .txt file that has the firts 50 firts numbers from fibonacci sequence, and it's done.
 I want in the next updates make she possible to make complex interactions with the terminal, and codes, she may be possible to execute codes, and test them by herself, so she will have the possibility to know, where, why, and how a bug it's happening, she will also be able to search for directorys that may have a bug, when something is missing.
 
 # A2!
-What's A2 you might ask? It's my own file editor. The VIM is my main file editor, and that won't change, but when you need to edit a file, or make a correction or whatever reason, the A2 will be there waiting you. It's inspired by vim. A2 isn't perfect yet, but it's working and A2 is working well! The code now has color in the text, and have a documented way where you can study it to help you understand the code.
-A2 is now a much more complete then before, you can run linux commands just like vim, and there a new file "c.syntax" and what does that file do you might ask?
-Easy! There is the words who will be highlighted and i will add in the future a c.dict that will be a dictionary for words! and the best!
+What's A2 you might ask? It's my own file editor. The VIM is my main file editor, but with the develop of the A2 and it's improvments i'm slowing changing it to be my main editor.
+I have added functions that are not present in VIM or any text editor i have used in the past, functions like GCC, or diff, are functions that help my everyday development so i added them.
+Every cool feature and more important, useful that comes to my mind, i will try to add it.
 
 # A2 or JNTD?
 Even tought this repo and the main code is JNTD, i'm having a lot of fun adding useful functions in a2, so i'm giving it a lot more attention the JNTD, but i will not do it forever, after i added 
@@ -24,7 +24,7 @@ My pc left me down, i was making updates to enchace of the issue #14, and becaus
 It's gonna save the file every minute, in a file.sv that you can then reload with the last modifications, it's gonna be deleted everytime you sucessfuly save a file, inspired by Vim.
 
 # CTRL Z Y!
-This is nice function, but it was hard to implement even though it really common in text editors and IDE's.
+This is nice function, but it was hard to implement even though it really common in text editors and IDE'
 
 # Multiplatform (again)?
 I'm now proudly using FREE BSD, and isn't really nothing special from other linux distros, even though it's not linux. Will use it for some time.
