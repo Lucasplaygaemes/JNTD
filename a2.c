@@ -2,6 +2,7 @@
 #define _XOPEN_SOURCE_EXTENDED 1
 #define NCURSES_WIDECHAR 1
 
+#include "timer.h"
 #include <ncurses.h>
 #include <stdlib.h>
 #include <string.h>
@@ -164,7 +165,8 @@ void editor_insert_char(EditorState *state, wint_t ch);
 void editor_delete_line(EditorState *state);
 void editor_move_to_next_word(EditorState *state);
 void editor_move_to_previous_word(EditorState *state);
-void process_command(EditorState *state, bool *should_exit);
+void 
+process_command(EditorState *state, bool *should_exit);
 void ensure_cursor_in_bounds(EditorState *state);
 void adjust_viewport(EditorState *state);
 void handle_insert_mode_key(EditorState *state, wint_t ch);
@@ -411,7 +413,8 @@ void display_help_screen() {
         {":rc", "Reload the current file."},
         {":diff", "Show the difference between 2 files, <ex: (diff a2.c a1.c),"},
         {":set paste", "Enable paste mode to prevent auto-indent on paste."},
-        {":set nopaste", "Disable paste mode and re-enable auto-indent."}
+        {":set nopaste", "Disable paste mode and re-enable auto-indent."},
+        {":timer", "Show the timer, it count the passed time using the editor."}
     };
     
     int num_commands = sizeof(commands) / sizeof(commands[0]);
@@ -1387,6 +1390,15 @@ void process_command(EditorState *state, bool *should_exit) {
     } else if (strcmp(command, "wq") == 0) {
         save_file(state);
         *should_exit = true;
+    } else if (strcmp(command, "timer") == 0) {
+        def_prog_mode();
+        endwin();
+        
+        display_work_summary();
+        
+        reset_prog_mode();
+        refresh();
+        
     } else if (strcmp(command, "diff") == 0) {
         diff_command(state, args);
     } else if (strcmp(command, "set") == 0) {
@@ -1754,6 +1766,7 @@ void handle_command_mode_key(EditorState *state, wint_t ch, bool *should_exit) {
 }
 
 int main(int argc, char *argv[]) {
+    start_work_timer();
     setlocale(LC_ALL, ""); 
     inicializar_ncurses();
     EditorState *state = calloc(1, sizeof(EditorState));
@@ -1954,7 +1967,7 @@ int main(int argc, char *argv[]) {
     if (state->filename[0] != '[') {
         save_last_line(state->filename, state->current_line);
     }
-
+    stop_and_log_work();
     endwin(); 
     if (state->completion_mode != COMPLETION_NONE) editor_end_completion(state);
     for(int i=0; i < state->history_count; i++) free(state->command_history[i]);
