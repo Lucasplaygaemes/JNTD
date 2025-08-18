@@ -14,7 +14,7 @@
 #include <stdbool.h>
 #include <termios.h> 
 #include <ctype.h>
-#include "plugin_todo.c"
+#include "plugins/plugin_todo.c"
 
 #ifdef _WIN32
 #include <windows.h> // Para Sleep()

@@ -1,4 +1,0 @@
-"ls=la"
-"clear=cl"
-"clear=cl"
-clear=cl
