@@ -19,6 +19,10 @@ Every cool feature and more important, useful that comes to my mind, i will try 
 Even tought this repo and the main code is JNTD, i'm having a lot of fun adding useful functions in a2, so i'm giving it a lot more attention the JNTD, but i will not do it forever, after i added 
 the functions in my TODO list, i will return my focus to JNTD, but i have a lot of cool features to add at JNTD, but even more add a2.c.
 
+#Releases!
+I lost the last 2 days just installing different Distros to make a release to most of them, but i lost a lot of time installing hyprland in debian and arch, lol.
+So we will 3 bulds for now.
+
 # Changing OS
 Now i'm going to use debian as my main distro, i was going to use NixOS, it's a great distro but i'm just gonna go to debian again, i'm making virtual machines a lot recently so i can compile a version of my code to every main distro,
 so you don't need to make it by yourself, but you can! if you want, go ahead.
