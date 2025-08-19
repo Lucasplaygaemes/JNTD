@@ -1,25 +1,28 @@
 # Compiler and flags
-CC = cc
+CC = gcc
 CFLAGS = -Wall -Wextra -g -Iinclude # Good warnings, debug symbols, and include path
-LDFLAGS = -lcurl -lpthread -ldl # Libraries to link
+LDFLAGS = -lcurl -lpthread -ldl -lncursesw # Libraries to link
 
 # Plugin compilation flags
 PLUGIN_CFLAGS = -fPIC -shared
 
-# Main executable
-TARGET = 2bt
+# Main executables
+TARGETS = 2bt a2
 
 # Find all C files in the plugins directory
 PLUGIN_SRCS = $(wildcard plugins/*.c)
 # Convert the list of .c files to a list of .so files
 PLUGIN_TARGETS = $(PLUGIN_SRCS:.c=.so)
 
-# The 'all' target is the default one. It builds the main program and all plugins.
-all: $(TARGET) $(PLUGIN_TARGETS)
+# The 'all' target is the default one. It builds the main programs and all plugins.
+all: $(TARGETS) $(PLUGIN_TARGETS)
 
-# Rule to build the main executable
-$(TARGET): 2bt.c
-	$(CC) $(CFLAGS) -o $(TARGET) 2bt.c $(LDFLAGS)
+# Rules to build the main executables
+2bt: 2bt.c
+	$(CC) $(CFLAGS) -o 2bt 2bt.c $(LDFLAGS)
+
+a2: a2.c timer.c
+	$(CC) $(CFLAGS) -o a2 a2.c timer.c $(LDFLAGS)
 
 # A pattern rule to build any .so plugin from its .c source file
 # $@ is the target file (e.g., plugins/todo.so)
@@ -29,4 +32,4 @@ plugins/%.so: plugins/%.c
 
 # Target to clean up all built files
 clean:
-	rm -f $(TARGET) $(PLUGIN_TARGETS) *.o
+	rm -f $(TARGETS) $(PLUGIN_TARGETS) *.o

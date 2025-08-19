@@ -147,6 +147,7 @@ typedef struct {
     time_t last_auto_save_time;
     bool auto_indent_on_newline;
     bool paste_mode;
+    bool word_wrap_enabled;
 } EditorState;
 
 // --- Declarações de Funções ---
@@ -165,8 +166,7 @@ void editor_insert_char(EditorState *state, wint_t ch);
 void editor_delete_line(EditorState *state);
 void editor_move_to_next_word(EditorState *state);
 void editor_move_to_previous_word(EditorState *state);
-void 
-process_command(EditorState *state, bool *should_exit);
+void process_command(EditorState *state, bool *should_exit);
 void ensure_cursor_in_bounds(EditorState *state);
 void adjust_viewport(EditorState *state);
 void handle_insert_mode_key(EditorState *state, wint_t ch);
@@ -178,6 +178,8 @@ void editor_find(EditorState *state);
 void search_google(const char *query);
 void reload_file(EditorState *state);
 void check_external_modification(EditorState *state);
+void get_visual_pos(EditorState *state, int *visual_y, int *visual_x);
+
 
 // Funções para recuperação de arquivo
 void handle_file_recovery(EditorState *state, const char *original_filename, const char *sv_filename);
@@ -391,11 +393,32 @@ void load_syntax_file(EditorState *state, const char *filename) {
 }
 
 void adjust_viewport(EditorState *state) {
-    int rows, cols; getmaxyx(stdscr, rows, cols); rows -= 2;
-    if (state->current_line < state->top_line) state->top_line = state->current_line;
-    if (state->current_line >= state->top_line + rows) state->top_line = state->current_line - rows + 1;
-    if (state->current_col < state->left_col) state->left_col = state->current_col;
-    if (state->current_col >= state->left_col + cols) state->left_col = state->current_col - cols + 1;
+    int rows, cols; getmaxyx(stdscr, rows, cols); 
+    
+    int visual_y, visual_x;
+    get_visual_pos(state, &visual_y, &visual_x);
+
+    if (state->word_wrap_enabled) {
+        if (visual_y < state->top_line) {
+            state->top_line = visual_y;
+        }
+        if (visual_y >= state->top_line + (rows - 2)) {
+            state->top_line = visual_y - (rows - 2) + 1;
+        }
+    } else {
+        if (state->current_line < state->top_line) {
+            state->top_line = state->current_line;
+        }
+        if (state->current_line >= state->top_line + (rows - 2)) {
+            state->top_line = state->current_line - (rows - 2) + 1;
+        }
+        if (visual_x < state->left_col) {
+            state->left_col = visual_x;
+        }
+        if (visual_x >= state->left_col + cols) {
+            state->left_col = visual_x - cols + 1;
+        }
+    }
 }
 
 //Função para mostrar a tela de ajuda//
@@ -410,11 +433,11 @@ void display_help_screen() {
         {":help", "Show this help screen"},
         {":gcc [libs]", "Compile the current file, (ex: :gcc -lm)."},
         {"![cmd]", "Execute a command in the shell, (ex: !ls -l)."},
-        {":rc", "Reload the current file."},
+        {":rc", "Reload the current file."} ,
         {":diff", "Show the difference between 2 files, <ex: (diff a2.c a1.c),"},
-        {":set paste", "Enable paste mode to prevent auto-indent on paste."},
-        {":set nopaste", "Disable paste mode and re-enable auto-indent."},
-        {":timer", "Show the timer, it count the passed time using the editor."}
+        {":set paste", "Enable paste mode to prevent auto-indent on paste."} ,
+        {":set nopaste", "Disable paste mode and re-enable auto-indent."} ,
+        {":timer", "Show the timer, it count the passed time using the editor." }
     };
     
     int num_commands = sizeof(commands) / sizeof(commands[0]);
@@ -429,7 +452,7 @@ void display_help_screen() {
         move(4 + i, 4);
         
         attron(COLOR_PAIR(3) | A_BOLD);
-        printw("%-15s", commands[i].command);
+        printw("% -15s", commands[i].command);
         attroff(COLOR_PAIR(3) | A_BOLD);
         
         printw(": %s", commands[i].description);
@@ -460,7 +483,6 @@ FileViewer* create_file_viewer(const char* filename) {
     return viewer;
 }
 
-//Função para achar o proximo objeto//
 void editor_find_next(EditorState *state) {
     if (state->last_search[0] == '\0') {
         snprintf(state->status_msg, sizeof(state->status_msg), "Nenhum termo para buscar. Use Ctrl+F primeiro.");
@@ -474,23 +496,21 @@ void editor_find_next(EditorState *state) {
         int current_line_idx = (start_line + i) % state->num_lines;
         char *line = state->lines[current_line_idx];
         
+        if (i > 0) start_col = 0;
+
         char *match = strstr(&line[start_col], state->last_search);
         
         if (match) {
             state->current_line = current_line_idx;
             state->current_col = match - line;
             state->ideal_col = state->current_col;
-            state->top_line = current_line_idx;
-            state->last_match_line = state->current_line;
             snprintf(state->status_msg, sizeof(state->status_msg), "Encontrado em L:%d C:%d", state->current_line + 1, state->current_col + 1);
             return;
         }
-        start_col = 0; 
     }
     snprintf(state->status_msg, sizeof(state->status_msg), "Nenhuma outra ocorrência de: %s", state->last_search);
 }
 
-//Econtrar a ultima ocorrencia//
 void editor_find_previous(EditorState *state) {
     if (state->last_search[0] == '\0') {
         snprintf(state->status_msg, sizeof(state->status_msg), "Nenhum termo para buscar. Use Ctrl+F primeiro.");
@@ -507,7 +527,6 @@ void editor_find_previous(EditorState *state) {
         char *last_match_in_line = NULL;
         char *match = strstr(line, state->last_search);
         while (match) {
-            // Se estamos na linha original, só considera matches antes da posição inicial
             if (current_line_idx == start_line && (match - line) >= start_col) {
                 break;
             }
@@ -519,12 +538,9 @@ void editor_find_previous(EditorState *state) {
             state->current_line = current_line_idx;
             state->current_col = last_match_in_line - line;
             state->ideal_col = state->current_col;
-            state->top_line = current_line_idx;
-            state->last_match_line = state->current_line;
             snprintf(state->status_msg, sizeof(state->status_msg), "Encontrado em L:%d C:%d", state->current_line + 1, state->current_col + 1);
             return;
         }
-        // Para as próximas linhas (anteriores), a posição inicial não importa
         start_col = strlen(line);
     }
     snprintf(state->status_msg, sizeof(state->status_msg), "Nenhuma outra ocorrência de: %s", state->last_search);
@@ -758,6 +774,59 @@ int load_last_line(const char *filename) {
     return 0;
 }
 
+void get_visual_pos(EditorState *state, int *visual_y, int *visual_x) {
+    int rows, cols;
+    getmaxyx(stdscr, rows, cols);
+
+    int y = 0;
+    int x = 0;
+
+    if (state->word_wrap_enabled) {
+        for (int i = 0; i < state->current_line; i++) {
+            char* line = state->lines[i];
+            int line_len = strlen(line);
+            if (line_len == 0) {
+                y++;
+            } else {
+                int line_offset = 0;
+                while(line_offset < line_len) {
+                    int break_pos = (line_len - line_offset > cols) ? cols : line_len - line_offset;
+                     if (line_offset + break_pos < line_len) {
+                        int temp_break = -1;
+                        for (int j = break_pos - 1; j >= 0; j--) {
+                            if (isspace(line[line_offset + j])) { temp_break = j; break; }
+                        }
+                        if (temp_break != -1) break_pos = temp_break + 1;
+                    }
+                    line_offset += break_pos;
+                    y++;
+                }
+            }
+        }
+        
+        int current_line_offset = 0;
+        while(current_line_offset + cols < state->current_col) {
+             int break_pos = cols;
+             if (current_line_offset + cols < strlen(state->lines[state->current_line])) {
+                int temp_break = -1;
+                for (int j = cols - 1; j >= 0; j--) {
+                    if (isspace(state->lines[state->current_line][current_line_offset + j])) { temp_break = j; break; }
+                }
+                if (temp_break != -1) break_pos = temp_break + 1;
+            }
+            current_line_offset += break_pos;
+            y++;
+        }
+        x = state->current_col - current_line_offset;
+
+    } else {
+        y = state->current_line;
+        x = get_visual_col(state->lines[state->current_line], state->current_col);
+    }
+    *visual_y = y;
+    *visual_x = x;
+}
+
 
 void editor_redraw(EditorState *state) {
     erase();
@@ -765,73 +834,106 @@ void editor_redraw(EditorState *state) {
     getmaxyx(stdscr, rows, cols); 
     adjust_viewport(state);
 
-    const char *delimiters = " \t\r\n,;()[]{}<>=+-*/%&|\"\"!^<>.`\"'";
+    const char *delimiters = " \t\r\n,;()[]{}<>=+-*/%&|!^.";
+    int screen_y = 0;
 
-    for (int i = 0; i < rows - 2; i++) {
-        int line_idx = state->top_line + i;
-        if (line_idx >= state->num_lines) continue;
+    if (state->word_wrap_enabled) {
+        state->left_col = 0;
+        int visual_line_idx = 0;
+        for (int file_line_idx = 0; file_line_idx < state->num_lines && screen_y < rows - 2; file_line_idx++) {
+            char *line = state->lines[file_line_idx];
+            if (!line) continue;
 
-        char *line = state->lines[line_idx]; 
-        if (!line) continue;
-        
-        move(i, 0);
-        
-        int line_len = strlen(line);
-        int start_col = state->left_col;
-        if (start_col >= line_len) continue;
-
-        int current_pos = start_col;
-        
-        while(current_pos < line_len) {
-            
-            if (line[current_pos] == '#' || 
-                (line[current_pos] == '/' && current_pos + 1 < line_len && line[current_pos + 1] == '/')) {
-                attron(COLOR_PAIR(6));
-                printw("%s", &line[current_pos]);
-                attroff(COLOR_PAIR(6));
-                break; 
+            int line_len = strlen(line);
+            if (line_len == 0) {
+                if (visual_line_idx >= state->top_line) {
+                    move(screen_y, 0);
+                    clrtoeol();
+                    screen_y++;
+                }
+                visual_line_idx++;
+                continue;
             }
 
-            int token_start = current_pos;
-            if (strchr(delimiters, line[current_pos])) {
-                while(current_pos < line_len && strchr(delimiters, line[current_pos])) {
-                    current_pos++;
-                }
-            } else {
-                while(current_pos < line_len && !strchr(delimiters, line[current_pos])) {
-                    current_pos++;
-                }
-            }
-            
-            int token_len = current_pos - token_start;
-            if (token_len > 0) {
-                char *token_ptr = &line[token_start];
-                int color_pair = 0;
+            int line_offset = 0;
+            while(line_offset < line_len || line_len == 0) {
+                int len_to_draw = (line_len - line_offset > cols) ? cols : line_len - line_offset;
                 
-                if (!strchr(delimiters, *token_ptr)) {
-                    for (int j = 0; j < state->num_syntax_rules; j++) {
-                        if (strlen(state->syntax_rules[j].word) == token_len &&
-                            strncmp(token_ptr, state->syntax_rules[j].word, token_len) == 0) {
-                            
-                            switch(state->syntax_rules[j].type) {
-                                case SYNTAX_KEYWORD:      color_pair = 3; break;
-                                case SYNTAX_TYPE:         color_pair = 4; break;
-                                case SYNTAX_STD_FUNCTION: color_pair = 5; break;
-                            }
+                int break_pos = len_to_draw;
+                if (line_offset + len_to_draw < line_len) { 
+                    int temp_break = -1;
+                    for (int j = len_to_draw - 1; j >= 0; j--) {
+                        if (isspace(line[line_offset + j])) {
+                            temp_break = j;
                             break;
                         }
                     }
+                    if (temp_break != -1) {
+                        break_pos = temp_break + 1;
+                    }
                 }
 
-                if (color_pair) attron(COLOR_PAIR(color_pair));
-                printw("%.*s", token_len, token_ptr);
-                if (color_pair) attroff(COLOR_PAIR(color_pair));
+                if (visual_line_idx >= state->top_line && screen_y < rows - 2) {
+                    move(screen_y, 0);
+                    int current_pos_in_segment = 0;
+                    while(current_pos_in_segment < break_pos) {
+                        int token_start_in_line = line_offset + current_pos_in_segment;
+                        if (line[token_start_in_line] == '#' || (line[token_start_in_line] == '/' && token_start_in_line + 1 < line_len && line[token_start_in_line + 1] == '/')) {
+                            attron(COLOR_PAIR(6)); printw("%s", &line[token_start_in_line]); attroff(COLOR_PAIR(6)); break;
+                        }
+                        int token_start_in_segment = current_pos_in_segment;
+                        if (strchr(delimiters, line[token_start_in_line])) {
+                            while(current_pos_in_segment < break_pos && strchr(delimiters, line[line_offset + current_pos_in_segment])) current_pos_in_segment++;
+                        } else {
+                            while(current_pos_in_segment < break_pos && !strchr(delimiters, line[line_offset + current_pos_in_segment])) current_pos_in_segment++;
+                        }
+                        int token_len = current_pos_in_segment - token_start_in_segment;
+                        if (token_len > 0) {
+                            char *token_ptr = &line[token_start_in_line];
+                            int color_pair = 0;
+                            if (!strchr(delimiters, *token_ptr)) {
+                                for (int j = 0; j < state->num_syntax_rules; j++) {
+                                    if (strlen(state->syntax_rules[j].word) == token_len && strncmp(token_ptr, state->syntax_rules[j].word, token_len) == 0) {
+                                        switch(state->syntax_rules[j].type) {
+                                            case SYNTAX_KEYWORD: color_pair = 3; break;
+                                            case SYNTAX_TYPE: color_pair = 4; break;
+                                            case SYNTAX_STD_FUNCTION: color_pair = 5; break;
+                                        }
+                                        break;
+                                    }
+                                }
+                            }
+                            if (color_pair) attron(COLOR_PAIR(color_pair));
+                            printw("%.*s", token_len, token_ptr);
+                            if (color_pair) attroff(COLOR_PAIR(color_pair));
+                        }
+                    }
+                    clrtoeol();
+                    screen_y++;
+                }
+                
+                visual_line_idx++;
+                line_offset += break_pos;
+                if (line_len == 0) break;
             }
         }
-        clrtoeol();
+    } else {
+        for (int line_idx = state->top_line; line_idx < state->num_lines && screen_y < rows - 2; line_idx++) {
+            char *line = state->lines[line_idx];
+            if (!line) {
+                continue;
+            }
+            move(screen_y, 0);
+            int start_col = state->left_col;
+            int line_len = strlen(line);
+            if (start_col < line_len) {
+                printw("%.*s", cols, &line[start_col]);
+            }
+            clrtoeol();
+            screen_y++;
+        }
     }
 
-    // Barras de status e cursor
     attron(COLOR_PAIR(2)); 
     mvprintw(rows - 2, 0, "%s", state->status_msg); 
     attroff(COLOR_PAIR(2));
@@ -846,7 +948,7 @@ void editor_redraw(EditorState *state) {
             case NORMAL: strcpy(mode_str, "-- NORMAL --"); break; 
             case INSERT: strcpy(mode_str, "-- INSERT --"); break;
             default: strcpy(mode_str, "--          --"); break;
-             }
+        }
         char display_filename[40];
         strncpy(display_filename, state->filename, sizeof(display_filename) - 1);
         display_filename[sizeof(display_filename) - 1] = '\0'; 
@@ -858,9 +960,9 @@ void editor_redraw(EditorState *state) {
     if (state->mode == COMMAND) {
         move(rows - 1, state->command_pos + 1);
     } else {
-        int visual_cursor_x = get_visual_col(state->lines[state->current_line], state->current_col);
-        int visual_left_offset = get_visual_col(state->lines[state->current_line], state->left_col);
-        move(state->current_line - state->top_line, visual_cursor_x - visual_left_offset);
+        int visual_y, visual_x;
+        get_visual_pos(state, &visual_y, &visual_x);
+        move(visual_y - state->top_line, visual_x - state->left_col);
     }
 
     wnoutrefresh(stdscr);
@@ -868,11 +970,12 @@ void editor_redraw(EditorState *state) {
     if (state->completion_mode != COMPLETION_NONE) {
         editor_draw_completion_win(state);
     } else {
-       curs_set(1);
+       curs_set(1); 
     }
 
     doupdate();
 }
+
 
 // --- Funções de Snapshot e Undo/Redo ---
 // Libera a memória de um único snapshot.
@@ -1000,11 +1103,11 @@ void load_file_core(EditorState *state, const char *filename) {
             state->num_lines++;
         }
         fclose(file);
-        snprintf(state->status_msg, sizeof(state->status_msg), "\"%s\" loaded", filename);
+        snprintf(state->status_msg, sizeof(state->status_msg), "%s\" loaded", filename);
     } else {
         if (errno == ENOENT) {
             state->lines[0] = calloc(1, 1);
-            if (!state->lines[0]) return;
+            if (!state->lines[0]) return; 
             state->num_lines = 1;
             snprintf(state->status_msg, sizeof(state->status_msg), "New file: \"%s\"", filename);
         } else {
@@ -1031,7 +1134,8 @@ void load_file_core(EditorState *state, const char *filename) {
     state->last_file_mod_time = get_file_mod_time(state->filename);
 }
    
-void load_file(EditorState *state, const char *filename) {    // Não execute a lógica de recuperação para o próprio arquivo .sv    
+void load_file(EditorState *state, const char *filename) {
+    // Não execute a lógica de recuperação para o próprio arquivo .sv    
 	if (strstr(filename, AUTO_SAVE_EXTENSION) == NULL) {
 		char sv_filename[256];
 		snprintf(sv_filename, sizeof(sv_filename), "%s%s", filename, AUTO_SAVE_EXTENSION);
@@ -1041,7 +1145,7 @@ void load_file(EditorState *state, const char *filename) {    // Não execute a 
 		
   handle_file_recovery(state, filename, sv_filename);
 		return; // A função de recuperação cuidará do carregamento.
-		}    // Se não houver arquivo de recuperação, apenas carregue o arquivo solicitado.
+		}	// Se não houver arquivo de recuperação, apenas carregue o arquivo solicitado.
 	}
 	load_file_core(state, filename);
 }
@@ -1069,7 +1173,7 @@ void save_file(EditorState *state) {
         char display_filename[40]; 
         strncpy(display_filename, state->filename, sizeof(display_filename) - 1); 
         display_filename[sizeof(display_filename) - 1] = '\0';
-        snprintf(state->status_msg, sizeof(state->status_msg), "\"%s\" written", display_filename);
+        snprintf(state->status_msg, sizeof(state->status_msg), "%s\" written", display_filename);
         state->buffer_modified = false;
         state->last_file_mod_time = get_file_mod_time(state->filename);
     } else { 
@@ -1279,7 +1383,7 @@ void editor_reload_file(EditorState *state) {
     time_t on_disk_mod_time = get_file_mod_time(state->filename);
 
     if (state->buffer_modified && on_disk_mod_time != 0 && on_disk_mod_time != state->last_file_mod_time) {
-        snprintf(state->status_msg, sizeof(state->status_msg), "File on disk changed! (S)ave, (L)oad, or (C)ancel?");
+        snprintf(state->status_msg, sizeof(state->status_msg), "Warning: File on disk has changed! (S)ave, (L)oad, or (C)ancel?");
         editor_redraw(state);
         wint_t ch;
         get_wch(&ch);
@@ -1410,6 +1514,12 @@ void process_command(EditorState *state, bool *should_exit) {
             state->paste_mode = false;
             state->auto_indent_on_newline = true;
             snprintf(state->status_msg, sizeof(state->status_msg), "-- PASTE MODE OFF --");
+        } else if (strcmp(args, "wrap") == 0) {
+            state->word_wrap_enabled = true;
+            snprintf(state->status_msg, sizeof(state->status_msg), "Word wrap ativado");
+        } else if (strcmp(args, "nowrap") == 0) {
+            state->word_wrap_enabled = false;
+            snprintf(state->status_msg, sizeof(state->status_msg), "Word wrap desativado");
         } else {
             snprintf(state->status_msg, sizeof(state->status_msg), "Argumento desconhecido para set: %s", args);
         }
@@ -1632,7 +1742,11 @@ void editor_draw_completion_win(EditorState *state) {
     int win_h, win_w, win_y, win_x;
 
     if (state->completion_mode == COMPLETION_TEXT) {
-        int cursor_screen_y = state->current_line - state->top_line;
+        int visual_cursor_y, visual_cursor_x;
+        get_visual_pos(state, &visual_cursor_y, &visual_cursor_x);
+        
+        int cursor_screen_y = visual_cursor_y - state->top_line;
+        
         int max_h = rows - 2 - (cursor_screen_y + 1);
         if (max_h < 3) max_h = 3;
         if (max_h > 15) max_h = 15;
@@ -1641,7 +1755,8 @@ void editor_draw_completion_win(EditorState *state) {
         win_w = max_len + 2;
 
         win_y = cursor_screen_y + 1;
-        win_x = state->completion_start_col - state->left_col;
+        
+        win_x = get_visual_col(state->lines[state->current_line], state->completion_start_col) % cols;
 
         if (win_x + win_w >= cols) win_x = cols - win_w;
         if (win_y < 0) win_y = 0;
@@ -1696,6 +1811,13 @@ void handle_insert_mode_key(EditorState *state, wint_t ch) {
 	    break;
         case KEY_CTRL_F:
             editor_find(state);
+            break;
+        case KEY_UNDO:
+            do_undo(state);
+            break;
+        case KEY_REDO:
+            do_redo(state);
+            break;
         case KEY_ENTER: case '\n': editor_handle_enter(state); break;
         case KEY_BACKSPACE: case 127: case 8: editor_handle_backspace(state); break;
         case '\t':
@@ -1704,8 +1826,49 @@ void handle_insert_mode_key(EditorState *state, wint_t ch) {
                 for (int i = 0; i < TAB_SIZE; i++) editor_insert_char(state, ' ');
             }
             break;
-        case KEY_UP: if (state->current_line > 0) { state->current_line--; state->current_col = state->ideal_col; } break;
-        case KEY_DOWN: if (state->current_line < state->num_lines - 1) { state->current_line++; state->current_col = state->ideal_col; } break;
+        case KEY_UP: {
+    if (state->word_wrap_enabled) {
+        int r, cols;
+        getmaxyx(stdscr, r, cols);
+        if (cols <= 0) break;
+        state->ideal_col = state->current_col % cols; 
+        
+        if (state->current_col >= cols) {
+            state->current_col -= cols;
+        } else {
+            if (state->current_line > 0) {
+                state->current_line--;
+                state->current_col = strlen(state->lines[state->current_line]);
+            }
+        }
+    } else {
+        if (state->current_line > 0) state->current_line--;
+    }
+    break;
+}
+case KEY_DOWN: {
+    if (state->word_wrap_enabled) {
+        int r, cols;
+        getmaxyx(stdscr, r, cols);
+        if (cols <= 0) break;
+        state->ideal_col = state->current_col % cols;
+
+        char *line = state->lines[state->current_line];
+        int line_len = strlen(line);
+
+        if (state->current_col + cols < line_len) {
+            state->current_col += cols;
+        } else {
+            if (state->current_line < state->num_lines - 1) {
+                state->current_line++;
+                state->current_col = 0;
+            }
+        }
+    } else {
+        if (state->current_line < state->num_lines - 1) state->current_line++;
+    }
+    break;
+}
         case KEY_LEFT: if (state->current_col > 0) state->current_col--; state->ideal_col = state->current_col; break;
         case KEY_RIGHT: { char* line = state->lines[state->current_line]; int line_len = line ? strlen(line) : 0; if (state->current_col < line_len) state->current_col++; state->ideal_col = state->current_col; } break;
         case KEY_PPAGE: case KEY_SR: for (int i = 0; i < PAGE_JUMP; i++) if (state->current_line > 0) state->current_line--; state->current_col = state->ideal_col; break;
@@ -1787,6 +1950,7 @@ int main(int argc, char *argv[]) {
     state->last_auto_save_time = time(NULL); // Inicialize o tempo
     state->auto_indent_on_newline = true;
     state->paste_mode = false;
+    state->word_wrap_enabled = true;
     
     load_syntax_file(state, "c.syntax");
 
@@ -1927,8 +2091,49 @@ int main(int argc, char *argv[]) {
                     case KEY_CTRL_A:
                         editor_find_previous(state);
                         break;
-                    case KEY_UP: if (state->current_line > 0) { state->current_line--; state->current_col = state->ideal_col; } break;
-                    case KEY_DOWN: if (state->current_line < state->num_lines - 1) { state->current_line++; state->current_col = state->ideal_col; } break;
+                    case KEY_UP: {
+                        if (state->word_wrap_enabled) {
+                            int r, cols;
+                            getmaxyx(stdscr, r, cols);
+                            if (cols <= 0) break;
+                            state->ideal_col = state->current_col % cols; 
+                            
+                            if (state->current_col >= cols) {
+                                state->current_col -= cols;
+                            } else {
+                                if (state->current_line > 0) {
+                                    state->current_line--;
+                                    state->current_col = strlen(state->lines[state->current_line]);
+                                }
+                            }
+                        } else {
+                            if (state->current_line > 0) state->current_line--;
+                        }
+                        break;
+                    }
+                    case KEY_DOWN: {
+                        if (state->word_wrap_enabled) {
+                            int r, cols;
+                            getmaxyx(stdscr, r, cols);
+                            if (cols <= 0) break;
+                            state->ideal_col = state->current_col % cols;
+
+                            char *line = state->lines[state->current_line];
+                            int line_len = strlen(line);
+
+                            if (state->current_col + cols < line_len) {
+                                state->current_col += cols;
+                            } else {
+                                if (state->current_line < state->num_lines - 1) {
+                                    state->current_line++;
+                                    state->current_col = 0;
+                                }
+                            }
+                        } else {
+                            if (state->current_line < state->num_lines - 1) state->current_line++;
+                        }
+                        break;
+                    }
                     case KEY_LEFT:
                         if (state->current_col > 0) {
                             state->current_col--;
@@ -1980,6 +2185,6 @@ int main(int argc, char *argv[]) {
     }
     free(state->syntax_rules);
 
-    free(state); 
+    free(state);
     return state->current_line;
 }
