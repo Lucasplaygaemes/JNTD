@@ -19,8 +19,8 @@
 #include <time.h>
 
 // --- Definições do Editor ---
-#define MAX_LINES 4098
-#define MAX_LINE_LEN 2048
+#define MAX_LINES 16486
+#define MAX_LINE_LEN 4096
 #define STATUS_MSG_LEN 250
 #define PAGE_JUMP 10
 #define TAB_SIZE 4
@@ -34,6 +34,7 @@
 #define KEY_CTRL_F 6
 #define KEY_CTRL_D 4
 #define KEY_CTRL_A 1
+#define KEY_CTRL_G 7
 
 typedef struct {
     char **lines;
@@ -44,6 +45,13 @@ typedef struct {
     int top_line;
     int left_col;
 } EditorSnapshot;
+
+
+// Função para o directory manager
+typedef struct {
+    char *path;
+    int access_count;
+} DirectoryInfo;
 
 // Enum para os tipos de sintaxe que definimos no arquivo .syntax
 typedef enum {
@@ -70,13 +78,10 @@ typedef struct {
     int num_lines;
 } FileViewer;
 
-
 // --- Dicionários estáticos para autocompletar headers (será substituído no futuro) ---
 const char* stdio_h_symbols[] = {"printf", "scanf", "fprintf", "sprintf", "sscanf", "fopen", "fclose", "fgetc", "fgets", "fputc", "fputs", "fread", "fwrite", "fseek", "ftell", "rewind", "remove", "rename", "tmpfile", "tmpnam", "setvbuf", "setbuf", "ferror", "feof", "clearerr", "perror", "FILE", "EOF", "NULL", "SEEK_SET", "SEEK_CUR", "SEEK_END"};
 const char* stdlib_h_symbols[] = {"malloc", "calloc", "realloc", "free", "atoi", "atof", "atol", "strtod", "strtol", "strtoul", "rand", "srand", "system", "exit", "getenv", "abs", "labs", "div", "ldiv", "qsort", "bsearch", "EXIT_SUCCESS", "EXIT_FAILURE", "RAND_MAX"};
 const char* string_h_symbols[] = {"strcpy", "strncpy", "strcat", "strncat", "strcmp", "strncmp", "strchr", "strrchr", "strlen", "strspn", "strcspn", "strpbrk", "strstr", "strtok", "memset", "memcpy", "memmove", "memcmp", "memchr", "strerror"};
-
-
 
 typedef struct {
     const char* header_name;
@@ -148,6 +153,9 @@ typedef struct {
     bool auto_indent_on_newline;
     bool paste_mode;
     bool word_wrap_enabled;
+
+    DirectoryInfo **recent_dirs;
+    int num_recent_dirs;
 } EditorState;
 
 // --- Declarações de Funções ---
@@ -179,6 +187,10 @@ void search_google(const char *query);
 void reload_file(EditorState *state);
 void check_external_modification(EditorState *state);
 void get_visual_pos(EditorState *state, int *visual_y, int *visual_x);
+void load_directory_history(EditorState *state);
+void save_directory_history(EditorState *state);
+void update_directory_access(EditorState *state);
+void display_directory_navigator(EditorState *state);
 
 
 // Funções para recuperação de arquivo
@@ -275,6 +287,7 @@ void run_and_display_command(const char* command, const char* title) {
     display_output_screen(title, temp_output_file);
 }
 
+// Função para o comando de diff
 void diff_command(EditorState *state, const char *args) {
     char filename1[256] = {0};
     char filename2[256] = {0};
@@ -391,6 +404,88 @@ void load_syntax_file(EditorState *state, const char *filename) {
     }
     fclose(file);
 }
+
+
+// ---- FUNCOES PARA O TROCADOR DE DIRETORIOS ---- //
+
+void load_directory_history(EditorState *state) {
+    state->recent_dirs = NULL;
+    state->num_recent_dirs = 0;
+    
+    char history_file[1024];
+    get_history_filename(history_file, sizeof(history_file));
+    
+    FILE *f = fopen(history_file, "r");
+    
+    if (!f) {
+        perror("Error opening the file"):
+        return;
+    }
+    
+    char line[MAX_LINE_LEN];
+    
+    while (fgets(line, sizeof(line), f)) {
+        int count;
+        char path[1024];
+        
+        // Formato <contagem> <caminho>
+        
+        if (sscanf(line, "%d %1023[^\]", &count, path) = 2) {
+            state->num_recent_dirs++;
+            state->recent_dirs = realloc(state->recent_dirs, sizeof(DirectoryInfo*) * state->num_recent_dirs);
+            
+            DirectoryInfo *new_dir = malloc(sizeof(DirectoryInfo));
+            
+            new_dir->path = strdup(path);
+            new_dir->access_count = count;
+            
+            state->recent_dirs[state->num_recent_dir - 1] = new_dir;
+        }
+        
+    }
+    fclose(f);
+    
+    qsort(state->recent_dirs, state->num_recent_dirs, sizeof(DirectoryInfo*), compare_dirs);
+    
+}
+
+void save_directory_history(EditorState *state) {
+    get_history_filename(history_file, sizeof(history_file));
+    
+    FILE *f = fopen(history_file, "w");
+    
+    if (!f) {
+        perror("Error saving to the directory history");
+        return;
+    }
+    
+    for (int i = 0; i < state->num_recent_dirs; i++) {
+        fprintf(f, "%d %s\n",
+        state->recent_dirs[i]->access_count,
+        state->recent_dirs[i]->path);
+    }
+    fclose(f);
+    
+}
+
+void update_directory_access(EditorState *state, const char *path) {
+    char canonical_path[PATH_MAX];
+    //realpath resolve caminhos como "." ou ".." para caminhos absolutos//
+    if (realpath(path, canonical_path) == NULL) {
+        strncpy(canonical_path, path, sizeof(canonical_path)-1);
+    }
+    for (int i = 0; i < state->num_recent_dirs[i]->path, canonical_path) == 0) {
+        if (strcmp(state->recent_dirs[i]->path, canonical_path) == 0) {
+            state->recent_dirs[i]->access_count++;
+            qsort(state->recent_dirs, state->num_recent_dirs, sizeof(DirectoryInfo*), compare_dirs);
+            save_directory_history(state);
+            return;
+        }
+    }
+        
+
+
+
 
 void adjust_viewport(EditorState *state) {
     int rows, cols; getmaxyx(stdscr, rows, cols); 
