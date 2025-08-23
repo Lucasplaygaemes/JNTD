@@ -20,11 +20,7 @@ Even tought this repo and the main code is JNTD, i'm having a lot of fun adding 
 the functions in my TODO list, i will return my focus to JNTD, but i have a lot of cool features to add at JNTD, but even more add a2.c.
 
 # Releases!
-I lost the last 2 days just installing different Distros to make a release to most of them, but i lost a lot of time installing hyprland in debian and arch, lol.
-So we will 3 bulds for now.
-
-# Changing OS
-I have migrated to debia, a great distro don't have nothing to say.
+I will make releases every few days with minor changes, or when big changes are made, i will also make one. Can't say which plataforms it will be deployed. 
 
 # Multiplatform (again)?
 I'm now proudly using FREE BSD, and isn't really nothing special from other linux distros, even though it's not linux. Will use it for some time.
@@ -34,15 +30,9 @@ Probably won't be my main OS, but knowing it was all made in C, give it's a spec
 I'm already doing it, and from now on i will add issues always i have a bug or something i need to fix, to improve terminal workflow, i'm using gh and git, because yet gh don't replace git for me.
 I will try to fix then in at max 2 weeks after created, or at least try and add updates about it.
 
-# Dependencies?
-Until this moment, i'm only using C, but not just default C libralys, so i will make a file to install dependecies on some systems, which are the one i know, and how to install.
-
 # Projects?
 JNTD is my main project for a while now, but i have other projects in mind, my favorite programming language is C, and that's clear, but, i would love somethings that are not native in C, i'm not a c developer,
 but i will make changes haha. I have other projects in mind, some of then i can add in JNTD, but other i can't, i will make then public once i feel they're good enough.
-
-# Awrit!
-Awrit is a miracle! You can use a browser fully in terminal, just with awrit + Kitty, kitty is a marvelous terminal. I don't own any of those programs, every right goes to the respective owners.
 
 # Multiplatform?
 And it's a miracle! The code is "multiplataform", not really, but the code was able to run on my pc. But it's not perfect, nothing is, i need to make some modifications so it can run nice on every platform.
