@@ -41,9 +41,6 @@ Until this moment, i'm only using C, but not just default C libralys, so i will 
 JNTD is my main project for a while now, but i have other projects in mind, my favorite programming language is C, and that's clear, but, i would love somethings that are not native in C, i'm not a c developer,
 but i will make changes haha. I have other projects in mind, some of then i can add in JNTD, but other i can't, i will make then public once i feel they're good enough.
 
-# Awrit!
-Awrit is a miracle! You can use a browser fully in terminal, just with awrit + Kitty, kitty is a marvelous terminal. I don't own any of those programs, every right goes to the respective owners.
-
 # Multiplatform?
 And it's a miracle! The code is "multiplataform", not really, but the code was able to run on my pc. But it's not perfect, nothing is, i need to make some modifications so it can run nice on every platform.
 
