@@ -1,6 +1,15 @@
+#ifndef max
+#define max(a, b) ((a) > (b) ? (a) : (b))
+#endif
+#ifndef min
+#define min(a, b) ((a) < (b) ? (a) : (b))
+#endif
+
+
 #define MAX_UNDO_LEVELS 100
 #define _XOPEN_SOURCE_EXTENDED 1
 #define NCURSES_WIDECHAR 1
+
 
 #include "timer.h"
 #include <ncurses.h>
@@ -189,8 +198,9 @@ void check_external_modification(EditorState *state);
 void get_visual_pos(EditorState *state, int *visual_y, int *visual_x);
 void load_directory_history(EditorState *state);
 void save_directory_history(EditorState *state);
-void update_directory_access(EditorState *state);
+void update_directory_access(EditorState *state, const char *path);
 void display_directory_navigator(EditorState *state);
+void prompt_for_directory_change(EditorState *state);
 
 
 // Funções para recuperação de arquivo
@@ -408,73 +418,96 @@ void load_syntax_file(EditorState *state, const char *filename) {
 
 // ---- FUNCOES PARA O TROCADOR DE DIRETORIOS ---- //
 
+// Retorna o caminho completo para o arquivo de histórico.
+void get_history_filename(char *buffer, size_t size) {
+    // Tenta obter o diretório HOME
+    const char *home_dir = getenv("HOME");
+    if (home_dir) {
+        snprintf(buffer, size, "%s/.jntd_dir_history", home_dir);
+    } else {
+        // Fallback para o diretório atual se HOME não estiver definido
+        snprintf(buffer, size, ".jntd_dir_history");
+    }
+}
+
+// Função de comparação para qsort, ordena em ordem decrescente de contagem
+int compare_dirs(const void *a, const void *b) {
+    DirectoryInfo *dir_a = *(DirectoryInfo**)a;
+    DirectoryInfo *dir_b = *(DirectoryInfo**)b;
+    return dir_b->access_count - dir_a->access_count;
+}
+
+
 void load_directory_history(EditorState *state) {
     state->recent_dirs = NULL;
     state->num_recent_dirs = 0;
-    
+
     char history_file[1024];
     get_history_filename(history_file, sizeof(history_file));
-    
+
     FILE *f = fopen(history_file, "r");
-    
-    if (!f) {
-        perror("Error opening the file"):
-        return;
-    }
-    
+    if (!f) return;
+
     char line[MAX_LINE_LEN];
-    
     while (fgets(line, sizeof(line), f)) {
         int count;
         char path[1024];
-        
-        // Formato <contagem> <caminho>
-        
-        if (sscanf(line, "%d %1023[^\]", &count, path) = 2) {
-            state->num_recent_dirs++;
-            state->recent_dirs = realloc(state->recent_dirs, sizeof(DirectoryInfo*) * state->num_recent_dirs);
-            
+        // Formato: <contagem> <caminho>
+        if (sscanf(line, "%d %1023[^\n]", &count, path) == 2) {
             DirectoryInfo *new_dir = malloc(sizeof(DirectoryInfo));
+            if (!new_dir) continue;
             
             new_dir->path = strdup(path);
-            new_dir->access_count = count;
+            if (!new_dir->path) {
+                free(new_dir);
+                continue;
+            }
             
-            state->recent_dirs[state->num_recent_dir - 1] = new_dir;
+            new_dir->access_count = count;
+
+            state->num_recent_dirs++;
+            state->recent_dirs = realloc(state->recent_dirs, sizeof(DirectoryInfo*) * state->num_recent_dirs);
+            if (!state->recent_dirs) {
+                free(new_dir->path);
+                free(new_dir);
+                state->num_recent_dirs--;
+                break;
+            }
+            
+            state->recent_dirs[state->num_recent_dirs - 1] = new_dir;
         }
-        
     }
     fclose(f);
-    
-    qsort(state->recent_dirs, state->num_recent_dirs, sizeof(DirectoryInfo*), compare_dirs);
-    
+
+    // Ordena o que foi carregado
+    if (state->num_recent_dirs > 0) {
+        qsort(state->recent_dirs, state->num_recent_dirs, sizeof(DirectoryInfo*), compare_dirs);
+    }
 }
 
 void save_directory_history(EditorState *state) {
+    char history_file[1024];
     get_history_filename(history_file, sizeof(history_file));
-    
+
     FILE *f = fopen(history_file, "w");
-    
-    if (!f) {
-        perror("Error saving to the directory history");
-        return;
-    }
-    
+    if (!f) return;
+
     for (int i = 0; i < state->num_recent_dirs; i++) {
-        fprintf(f, "%d %s\n",
-        state->recent_dirs[i]->access_count,
-        state->recent_dirs[i]->path);
+        fprintf(f, "%d %s\n", state->recent_dirs[i]->access_count, state->recent_dirs[i]->path);
     }
     fclose(f);
-    
 }
 
 void update_directory_access(EditorState *state, const char *path) {
     char canonical_path[PATH_MAX];
-    //realpath resolve caminhos como "." ou ".." para caminhos absolutos//
+    // realpath resolve caminhos como "." ou ".." para um caminho absoluto
     if (realpath(path, canonical_path) == NULL) {
+        // Se não for possível resolver, usa o caminho como está
         strncpy(canonical_path, path, sizeof(canonical_path)-1);
+        canonical_path[sizeof(canonical_path)-1] = '\00';
     }
-    for (int i = 0; i < state->num_recent_dirs[i]->path, canonical_path) == 0) {
+
+    for (int i = 0; i < state->num_recent_dirs; i++) {
         if (strcmp(state->recent_dirs[i]->path, canonical_path) == 0) {
             state->recent_dirs[i]->access_count++;
             qsort(state->recent_dirs, state->num_recent_dirs, sizeof(DirectoryInfo*), compare_dirs);
@@ -482,8 +515,195 @@ void update_directory_access(EditorState *state, const char *path) {
             return;
         }
     }
-        
 
+    // Se não encontrou, adiciona um novo
+    state->num_recent_dirs++;
+    state->recent_dirs = realloc(state->recent_dirs, sizeof(DirectoryInfo*) * state->num_recent_dirs);
+
+    DirectoryInfo *new_dir = malloc(sizeof(DirectoryInfo));
+    new_dir->path = strdup(canonical_path);
+    new_dir->access_count = 1;
+
+    state->recent_dirs[state->num_recent_dirs - 1] = new_dir;
+
+    qsort(state->recent_dirs, state->num_recent_dirs, sizeof(DirectoryInfo*), compare_dirs);
+    save_directory_history(state);
+}
+
+void change_directory(EditorState *state, const char *new_path) {
+    if (chdir(new_path) == 0) {
+        update_directory_access(state, new_path);
+        char cwd[1024];
+        if (getcwd(cwd, sizeof(cwd)) != NULL) {
+            snprintf(state->status_msg, sizeof(state->status_msg), "Diretório mudado para: %s", cwd);
+        }
+    } else {
+        snprintf(state->status_msg, sizeof(state->status_msg), "Erro ao mudar para: %s", strerror(errno));
+    }
+}
+
+void display_directory_navigator(EditorState *state) {
+    if (state->num_recent_dirs == 0) {
+        snprintf(state->status_msg, sizeof(state->status_msg), "No recent directories available.");
+        return;
+    }
+
+    WINDOW *nav_win;
+    int rows, cols;
+    getmaxyx(stdscr, rows, cols);
+
+    // Cria uma janela centralizada
+    int win_h = min(state->num_recent_dirs + 4, rows - 4);
+    if (win_h < 10) win_h = 10; // Minimum height
+    int win_w = cols - 10;
+    if (win_w < 50) win_w = 50; // Minimum width
+    int win_y = (rows - win_h) / 2;
+    int win_x = (cols - win_w) / 2;
+
+    nav_win = newwin(win_h, win_w, win_y, win_x);
+    if (!nav_win) return;
+    
+    keypad(nav_win, TRUE);
+    wbkgd(nav_win, COLOR_PAIR(9));
+    box(nav_win, 0, 0);
+
+    mvwprintw(nav_win, 1, (win_w - 25) / 2, "Navegador de Diretórios");
+    
+    int current_selection = 0;
+    int top_of_list = 0;
+    int max_visible = win_h - 4;
+
+    while (1) {
+        werase(nav_win);
+        box(nav_win, 0, 0);
+        mvwprintw(nav_win, 1, (win_w - 25) / 2, "Navegador de Diretórios");
+
+        // Desenha a lista
+        for (int i = 0; i < max_visible; i++) {
+            int dir_idx = top_of_list + i;
+            if (dir_idx < state->num_recent_dirs) {
+                if (dir_idx == current_selection) {
+                    wattron(nav_win, A_REVERSE);
+                }
+                
+                // Truncate the path if it's too long
+                char display_path[win_w - 4];
+                strncpy(display_path, state->recent_dirs[dir_idx]->path, sizeof(display_path) - 1);
+                display_path[sizeof(display_path) - 1] = '\0';
+                
+                if (strlen(state->recent_dirs[dir_idx]->path) > sizeof(display_path) - 1) {
+                    strcpy(display_path + sizeof(display_path) - 4, "...");
+                }
+                
+                mvwprintw(nav_win, i + 2, 2, "%s (%d acessos)", 
+                         display_path, state->recent_dirs[dir_idx]->access_count);
+                
+                if (dir_idx == current_selection) {
+                    wattroff(nav_win, A_REVERSE);
+                }
+            }
+        }
+
+        mvwprintw(nav_win, win_h - 2, 2, "Use as setas para navegar, ENTER para selecionar, ESC para sair.");
+        wrefresh(nav_win);
+
+        int ch = wgetch(nav_win);
+        switch(ch) {
+            case KEY_UP:
+                if (current_selection > 0) {
+                    current_selection--;
+                    if(current_selection < top_of_list) {
+                        top_of_list = current_selection;
+                    }
+                }
+                break;
+            case KEY_DOWN:
+                if (current_selection < state->num_recent_dirs - 1) {
+                    current_selection++;
+                    if(current_selection >= top_of_list + max_visible) {
+                        top_of_list = current_selection - max_visible + 1;
+                    }
+                }
+                break;
+            case KEY_ENTER:
+            case '\n':
+            case '\r':
+                if (current_selection < state->num_recent_dirs) {
+                    change_directory(state, state->recent_dirs[current_selection]->path);
+                    goto end_nav;
+                }
+                break;
+            case 27: // ESC
+            case 'q':
+            case 'Q':
+                goto end_nav;
+            case KEY_NPAGE:
+                current_selection = min(current_selection + max_visible, state->num_recent_dirs - 1);
+                top_of_list = min(top_of_list + max_visible, state->num_recent_dirs - max_visible);
+                break;
+            case KEY_PPAGE:
+                current_selection = max(current_selection - max_visible, 0);
+                top_of_list = max(top_of_list - max_visible, 0);
+                break;
+        }
+    }
+
+end_nav:
+    delwin(nav_win);
+    touchwin(stdscr);
+    editor_redraw(state);
+}
+
+void prompt_for_directory_change(EditorState *state) {
+    if (state->buffer_modified) {
+        snprintf(state->status_msg, sizeof(state->status_msg), "Unsaved changes. Proceed with directory change? (y/n)");
+        editor_redraw(state);
+        wint_t ch;
+        get_wch(&ch);
+        if (tolower(ch) != 'y') {
+            snprintf(state->status_msg, sizeof(state->status_msg), "Cancelled.");
+            editor_redraw(state);
+            return;
+        }
+    }
+
+    int rows, cols;
+    getmaxyx(stdscr, rows, cols);
+    int win_h = 5;
+    int win_w = cols - 20;
+    if (win_w < 50) win_w = 50;
+    int win_y = (rows - win_h) / 2;
+    int win_x = (cols - win_w) / 2;
+    WINDOW *input_win = newwin(win_h, win_w, win_y, win_x);
+    keypad(input_win, TRUE);
+    wbkgd(input_win, COLOR_PAIR(9));
+    box(input_win, 0, 0);
+
+    mvwprintw(input_win, 1, 2, "Change to directory:");
+    wrefresh(input_win);
+
+    char path_buffer[1024] = {0};
+    
+    curs_set(1);
+    echo(); 
+    
+    wmove(input_win, 2, 2);
+    wgetnstr(input_win, path_buffer, sizeof(path_buffer) - 1);
+
+    noecho();
+    curs_set(0);
+
+    delwin(input_win);
+    touchwin(stdscr);
+
+    if (strlen(path_buffer) > 0) {
+        change_directory(state, path_buffer);
+    } else {
+        snprintf(state->status_msg, sizeof(state->status_msg), "No path entered. Cancelled.");
+    }
+    
+    editor_redraw(state);
+}
 
 
 
@@ -519,20 +739,20 @@ void adjust_viewport(EditorState *state) {
 //Função para mostrar a tela de ajuda//
 void display_help_screen() {
     static const CommandInfo commands[] = {
-        {":w", "Save the current file."},
-        {":w <name>", "Save with a new name."},
-        {":q", "Exit."},
-        {":wq", "Save and exit"},
-        {":open <name>", "Open a file"},
-        {":new", "Creates a blank file."},
-        {":help", "Show this help screen"},
-        {":gcc [libs]", "Compile the current file, (ex: :gcc -lm)."},
-        {"![cmd]", "Execute a command in the shell, (ex: !ls -l)."},
-        {":rc", "Reload the current file."} ,
-        {":diff", "Show the difference between 2 files, <ex: (diff a2.c a1.c),"},
-        {":set paste", "Enable paste mode to prevent auto-indent on paste."} ,
-        {":set nopaste", "Disable paste mode and re-enable auto-indent."} ,
-        {":timer", "Show the timer, it count the passed time using the editor." }
+        { ":w", "Save the current file." },
+        { ":w <name>", "Save with a new name." },
+        { ":q", "Exit." },
+        { ":wq", "Save and exit" },
+        { ":open <name>", "Open a file" },
+        { ":new", "Creates a blank file." },
+        { ":help", "Show this help screen" },
+        { ":gcc [libs]", "Compile the current file, (ex: :gcc -lm)." },
+        { "![cmd]", "Execute a command in the shell, (ex: !ls -l)." },
+        { ":rc", "Reload the current file." } ,
+        { ":diff", "Show the difference between 2 files, <ex: (diff a2.c a1.c)," },
+        { ":set paste", "Enable paste mode to prevent auto-indent on paste." } ,
+        { ":set nopaste", "Disable paste mode and re-enable auto-indent." } ,
+        { ":timer", "Show the timer, it count the passed time using the editor." }
     };
     
     int num_commands = sizeof(commands) / sizeof(commands[0]);
@@ -1198,7 +1418,7 @@ void load_file_core(EditorState *state, const char *filename) {
             state->num_lines++;
         }
         fclose(file);
-        snprintf(state->status_msg, sizeof(state->status_msg), "%s\" loaded", filename);
+        snprintf(state->status_msg, sizeof(state->status_msg), "%s loaded", filename);
     } else {
         if (errno == ENOENT) {
             state->lines[0] = calloc(1, 1);
@@ -1249,7 +1469,7 @@ void save_file(EditorState *state) {
     if (strcmp(state->filename, "[No Name]") == 0) { 
         strncpy(state->status_msg, "No file name. Use :w <filename>", sizeof(state->status_msg) - 1); 
         return; 
-    }
+    } 
     
     FILE *file = fopen(state->filename, "w");
     if (file) {
@@ -1268,12 +1488,12 @@ void save_file(EditorState *state) {
         char display_filename[40]; 
         strncpy(display_filename, state->filename, sizeof(display_filename) - 1); 
         display_filename[sizeof(display_filename) - 1] = '\0';
-        snprintf(state->status_msg, sizeof(state->status_msg), "%s\" written", display_filename);
+        snprintf(state->status_msg, sizeof(state->status_msg), "%s written", display_filename);
         state->buffer_modified = false;
         state->last_file_mod_time = get_file_mod_time(state->filename);
     } else { 
         snprintf(state->status_msg, sizeof(state->status_msg), "Error saving: %s", strerror(errno)); 
-    }
+    } 
 }
 
 void editor_handle_enter(EditorState *state) {
@@ -1376,14 +1596,14 @@ void editor_handle_backspace(EditorState *state) {
         if (!new_prev_line) return;
         
         memcpy(new_prev_line + prev_len, current_line_ptr, current_len + 1);
-        state->lines[prev_line_idx] = new_prev_line;
+        state->lines[prev_line_idx] = new_prev_line; 
         
         free(current_line_ptr);
         for (int i = state->current_line; i < state->num_lines - 1; i++) {
             state->lines[i] = state->lines[i + 1];
         }
         state->num_lines--; 
-        state->lines[state->num_lines] = NULL;
+        state->lines[state->num_lines] = NULL; 
         
         state->current_line--; 
         state->current_col = prev_len; 
@@ -2046,6 +2266,16 @@ int main(int argc, char *argv[]) {
     state->auto_indent_on_newline = true;
     state->paste_mode = false;
     state->word_wrap_enabled = true;
+
+    state->num_recent_dirs = 0;
+    state->recent_dirs = NULL;
+    load_directory_history(state);
+
+    // Registra o diretório inicial
+    char initial_cwd[1024];
+    if (getcwd(initial_cwd, sizeof(initial_cwd)) != NULL) {
+        update_directory_access(state, initial_cwd);
+    }
     
     load_syntax_file(state, "c.syntax");
 
@@ -2159,6 +2389,8 @@ int main(int argc, char *argv[]) {
                         editor_move_to_next_word(state);
                     } else if (next_ch == 'b' || next_ch == 'q') {
                         editor_move_to_previous_word(state);
+                    } else if (next_ch == 'g' || next_ch == 'G') {
+                        prompt_for_directory_change(state);
                     }
                 }
             }
@@ -2185,6 +2417,9 @@ int main(int argc, char *argv[]) {
                         break;
                     case KEY_CTRL_A:
                         editor_find_previous(state);
+                        break;
+                    case KEY_CTRL_G:
+                        display_directory_navigator(state);
                         break;
                     case KEY_UP: {
                         if (state->word_wrap_enabled) {
@@ -2279,7 +2514,21 @@ int main(int argc, char *argv[]) {
         free(state->syntax_rules[i].word);
     }
     free(state->syntax_rules);
+    save_directory_history(state);
+    for (int i = 0; i < state->num_recent_dirs; i++) {
+        free(state->recent_dirs[i]->path);
+        free(state->recent_dirs[i]);
+    }
+    free(state->recent_dirs);
 
+    // Libera a memória de cada linha do arquivo
+    for (int i = 0; i < state->num_lines; i++) {
+        if (state->lines[i]) {
+            free(state->lines[i]);
+        }
+    }
+
+    int last_line = state->current_line;
     free(state);
-    return state->current_line;
+    return last_line;
 }
