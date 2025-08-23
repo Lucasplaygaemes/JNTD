@@ -538,7 +538,7 @@ int main(int argc, char *argv[]) {
 
     int last_line = state->current_line;
     free(state);
-    return last_line;
+    return 0;
 }
 
 // ===================================================================
