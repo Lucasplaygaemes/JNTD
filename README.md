@@ -23,9 +23,6 @@ the functions in my TODO list, i will return my focus to JNTD, but i have a lot 
 I lost the last 2 days just installing different Distros to make a release to most of them, but i lost a lot of time installing hyprland in debian and arch, lol.
 So we will 3 bulds for now.
 
-# Changing OS
-I have migrated to debia, a great distro don't have nothing to say.
-
 # Multiplatform (again)?
 I'm now proudly using FREE BSD, and isn't really nothing special from other linux distros, even though it's not linux. Will use it for some time.
 Probably won't be my main OS, but knowing it was all made in C, give it's a special place in my heart.
