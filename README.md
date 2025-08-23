@@ -20,8 +20,7 @@ Even tought this repo and the main code is JNTD, i'm having a lot of fun adding 
 the functions in my TODO list, i will return my focus to JNTD, but i have a lot of cool features to add at JNTD, but even more add a2.c.
 
 # Releases!
-I lost the last 2 days just installing different Distros to make a release to most of them, but i lost a lot of time installing hyprland in debian and arch, lol.
-So we will 3 bulds for now.
+I will make releases every few days with minor changes, or when big changes are made, i will also make one. Can't say which plataforms it will be deployed. 
 
 # Multiplatform (again)?
 I'm now proudly using FREE BSD, and isn't really nothing special from other linux distros, even though it's not linux. Will use it for some time.
