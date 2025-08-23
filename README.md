@@ -30,9 +30,6 @@ Probably won't be my main OS, but knowing it was all made in C, give it's a spec
 I'm already doing it, and from now on i will add issues always i have a bug or something i need to fix, to improve terminal workflow, i'm using gh and git, because yet gh don't replace git for me.
 I will try to fix then in at max 2 weeks after created, or at least try and add updates about it.
 
-# Dependencies?
-Until this moment, i'm only using C, but not just default C libralys, so i will make a file to install dependecies on some systems, which are the one i know, and how to install.
-
 # Projects?
 JNTD is my main project for a while now, but i have other projects in mind, my favorite programming language is C, and that's clear, but, i would love somethings that are not native in C, i'm not a c developer,
 but i will make changes haha. I have other projects in mind, some of then i can add in JNTD, but other i can't, i will make then public once i feel they're good enough.
