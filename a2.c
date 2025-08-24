@@ -377,33 +377,6 @@ int main(int argc, char *argv[]) {
             }
             continue; 
         }
-            
-        if (ch == 27) {
-            // In INSERT mode, ESC always returns to NORMAL mode.
-            // In other modes, it can be a prefix for Alt+key sequences.
-            if (state->mode == INSERT) {
-                state->mode = NORMAL;
-            } else {
-                nodelay(stdscr, TRUE);
-                int next_ch = getch();
-                nodelay(stdscr, FALSE);
-
-                if (next_ch != ERR) {
-                    if (next_ch == 'z' || next_ch == 'Z') {
-                        do_undo(state);
-                    } else if (next_ch == 'y' || next_ch == 'Y') {
-                        do_redo(state);
-                    } else if (next_ch == 'f' || next_ch == 'w') {
-                        editor_move_to_next_word(state);
-                    } else if (next_ch == 'b' || next_ch == 'q') {
-                        editor_move_to_previous_word(state);
-                    } else if (next_ch == 'g' || next_ch == 'G') {
-                        prompt_for_directory_change(state);
-                    }
-                }
-            }
-            continue;
-        }
 
         switch (state->mode) {
             case NORMAL:
@@ -431,8 +404,8 @@ int main(int argc, char *argv[]) {
                         break;
                     case KEY_UP: {
                         if (state->word_wrap_enabled) {
-                            int r, cols;
-                            getmaxyx(stdscr, r, cols);
+                            int cols;
+                            getmaxyx(stdscr, *(int*)NULL, cols);
                             if (cols <= 0) break;
                             state->ideal_col = state->current_col % cols; 
                             
@@ -451,15 +424,15 @@ int main(int argc, char *argv[]) {
                     }
                     case KEY_DOWN: {
                         if (state->word_wrap_enabled) {
-                            int r, cols;
-                            getmaxyx(stdscr, r, cols);
+                            int cols;
+                            getmaxyx(stdscr, *(int*)NULL, cols);
                             if (cols <= 0) break;
                             state->ideal_col = state->current_col % cols;
 
                             char *line = state->lines[state->current_line];
                             int line_len = strlen(line);
 
-                            if (state->current_col + cols < line_len) {
+                            if ((size_t)state->current_col + cols < strlen(line)) {
                                 state->current_col += cols;
                             } else {
                                 if (state->current_line < state->num_lines - 1) {
@@ -483,7 +456,7 @@ int main(int argc, char *argv[]) {
                         break;
                     case KEY_RIGHT: {
                         char* line = state->lines[state->current_line];
-                        if (line && state->current_col < strlen(line)) {
+                        if (line && (size_t)state->current_col < strlen(line)) {
                             state->current_col++;
                             while (line[state->current_col] != '\0' && (line[state->current_col] & 0xC0) == 0x80) {
                                 state->current_col++;
@@ -536,7 +509,6 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    int last_line = state->current_line;
     free(state);
     return 0;
 }
@@ -1201,8 +1173,12 @@ void process_command(EditorState *state, bool *should_exit) {
         if (strlen(args) > 0) load_file(state, args);
         else snprintf(state->status_msg, sizeof(state->status_msg), "Usage: :open <filename>");
     } else if (strcmp(command, "new") == 0) {
-        for (int i = 0; i < state->num_lines; i++) { if(state->lines[i]) 
-        free(state->lines[i]); state->lines[i] = NULL; }
+        for (int i = 0; i < state->num_lines; i++) {
+		if(state->lines[i]) {
+			free(state->lines[i]);
+			state->lines[i] = NULL;
+		}
+	}
         state->num_lines = 1; state->lines[0] = calloc(1, 1); strcpy(state->filename, "[No Name]");
         state->current_line = 0; state->current_col = 0; state->ideal_col = 0; state->top_line = 0; state->left_col = 0;
         snprintf(state->status_msg, sizeof(state->status_msg), "New file opened.");
@@ -1431,7 +1407,7 @@ void editor_redraw(EditorState *state) {
                     int current_pos_in_segment = 0;
                     while(current_pos_in_segment < break_pos) {
                         int token_start_in_line = line_offset + current_pos_in_segment;
-                        if (line[token_start_in_line] == '#' || (line[token_start_in_line] == '/' && token_start_in_line + 1 < line_len && line[token_start_in_line + 1] == '/')) {
+                        if (line[token_start_in_line] == '#' || (line[token_start_in_line] == '/' && (size_t)token_start_in_line + 1 < strlen(line) && line[token_start_in_line + 1] == '/')) {
                             attron(COLOR_PAIR(6)); printw("%s", &line[token_start_in_line]); attroff(COLOR_PAIR(6)); break;
                         }
                         int token_start_in_segment = current_pos_in_segment;
@@ -1446,7 +1422,7 @@ void editor_redraw(EditorState *state) {
                             int color_pair = 0;
                             if (!strchr(delimiters, *token_ptr)) {
                                 for (int j = 0; j < state->num_syntax_rules; j++) {
-                                    if (strlen(state->syntax_rules[j].word) == token_len && strncmp(token_ptr, state->syntax_rules[j].word, token_len) == 0) {
+                                    if (strlen(state->syntax_rules[j].word) == (size_t)token_len && strncmp(token_ptr, state->syntax_rules[j].word, token_len) == 0) {
                                         switch(state->syntax_rules[j].type) {
                                             case SYNTAX_KEYWORD: color_pair = 3; break;
                                             case SYNTAX_TYPE: color_pair = 4; break;
@@ -1497,7 +1473,7 @@ void editor_redraw(EditorState *state) {
         mvprintw(rows - 1, 0, ":%s", state->command_buffer);
     } else {
         char mode_str[20];
-        switch (state->mode) { 
+        switch (state->mode) {
             case NORMAL: strcpy(mode_str, "-- NORMAL --"); break; 
             case INSERT: strcpy(mode_str, "-- INSERT --"); break;
             default: strcpy(mode_str, "--          --"); break;
@@ -1559,8 +1535,8 @@ void adjust_viewport(EditorState *state) {
 }
 
 void get_visual_pos(EditorState *state, int *visual_y, int *visual_x) {
-    int rows, cols;
-    getmaxyx(stdscr, rows, cols);
+    int cols;
+    getmaxyx(stdscr, *(int*)NULL, cols);
 
     int y = 0;
     int x = 0;
@@ -1575,7 +1551,7 @@ void get_visual_pos(EditorState *state, int *visual_y, int *visual_x) {
                 int line_offset = 0;
                 while(line_offset < line_len) {
                     int break_pos = (line_len - line_offset > cols) ? cols : line_len - line_offset;
-                     if (line_offset + break_pos < line_len) {
+                     if ((size_t)line_offset + break_pos < strlen(line)) {
                         int temp_break = -1;
                         for (int j = break_pos - 1; j >= 0; j--) {
                             if (isspace(line[line_offset + j])) { temp_break = j; break; }
@@ -1589,9 +1565,9 @@ void get_visual_pos(EditorState *state, int *visual_y, int *visual_x) {
         }
         
         int current_line_offset = 0;
-        while(current_line_offset + cols < state->current_col) {
+        while((size_t)current_line_offset + cols < (size_t)state->current_col) {
              int break_pos = cols;
-             if (current_line_offset + cols < strlen(state->lines[state->current_line])) {
+             if ((size_t)current_line_offset + cols < strlen(state->lines[state->current_line])) {
                 int temp_break = -1;
                 for (int j = cols - 1; j >= 0; j--) {
                     if (isspace(state->lines[state->current_line][current_line_offset + j])) { temp_break = j; break; }
@@ -1883,7 +1859,7 @@ void editor_insert_char(EditorState *state, wint_t ch) {
     int char_len = wctomb(multibyte_char, ch); if (char_len < 0) return;
     multibyte_char[char_len] = '\0';
 
-    if (line_len + char_len >= MAX_LINE_LEN - 1) return;
+    if ((size_t)line_len + char_len >= MAX_LINE_LEN - 1) return;
     char *new_line = realloc(line, line_len + char_len + 1); if (!new_line) return;
     state->lines[state->current_line] = new_line;
 
@@ -1994,7 +1970,7 @@ void editor_find(EditorState *state) {
             break;
         } else if (ch == KEY_BACKSPACE || ch == 127 || ch == 8) {
             if (query_pos > 0) query[--query_pos] = '\0';
-        } else if (iswprint(ch) && query_pos < sizeof(query) - 1) {
+        } else if (iswprint(ch) && (size_t)query_pos < sizeof(query) - 1) {
             query[query_pos++] = (char)ch;
             query[query_pos] = '\0';
         }
@@ -2048,7 +2024,7 @@ void editor_find_previous(EditorState *state) {
         char *last_match_in_line = NULL;
         char *match = strstr(line, state->last_search);
         while (match) {
-            if (current_line_idx == start_line && (match - line) >= start_col) {
+            if (current_line_idx == start_line && (size_t)(match - line) >= (size_t)start_col) {
                 break;
             }
             last_match_in_line = match;
@@ -2211,7 +2187,7 @@ void editor_start_completion(EditorState *state) {
              token != NULL;
              token = strtok_r(NULL, delimiters, &saveptr))
         {
-            if (strncmp(token, state->word_to_complete, len) == 0 && strlen(token) > len) {
+            if (strncmp(token, state->word_to_complete, len) == 0 && strlen(token) > (size_t)len) {
                 add_suggestion(state, token);
             }
         }
@@ -2345,7 +2321,7 @@ void editor_apply_completion(EditorState *state) {
         state->command_buffer[sizeof(state->command_buffer) - 1] = '\0';
         state->command_pos = strlen(state->command_buffer);
         if (strcmp(selected, "q") != 0 && strcmp(selected, "wq") != 0 && strcmp(selected, "new") != 0 && strcmp(selected, "help") != 0) {
-            if (state->command_pos < sizeof(state->command_buffer) - 2) {
+            if ((size_t)state->command_pos < sizeof(state->command_buffer) - 2) {
                 state->command_buffer[state->command_pos++] = ' ';
                 state->command_buffer[state->command_pos] = '\0';
             }
@@ -2465,8 +2441,8 @@ void handle_insert_mode_key(EditorState *state, wint_t ch) {
             break;
         case KEY_UP: {
     if (state->word_wrap_enabled) {
-        int r, cols;
-        getmaxyx(stdscr, r, cols);
+        int cols;
+        getmaxyx(stdscr, *(int*)NULL, cols);
         if (cols <= 0) break;
         state->ideal_col = state->current_col % cols; 
         
@@ -2485,15 +2461,15 @@ void handle_insert_mode_key(EditorState *state, wint_t ch) {
 }
 case KEY_DOWN: {
     if (state->word_wrap_enabled) {
-        int r, cols;
-        getmaxyx(stdscr, r, cols);
+        int cols;
+        getmaxyx(stdscr, *(int*)NULL, cols);
         if (cols <= 0) break;
         state->ideal_col = state->current_col % cols;
 
         char *line = state->lines[state->current_line];
         int line_len = strlen(line);
 
-        if (state->current_col + cols < line_len) {
+        if ((size_t)state->current_col + cols < strlen(line)) {
             state->current_col += cols;
         } else {
             if (state->current_line < state->num_lines - 1) {
@@ -2507,12 +2483,37 @@ case KEY_DOWN: {
     break;
 }
         case KEY_LEFT: if (state->current_col > 0) state->current_col--; state->ideal_col = state->current_col; break;
-        case KEY_RIGHT: { char* line = state->lines[state->current_line]; int line_len = line ? strlen(line) : 0; if (state->current_col < line_len) state->current_col++; state->ideal_col = state->current_col; } break;
+        case KEY_RIGHT: { char* line = state->lines[state->current_line]; int line_len = line ? strlen(line) : 0; if ((size_t)state->current_col < strlen(line)) state->current_col++; state->ideal_col = state->current_col; } break;
         case KEY_PPAGE: case KEY_SR: for (int i = 0; i < PAGE_JUMP; i++) if (state->current_line > 0) state->current_line--; state->current_col = state->ideal_col; break;
         case KEY_NPAGE: case KEY_SF: for (int i = 0; i < PAGE_JUMP; i++) if (state->current_line < state->num_lines - 1) state->current_line++; state->current_col = state->ideal_col; break;
         case KEY_HOME: state->current_col = 0; state->ideal_col = 0; break;
         case KEY_END: { char* line = state->lines[state->current_line]; if(line) state->current_col = strlen(line); state->ideal_col = state->current_col; } break;
         case KEY_SDC: editor_delete_line(state); break;
+        case 27: { // Tecla ESC
+            nodelay(stdscr, TRUE);
+            wint_t next_ch;
+            int ret = get_wch(&next_ch);
+            nodelay(stdscr, FALSE);
+
+            if (ret == ERR) {
+                // Se nenhum caractere seguir o ESC, volte ao modo NORMAL
+                state->mode = NORMAL;
+            } else {
+                // Caso contrário, trate como um atalho Alt+tecla
+                if (next_ch == 'z' || next_ch == 'Z') {
+                    do_undo(state);
+                } else if (next_ch == 'y' || next_ch == 'Y') {
+                    do_redo(state);
+                } else if (next_ch == 'f' || next_ch == 'w') {
+                    editor_move_to_next_word(state);
+                } else if (next_ch == 'b' || next_ch == 'q') {
+                    editor_move_to_previous_word(state);
+                } else if (next_ch == 'g' || next_ch == 'G') {
+                    prompt_for_directory_change(state);
+                }
+            }
+            break;
+        }
         default: if (iswprint(ch)) { editor_insert_char(state, ch); } break;
     }
 }
@@ -2529,7 +2530,7 @@ void handle_command_mode_key(EditorState *state, wint_t ch, bool *should_exit) {
             break;
 
         case KEY_LEFT: if (state->command_pos > 0) state->command_pos--; break;
-        case KEY_RIGHT: if (state->command_pos < strlen(state->command_buffer)) state->command_pos++; break;
+        case KEY_RIGHT: if ((size_t)state->command_pos < strlen(state->command_buffer)) state->command_pos++; break;
         case KEY_UP:
             if (state->history_pos > 0) {
                 state->history_pos--;
