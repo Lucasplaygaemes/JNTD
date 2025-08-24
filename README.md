@@ -22,10 +22,6 @@ the functions in my TODO list, i will return my focus to JNTD, but i have a lot 
 # Releases!
 I will make releases every few days with minor changes, or when big changes are made, i will also make one. Can't say which plataforms it will be deployed. 
 
-# Multiplatform (again)?
-I'm now proudly using FREE BSD, and isn't really nothing special from other linux distros, even though it's not linux. Will use it for some time.
-Probably won't be my main OS, but knowing it was all made in C, give it's a special place in my heart.
-
 # Issues!
 I'm already doing it, and from now on i will add issues always i have a bug or something i need to fix, to improve terminal workflow, i'm using gh and git, because yet gh don't replace git for me.
 I will try to fix then in at max 2 weeks after created, or at least try and add updates about it.
