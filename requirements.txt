@@ -1,0 +1,27 @@
+ncurses > 6.0.0
+bc 2.42 or equivalent
+curl/curl.h - libcurl 8.15.0 (released in July 2025) (libbcurl4-gnutls-dev)
+dirent.h - POSIX (glibc 2.42 or equivalent)
+dlfcn.h - POSIX (glibc 2.42 or equivalent; for Windows, see aside section)
+errno.h - C Standard (glibc 2.42 or equivalent)
+locale.h - C Standard (glibc 2.42 or equivalent)
+ncurses.h - ncurses 6.5 (with patch from August 2025)
+pthread.h - POSIX Threads (NPTL in glibc 2.42)
+stdbool.h - C99 (glibc 2.42 or equivalent)
+stdint.h - C99 (glibc 2.42 or equivalent)
+stdio.h - C Standard (glibc 2.42 or equivalent)
+stdlib.h - C Standard (glibc 2.42 or equivalent)
+string.h - C Standard (glibc 2.42 or equivalent)
+sys/stat.h - POSIX (glibc 2.42 or equivalent)
+sys/wait.h - POSIX (glibc 2.42 or equivalent)
+termios.h - POSIX (glibc 2.42 or equivalent)
+time.h - C Standard (glibc 2.42 or equivalent)
+unistd.h - POSIX (glibc 2.42 or equivalent)
+wchar.h - C99 (glibc 2.42 or equivalent)
+wctype.h - C99 (glibc 2.42 or equivalent)
+
+### Aside: Windows-Specific Dependencies
+These are separated as they are platform-specific to Windows environments (e.g., via MSVC or MinGW). They are not part of the core POSIX/C standard list above.
+direct.h - Windows Standard (part of MSVC or MinGW; use Windows SDK 10.0.26100)
+windows.h - Windows SDK 10.0.26100 (for Windows 11 24H2, released in 2025)
+dlfcn.h (Windows variant) - dlfcn-win32 1.4.2 (last updated in May 2025)
