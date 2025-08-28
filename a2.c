@@ -456,41 +456,20 @@ int main(int argc, char *argv[]) {
                     case KEY_CTRL_D: editor_find_next(state); break;
                     case KEY_CTRL_A: editor_find_previous(state); break;
                     case KEY_CTRL_G: display_directory_navigator(state); break;
-                    case KEY_UP: {
+                    case KEY_UP:
                         if (state->word_wrap_enabled) {
-                            int r, cols; getmaxyx(active_win, r, cols); if (cols <= 0) break;
-                            state->ideal_col = state->current_col % cols; 
-                            if (state->current_col >= cols) {
-                                state->current_col -= cols;
-                            } else {
-                                if (state->current_line > 0) {
-                                    state->current_line--;
-                                    state->current_col = strlen(state->lines[state->current_line]);
-                                }
+                            if (state->current_line > 0) {
+                                state->current_line--;
+                                state->current_col = state->ideal_col;
                             }
-                        } else {
-                            if (state->current_line > 0) state->current_line--;
+                            break;
                         }
-                        break;
-                    }
                     case KEY_DOWN: {
-                        if (state->word_wrap_enabled) {
-                            int r, cols; getmaxyx(active_win, r, cols); if (cols <= 0) break;
-                            state->ideal_col = state->current_col % cols;
-                            char *line = state->lines[state->current_line];
-                            int line_len = strlen(line);
-                            if (state->current_col + cols < line_len) {
-                                state->current_col += cols;
-                            } else {
-                                if (state->current_line < state->num_lines - 1) {
-                                    state->current_line++;
-                                    state->current_col = 0;
-                                }
-                            }
-                        } else {
-                            if (state->current_line < state->num_lines - 1) state->current_line++;
+                        if (state->current_line < state->num_lines - 1) {
+                            state->current_line++;
+                            state->current_col = state->ideal_col;
                         }
-                        break;
+                        break;                        
                     }
                     case KEY_LEFT:
                         if (state->current_col > 0) {
