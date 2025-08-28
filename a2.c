@@ -1654,7 +1654,12 @@ void editor_redraw(WINDOW *win, EditorState *state) {
             if (line_len == 0) {
                 if (visual_line_idx >= state->top_line) {
                     wmove(win, screen_y + border_offset, border_offset);
-                    wclrtoeol(win);
+                    int y, x;
+                    getyx(win, y, x);
+                    int end_col = cols - border_offset;
+                    for (int i = x; i < end_col; i++) {
+                        mvwaddch(win, y, i, ' ');
+                    }
                     screen_y++;
                 }
                 visual_line_idx++;
@@ -1736,10 +1741,14 @@ void editor_redraw(WINDOW *win, EditorState *state) {
                             if (color_pair) wattroff(win, COLOR_PAIR(color_pair));
                         }
                     }
-                    wclrtoeol(win);
+                    int y, x;
+                    getyx(win, y, x);
+                    int end_col = cols - border_offset;
+                    for (int i = x; i < end_col; i++) {
+                        mvwaddch(win, y, i, ' ');
+                    }
                     screen_y++;
                 }
-
                 visual_line_idx++;
                 line_offset += break_pos;
                 if (line_len == 0) break;
@@ -1801,14 +1810,22 @@ void editor_redraw(WINDOW *win, EditorState *state) {
 
                 current_col += token_len;
             }
-            wclrtoeol(win);
+            int y, x;
+            getyx(win, y, x);
+            int end_col = cols - border_offset;
+            for (int i = x; i < end_col; i++) {
+                mvwaddch(win, y, i, ' ');
+            }
             screen_y++;
         }
     }
 
-    wattron(win, COLOR_PAIR(1)); 
-    wmove(win, rows - 1, 0); 
-    wclrtoeol(win);
+    wattron(win, COLOR_PAIR(1));
+    
+    for (int i = 1; i < cols - 1; i++) {
+        mvwaddch(win, rows - 1, i, ' ');
+    }
+    
     if (state->mode == COMMAND) {
         mvwprintw(win, rows - 1, 1, ":%.*s", cols-2, state->command_buffer);
     } else {
