@@ -1903,8 +1903,8 @@ void get_visual_pos(WINDOW *win, EditorState *state, int *visual_y, int *visual_
             current_line_offset += break_pos;
             y++;
         }
-        x = state->current_col - current_line_offset;
-
+        x = get_visual_col(state->lines[state->current_line] + current_line_offset, state->current_col - current_line_offset);
+        
     } else {
         y = state->current_line;
         x = get_visual_col(state->lines[state->current_line], state->current_col);
@@ -1916,12 +1916,27 @@ void get_visual_pos(WINDOW *win, EditorState *state, int *visual_y, int *visual_
 int get_visual_col(const char *line, int byte_col) {
     if (!line) return 0;
     int visual_col = 0;
-    for (int i = 0; i < byte_col; i++) {
-        if (((unsigned char)line[i] & 0xC0) != 0x80) {
-            visual_col++;
-        }
-    }
-    return visual_col;
+    int i = 0;
+    while (i < byte_col) {
+        if (line[i] == '\t') {
+            visual_col += TAB_SIZE - (visual_col % TAB_SIZE);
+            i++;
+        } else {
+            wchar_t wc;
+            int bytes_consumed = mbtowc(&wc, &line[i], MB_CUR_MAX);
+            
+            if (bytes_consumed <= 0) {
+                visual_col++;
+                i++;
+            } else {
+                int char_width = wcwidth(wc);
+                
+                visual_col += (char_width > 0) ? char_width : 1;
+                i += bytes_consumed;
+            }
+       }
+   }
+   return visual_col;
 }
 
 void display_help_screen() {
@@ -2237,40 +2252,69 @@ void editor_move_to_previous_word(EditorState *state) {
 // ===================================================================
 
 void editor_find(EditorState *state) {
-    char query[100] = {0};
-    int query_pos = 0;
-    int original_line = state->current_line, original_col = state->current_col;
-    WINDOW *win = gerenciador.janelas[gerenciador.janela_ativa_idx]->win;
-
+    JanelaEditor *active_jw = gerenciador.janelas[gerenciador.janela_ativa_idx];
+    WINDOW *win = active_jw->win;
+    int rows, cols;
+    getmaxyx(win, rows, cols);
+    
+    char search_term[100];
+    snprintf(state->command_buffer, sizeof(state->command_buffer), "/");
+    state->command_pos = 1;
+    
+    
     while (1) {
-        snprintf(state->status_msg, sizeof(state->status_msg), "Buscar: %s", query);
+        snprintf(state->status_msg, sizeof(state->status_msg), "Search: %s", state->command_buffer + 1);
         editor_redraw(win, state);
-
+        
         wint_t ch;
         wget_wch(win, &ch);
-
-        if (ch == 27) { 
-            state->status_msg[0] = '\0';
-            state->current_line = original_line;
-            state->current_col = original_col;
-            return;
-        } else if (ch == KEY_ENTER || ch == '\n') {
-            if (query_pos > 0) {
-                strncpy(state->last_search, query, sizeof(state->last_search) - 1);
-                state->last_search[sizeof(state->last_search) - 1] = '\0';
-            } else {
-                state->status_msg[0] = '\0';
-                return;
-            }
+                
+        if (ch == KEY_ENTER || '\n') {
+            strncpy(search_term, state->command_buffer + 1, sizeof(search_term - 1));
+            search_term[sizeof(search_term) - 1] = '\0';
             break;
-        } else if (ch == KEY_BACKSPACE || ch == 127 || ch == 8) {
-            if (query_pos > 0) query[--query_pos] = '\0';
-        } else if (iswprint(ch) && query_pos < sizeof(query) - 1) {
-            query[query_pos++] = (char)ch;
-            query[query_pos] = '\0';
+        } else if (ch == 27) {
+            search_term[0] = '\0';
+            break;
+        } else if (ch == KEY_BACKSPACE || ch == 27 || ch == 8) {
+            if (state->command_pos > 1) {
+                state->command_pos--;
+                state->command_buffer[state->command_pos] = '\0';
+            }
+        } else if (isprint(ch) && state->command_pos < sizeof(state->command_buffer) - 1) {
+            state->command_buffer[state->command_pos++] = ch;
+            state->command_buffer[state->command_pos] = '\0';
         }
+        
     }
-    editor_find_next(state);
+    
+    state->status_msg[0] = '\0';
+    state->command_buffer[0] = '\0';
+    redesenhar_todas_as_janelas();
+    
+    if (strlen(search_term) == 0) {
+        return;
+    }
+    
+    strncpy(state->last_search, search_term, sizeof(state->last_search) - 1);
+    state->last_match_line = state->current_line;
+    state->last_match_col = state->current_col;
+    
+    for (int i = 0; i < state->num_lines; i++) {
+        int line_num = (state->current_line + i + 1) % state->num_lines;
+        char *line = state->lines[line_num];
+        char *match = strstr(line, search_term);
+        if (match) {
+            state->current_line = line_num;
+            state->current_col = match - line;
+            state->ideal_col = state->current_col;
+            snprintf(state->status_msg, sizeof(state->status_msg), "Find in %d:%d", state->current_line + 1, state->current_col + 1);
+            return;
+       }
+       
+    }
+    snprintf(state->status_msg, sizeof(state->status_msg), "Word wasn't found: %s", search_term);
+
 }
 
 void editor_find_next(EditorState *state) {
