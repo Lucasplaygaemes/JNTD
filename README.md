@@ -56,4 +56,4 @@ So i will add a new file, Features, and the name again is selfexplanatory. When 
 There is a calculator, it's not a scientific calculator but neither a common one, it's between the line, a friend of mine will help me improve it futurely.
 
 # Languages?
-As you may noticed, all the README is in english, the commits are in english and Portuguese, and the functions are in portuguese as well. And i need to decide in which one i will make the whole code, so there is the folder en, where is the code with everything in english and explanations as well. The code will have 4 default languages, Brazilian Portuguese, English, Japanese, and maybe Spanish.
+The code is being constantly updated, and for me translate every little change every times isn't good or convinent, so i will probably delete the languages folder, and make a file to explain and documented all changes between relases.
