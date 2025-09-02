@@ -982,23 +982,18 @@ void editor_reload_file(EditorState *state) {
         return;
     }
     
-    WINDOW *win = gerenciador.janelas[gerenciador.janela_ativa_idx]->win;
     time_t on_disk_mod_time = get_file_mod_time(state->filename);
-
+    
     if (state->buffer_modified && on_disk_mod_time != 0 && on_disk_mod_time != state->last_file_mod_time) {
-        snprintf(state->status_msg, sizeof(state->status_msg), "Warning: File on disk has changed! (S)ave, (L)oad, or (C)ancel?");
-        editor_redraw(win, state);
-        wint_t ch;
-        wget_wch(win, &ch);
-        switch (tolower(ch)) {
-            case 's': save_file(state); break;
-            case 'l': load_file(state, state->filename); break;
-            case 'c': default: snprintf(state->status_msg, sizeof(state->status_msg), "Reload cancelled."); break;
-        }
-    } else {
-        load_file(state, state->filename);
-        snprintf(state->status_msg, sizeof(state->status_msg), "File reloaded.");
+        // Usar mensagem de status em vez de diálogo interativo
+        snprintf(state->status_msg, sizeof(state->status_msg), 
+                 "Warning: File changed on disk! Use :rc! to force reload.");
+        return;
     }
+    
+    // Recarregar o arquivo normalmente
+    load_file(state, state->filename);
+    snprintf(state->status_msg, sizeof(state->status_msg), "File reloaded.");
 }
 
 void load_syntax_file(EditorState *state, const char *filename) {
@@ -1068,33 +1063,62 @@ int load_last_line(const char *filename) {
 // 3. File Recovery
 // ===================================================================
 
-FileRecoveryChoice display_recovery_prompt(WINDOW *win, EditorState *state) {
-    snprintf(state->status_msg, sizeof(state->status_msg),
-             "Recovering: (R)ecover .sv | (O)riginal | (D)iff | (I)gnore | (Q)uit");
-    editor_redraw(win, state);
-
-    while (1) {
+FileRecoveryChoice display_recovery_prompt(WINDOW *parent_win, EditorState *state) {
+    int rows, cols;
+    getmaxyx(parent_win, rows, cols);
+    
+    // Criar uma janela de diálogo
+    int win_height = 7;
+    int win_width = 50;
+    int start_y = (rows - win_height) / 2;
+    int start_x = (cols - win_width) / 2;
+    
+    WINDOW *dialog_win = newwin(win_height, win_width, start_y, start_x);
+    keypad(dialog_win, TRUE);
+    wbkgd(dialog_win, COLOR_PAIR(9));
+    box(dialog_win, 0, 0);
+    
+    // Exibir mensagem
+    mvwprintw(dialog_win, 1, 2, "Arquivo de recuperação encontrado!");
+    mvwprintw(dialog_win, 2, 2, "Escolha uma opção:");
+    mvwprintw(dialog_win, 3, 4, "(R)ecover from .sv");
+    mvwprintw(dialog_win, 4, 4, "(O)pen original");
+    mvwprintw(dialog_win, 5, 4, "(D)iff files");
+    mvwprintw(dialog_win, 6, 4, "(I)gnore | (Q)uit");
+    
+    wrefresh(dialog_win);
+    
+    FileRecoveryChoice choice = RECOVER_ABORT;
+    bool decided = false;
+    
+    while (!decided) {
         wint_t ch;
-        wget_wch(win, &ch);
+        wget_wch(dialog_win, &ch);
         ch = tolower(ch);
+        
         switch (ch) {
-            case 'r': return RECOVER_FROM_SV;
-            case 'o': return RECOVER_OPEN_ORIGINAL;
-            case 'd': return RECOVER_DIFF;
-            case 'i': return RECOVER_IGNORE;
-            case 27: case 'q': return RECOVER_ABORT;
+            case 'r': choice = RECOVER_FROM_SV; decided = true; break;
+            case 'o': choice = RECOVER_OPEN_ORIGINAL; decided = true; break;
+            case 'd': choice = RECOVER_DIFF; decided = true; break;
+            case 'i': choice = RECOVER_IGNORE; decided = true; break;
+            case 'q': case 27: choice = RECOVER_ABORT; decided = true; break;
         }
     }
+    
+    delwin(dialog_win);
+    return choice;
 }
 
 void handle_file_recovery(EditorState *state, const char *original_filename, const char *sv_filename) {
     WINDOW *win = gerenciador.janelas[gerenciador.janela_ativa_idx]->win;
+    
     while (1) {
         FileRecoveryChoice choice = display_recovery_prompt(win, state);
+        
         switch (choice) {
             case RECOVER_DIFF: {
                 char diff_command[1024];
-                snprintf(diff_command, sizeof(diff_command), "git diff %s %s", original_filename, sv_filename);
+                snprintf(diff_command, sizeof(diff_command), "git diff --no-index -- %s %s", original_filename, sv_filename);
                 run_and_display_command(diff_command, "--- DIFERENÇAS ---");
                 break; 
             }
@@ -1427,6 +1451,13 @@ void process_command(EditorState *state, bool *should_exit) {
         compile_file(state, args);
     } else if (strcmp(command, "rc") == 0) {
         editor_reload_file(state);
+    } else if (strcmp(command, "rc!") == 0) {
+        if (strcmp(state->filename, "[No Name]") == 0) {
+            snprintf(state->status_msg, sizeof(state->status_msg), "No file name to reload.");
+    } else {
+            load_file(state, state->filename);
+            snprintf(state->status_msg, sizeof(state->status_msg), "File reloaded (force).");
+        }
     } else if (strcmp(command, "open") == 0) {
         if (strlen(args) > 0) load_file(state, args);
         else snprintf(state->status_msg, sizeof(state->status_msg), "Usage: :open <filename>");
@@ -1799,7 +1830,13 @@ void editor_redraw(WINDOW *win, EditorState *state) {
         }
     }
 
-    wattron(win, COLOR_PAIR(1));
+    int color_pair = 1; // Padrão: azul
+    if (strstr(state->status_msg, "Warning:") != NULL || 
+        strstr(state->status_msg, "Error:") != NULL) {
+        color_pair = 3; // Amarelo para avisos
+    }
+    
+    wattron(win, COLOR_PAIR(color_pair));
     
     for (int i = 1; i < cols - 1; i++) {
         mvwaddch(win, rows - 1, i, ' ');
@@ -1826,7 +1863,7 @@ void editor_redraw(WINDOW *win, EditorState *state) {
 
         mvwprintw(win, rows - 1, 1, "%.*s", cols - 2, final_bar);
     }
-    wattroff(win, COLOR_PAIR(1)); 
+    wattroff(win, COLOR_PAIR(color_pair)); 
 }
 
 void adjust_viewport(WINDOW *win, EditorState *state) {
