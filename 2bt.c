@@ -8,13 +8,14 @@
 #include <unistd.h>
 #include <dirent.h>
 #include <dlfcn.h>
-#include "plugin.h"
 #include <curl/curl.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <termios.h> 
 #include <ctype.h>
+#include <openssl/sha.h>
 #include "plugins/plugin_todo.c"
+#include "plugin.h"
 
 #ifdef _WIN32
 #include <windows.h> // Para Sleep()
@@ -39,13 +40,6 @@
 //define o tamanho maximo do input do usario + extras como calc
 #define COMBINED_PROMPT_LEN 2048 // Já estava adequado, mas mantido para clareza
 
-#define MAX_ALIASES 128
-#define MAX_PROMPT_LEN 256
-#define MAX_OLLAMA_CMD_LEN 4096
-#define OLLAMA_BUFFER_SIZE 1024
-#define OLLAMA_MODEL "llama2"
-#define MAX_HISTORY 50
-#define COMBINED_PROMPT_LEN 2048
 char input_copy[1024];
 char dir_novo[100];
 char *path[100];
@@ -137,7 +131,8 @@ static const CmdEntry cmds[] = {
     { "download", NULL, "Uma função de download, <use com download, depois irá pedir o nome do arquivo.>" },
     { "buscar", NULL, "Uma função para buscar coisas pelo JNTD." },
     { "elinks", "elinks", "Elinks é um código que te permite fazer pesquisas na internet sem sair do terminal. Todos os direitos vão para o criador." },
-    { "awrit", "awrit", "Awrit é um codigo que te permite usar o Chorimium pelo TERMINAL! Isso, sem que você saia dele, Todos os direitos vão para o craidor," }
+    { "awrit", "awrit", "Awrit é um codigo que te permite usar o Chorimium pelo TERMINAL! Isso, sem que você saia dele, Todos os direitos vão para o craidor," },
+    { "hash", NULL, "Verifica ou gera hashes SHA-256 para arquivos." }
 };
 
 // Declaração antecipada das funções
@@ -160,6 +155,7 @@ void *quiz_timer_background(void *arg);
 void load_plugins();
 void execute_plugin(const char* name, const char* args);
 void save_aliases_to_file();
+void handle_hash_command();
 
 //implementação dos plugins, sempre antes do dispatch//
 void load_plugins() {
@@ -313,7 +309,11 @@ static size_t write_data(void *ptr, size_t size, size_t nmemb, void *stream) {
 
 	status->dl_total += written;
 
-	printf("\r%ld KB     ", status->dl_total);
+    // Converte o total de bytes para megabytes
+    double mb_total = (double)status->dl_total / (1024.0 * 1024.0);
+
+    // Imprime o progresso formatado em MB, usando  para atualizar a linha
+	printf("\rDownload: %.2f MB        ", mb_total);
 	fflush(stdout);
 	return written;
 
@@ -344,12 +344,13 @@ bool download_file(char *url, char *filename) {
 	status.dl_total = 0;
 	status.fp = pagefile;
 	
-	curl_easy_setopt(curl_handle, CURLOPT_WRITEDATA, &status);
+curl_easy_setopt(curl_handle, CURLOPT_WRITEDATA, &status);
 	
 	for (int i = 0; i < 5; i++) {
-		if (curl_easy_perform(curl_handle)) {
+		CURLcode res = curl_easy_perform(curl_handle);
+		if (res != CURLE_OK) {
 			sucess = false;
-			printf("Falha na tentativa %d\n", i + 1);
+			fprintf(stderr, "Falha na tentativa %d: %s\n", i + 1, curl_easy_strerror(res));
 		} else {
 			sucess = true;
 		}
@@ -837,7 +838,6 @@ void search_google(const char *query) {
         if (encoded_query) {
             char url[1024];
             char command[2048];
-
             // Monta a URL do Google
             snprintf(url, sizeof(url), "https://www.google.com/search?q=%s", encoded_query);
             
@@ -987,6 +987,99 @@ void enable_raw_mode() {
     tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
 }
 
+int calculate_sha256(const char *filepath, char *output_hex_string) {
+    FILE *file = fopen(filepath, "rb");
+    if (!file) {
+        perror("Erro ao abrir arquivo");
+        return -1;
+    }
+    unsigned char hash[SHA256_DIGEST_LENGTH];
+    SHA256_CTX sha256_context;
+    SHA256_Init(&sha256_context);
+    
+    const int bufSize = 4096;
+    unsigned char buffer[bufSize];
+    size_t bytesRead = 0;
+    
+    while ((bytesRead = fread(buffer, 1, bufSize, file))) {
+        SHA256_Update(&sha256_context, buffer, bytesRead);
+    }
+    
+    SHA256_Final(hash, &sha256_context);
+    fclose(file);
+    
+    for (int i = 0; i < SHA256_DIGEST_LENGTH; i++) {
+        sprintf(output_hex_string + (i * 2), "%02x", hash[i]);
+    }
+    output_hex_string[64] = 0;
+    
+    return 0;
+}
+
+void handle_hash_command() {
+    char choice_str[5];
+    int choice;
+
+    disable_raw_mode(); // Desativa o modo raw para entrada padrão
+
+    printf("\n--- Verificador De Hash SHA-256 ---\n");
+    printf("1. Gerar hash de um arquivo\n");
+    printf("2. Comparar arquivo com hash colado\n");
+    printf("3. Sair\n");
+    printf("Escolha uma opção: ");
+
+    if (fgets(choice_str, sizeof(choice_str), stdin) == NULL) {
+        enable_raw_mode(); // Reativa em caso de erro
+        return;
+    }
+    choice = atoi(choice_str);
+
+    char filepath[256];
+    char hash_to_compare[129];
+    char calculated_hash[65];
+
+    switch (choice) {
+        case 1:
+            printf("Digite o caminho do arquivo para gerar hash: ");
+            fgets(filepath, sizeof(filepath), stdin);
+            filepath[strcspn(filepath, "\n")] = 0;
+            if (calculate_sha256(filepath, calculated_hash) == 0) {
+                printf("\nHash-256 Gerado:\n%s\n", calculated_hash);
+            }
+            break;
+
+        case 2:
+            printf("Cole o hash-256 para comparar: ");
+            if (fgets(hash_to_compare, sizeof(hash_to_compare), stdin) == NULL) break;
+            hash_to_compare[strcspn(hash_to_compare, "\n")] = 0;
+
+            printf("Digite o caminho do arquivo para verificar: ");
+            if (fgets(filepath, sizeof(filepath), stdin) == NULL) break;
+            filepath[strcspn(filepath, "\n")] = 0;
+
+            if (calculate_sha256(filepath, calculated_hash) == 0) {
+                printf("\nHash calculado: %s\n", calculated_hash);
+                printf("Hash esperado:  %s\n", hash_to_compare);
+                if (strncmp(calculated_hash, hash_to_compare, 64) == 0) {
+                    printf("\n>>> RESULTADO: Os hashes COINCIDEM!!!\n");
+                } else {
+                    printf("\n>>> RESULTADO: Os hashes NÃO COINCIDEM!!!\n");
+                }
+            }
+            break;
+
+        case 3:
+            printf("Saindo do modo hash...\n");
+            break;
+
+        default:
+            printf("Opção inválida.\n");
+            break;
+    }
+
+    enable_raw_mode(); // Reativa o modo raw antes de voltar ao shell
+}
+
 int read_command_line(char *buf, int size) {
     int pos = 0; 
     int len = 0; 
@@ -1015,7 +1108,7 @@ int read_command_line(char *buf, int size) {
                 }
                 fflush(stdout);
             }
-        } else if (c == '\x1b') { // Sequência de escape (setas)
+        } else if (c == '\x1b') { // Sequência de escape (setas) 
             int next1 = getchar();
             int next2 = getchar();
 
@@ -1187,16 +1280,40 @@ void dispatch(const char *user_in) {
 		        }
 	        } else if (strcasecmp(cmds[i]. key, "cp_di") == 0) {
 		        copy_f_t();
+            } else if (strcasecmp(cmds[i].key, "hash") == 0) {
+                handle_hash_command();
 	        } else if (strcasecmp(cmds[i].key, "download") == 0) {
 		        char url[512];
 		        char nome[32];
-		        printf("Qual arquivo será baixado?. (use download url nome).\n");
-		        printf("A url: \n");
-		        scanf("%s", url);
-		        printf("O nome: \n");		
-                        scanf("%s", nome);
-		        bool dl = download_file(url, nome);
-		        printf("Primeiro download terminou com status: %d\n", dl);
+
+                disable_raw_mode();
+
+		        printf("Qual a URL do arquivo a ser baixado?\n");
+		        printf("URL: ");
+		        if (fgets(url, sizeof(url), stdin) == NULL) {
+                    printf("Erro ou entrada cancelada.\n");
+                    enable_raw_mode();
+                    return;
+                }
+                url[strcspn(url, "\n")] = '\0';
+
+		        printf("Qual nome dar ao arquivo?\n");
+		        printf("Nome: ");
+                if (fgets(nome, sizeof(nome), stdin) == NULL) {
+                    printf("Erro ou entrada cancelada.\n");
+                    enable_raw_mode();
+                    return;
+                }
+                nome[strcspn(nome, "\n")] = '\0';
+
+                enable_raw_mode();
+                if (strlen(url) > 0 && strlen(nome) > 0) {
+                    printf("Baixando de '%s' para '%s'...", url, nome);
+		    bool dl = download_file(url, nome);
+		    printf("Download terminou com status: %d\n", dl);
+                } else {
+                    printf("URL ou nome do arquivo inválido.\n");
+                }
 	        } else if (cmds[i].shell_command != NULL) {
                         system(cmds[i].shell_command);
             }
@@ -1211,6 +1328,8 @@ void dispatch(const char *user_in) {
 }
 
 int main(void) {
+    curl_global_init(CURL_GLOBAL_ALL);
+
     printf("Iniciando o JNTD...\n");
     printf("Bem vindo/a\n");
     printf("Checado TODOs\n");
@@ -1249,5 +1368,7 @@ int main(void) {
 
     disable_raw_mode();
     printf("\nSaindo....\n");
+
+    curl_global_cleanup();
     return 0;
 }
