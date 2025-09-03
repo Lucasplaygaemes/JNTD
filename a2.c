@@ -660,12 +660,24 @@ void posicionar_cursor_ativo() {
         } else {
             int visual_y, visual_x;
             get_visual_pos(win, state, &visual_y, &visual_x);
+            
+            // Account for window borders correctly
             int border_offset = gerenciador.num_janelas > 1 ? 1 : 0;
-            wmove(win, visual_y - state->top_line + border_offset, visual_x - state->left_col + border_offset);
+            int screen_y = visual_y - state->top_line + border_offset;
+            int screen_x = visual_x - state->left_col + border_offset;
+            
+            // Ensure cursor stays within window bounds
+            int max_y, max_x;
+            getmaxyx(win, max_y, max_x);
+            if (screen_y >= max_y) screen_y = max_y - 1;
+            if (screen_x >= max_x) screen_x = max_x - 1;
+            if (screen_y < border_offset) screen_y = border_offset;
+            if (screen_x < border_offset) screen_x = border_offset;
+            
+            wmove(win, screen_y, screen_x);
         }
     }
 }
-
 void fechar_janela_ativa(bool *should_exit) {
     if (gerenciador.num_janelas == 0) return;
 
@@ -1866,13 +1878,18 @@ void editor_redraw(WINDOW *win, EditorState *state) {
     wattroff(win, COLOR_PAIR(color_pair)); 
 }
 
+
 void adjust_viewport(WINDOW *win, EditorState *state) {
-    int rows, cols; getmaxyx(win, rows, cols); 
+    int rows, cols;
+    getmaxyx(win, rows, cols);
     
+    // Account for window borders
+    int border_offset = gerenciador.num_janelas > 1 ? 1 : 0;
+    int content_height = rows - border_offset - 1; // Subtract status line
+    int content_width = cols - 2 * border_offset;
+
     int visual_y, visual_x;
     get_visual_pos(win, state, &visual_y, &visual_x);
-
-    int content_height = rows - (gerenciador.num_janelas > 1 ? 2 : 1);
 
     if (state->word_wrap_enabled) {
         if (visual_y < state->top_line) {
@@ -1891,15 +1908,19 @@ void adjust_viewport(WINDOW *win, EditorState *state) {
         if (visual_x < state->left_col) {
             state->left_col = visual_x;
         }
-        if (visual_x >= state->left_col + cols) {
-            state->left_col = visual_x - cols + 1;
+        if (visual_x >= state->left_col + content_width) {
+            state->left_col = visual_x - content_width + 1;
         }
     }
 }
 
 void get_visual_pos(WINDOW *win, EditorState *state, int *visual_y, int *visual_x) {
-    int rows, cols; getmaxyx(win, rows, cols);
-    int content_width = cols - (gerenciador.num_janelas > 1 ? 2 : 0);
+    int rows, cols;
+    getmaxyx(win, rows, cols);
+    
+    // Account for window borders in multi-window mode
+    int border_offset = gerenciador.num_janelas > 1 ? 1 : 0;
+    int content_width = cols - 2 * border_offset;
 
     int y = 0;
     int x = 0;
@@ -1914,10 +1935,13 @@ void get_visual_pos(WINDOW *win, EditorState *state, int *visual_y, int *visual_
                 int line_offset = 0;
                 while(line_offset < line_len) {
                     int break_pos = (line_len - line_offset > content_width) ? content_width : line_len - line_offset;
-                     if (line_offset + break_pos < line_len) {
+                    if (line_offset + break_pos < line_len) {
                         int temp_break = -1;
                         for (int j = break_pos - 1; j >= 0; j--) {
-                            if (isspace(line[line_offset + j])) { temp_break = j; break; }
+                            if (isspace(line[line_offset + j])) {
+                                temp_break = j;
+                                break;
+                            }
                         }
                         if (temp_break != -1) break_pos = temp_break + 1;
                     }
@@ -1929,19 +1953,22 @@ void get_visual_pos(WINDOW *win, EditorState *state, int *visual_y, int *visual_
         
         int current_line_offset = 0;
         while(current_line_offset + content_width < state->current_col) {
-             int break_pos = content_width;
-             if (current_line_offset + content_width < strlen(state->lines[state->current_line])) {
+            int break_pos = content_width;
+            if (current_line_offset + content_width < strlen(state->lines[state->current_line])) {
                 int temp_break = -1;
                 for (int j = content_width - 1; j >= 0; j--) {
-                    if (isspace(state->lines[state->current_line][current_line_offset + j])) { temp_break = j; break; }
+                    if (isspace(state->lines[state->current_line][current_line_offset + j])) {
+                        temp_break = j;
+                        break;
+                    }
                 }
                 if (temp_break != -1) break_pos = temp_break + 1;
             }
             current_line_offset += break_pos;
             y++;
         }
-        x = get_visual_col(state->lines[state->current_line] + current_line_offset, state->current_col - current_line_offset);
-        
+        x = get_visual_col(state->lines[state->current_line] + current_line_offset, 
+                          state->current_col - current_line_offset);
     } else {
         y = state->current_line;
         x = get_visual_col(state->lines[state->current_line], state->current_col);
@@ -2288,6 +2315,7 @@ void editor_move_to_previous_word(EditorState *state) {
 // 9. Search
 // ===================================================================
 
+
 void editor_find(EditorState *state) {
     JanelaEditor *active_jw = gerenciador.janelas[gerenciador.janela_ativa_idx];
     WINDOW *win = active_jw->win;
@@ -2298,31 +2326,31 @@ void editor_find(EditorState *state) {
     snprintf(state->command_buffer, sizeof(state->command_buffer), "/");
     state->command_pos = 1;
     
-    
     while (1) {
         snprintf(state->status_msg, sizeof(state->status_msg), "Search: %s", state->command_buffer + 1);
         editor_redraw(win, state);
+        wrefresh(win);
         
         wint_t ch;
         wget_wch(win, &ch);
-                
-        if (ch == KEY_ENTER || '\n') {
-            strncpy(search_term, state->command_buffer + 1, sizeof(search_term - 1));
+        
+        if (ch == KEY_ENTER || ch == '\n') {
+            strncpy(search_term, state->command_buffer + 1, sizeof(search_term) - 1);
             search_term[sizeof(search_term) - 1] = '\0';
             break;
         } else if (ch == 27) {
             search_term[0] = '\0';
             break;
-        } else if (ch == KEY_BACKSPACE || ch == 27 || ch == 8) {
+        } else if (ch == KEY_BACKSPACE || ch == 127 || ch == 8) {
             if (state->command_pos > 1) {
                 state->command_pos--;
                 state->command_buffer[state->command_pos] = '\0';
             }
-        } else if (isprint(ch) && state->command_pos < sizeof(state->command_buffer) - 1) {
-            state->command_buffer[state->command_pos++] = ch;
+        } else if (isprint(ch) && state->command_pos < (int)sizeof(state->command_buffer) - 1) {
+            state->command_buffer[state->command_pos] = (char)ch;
+            state->command_pos++;
             state->command_buffer[state->command_pos] = '\0';
         }
-        
     }
     
     state->status_msg[0] = '\0';
@@ -2337,21 +2365,36 @@ void editor_find(EditorState *state) {
     state->last_match_line = state->current_line;
     state->last_match_col = state->current_col;
     
+    // Search from current position forward
+    int start_line = state->current_line;
+    int start_col = state->current_col + 1;
+    
     for (int i = 0; i < state->num_lines; i++) {
-        int line_num = (state->current_line + i + 1) % state->num_lines;
+        int line_num = (start_line + i) % state->num_lines;
         char *line = state->lines[line_num];
-        char *match = strstr(line, search_term);
+        
+        // For the starting line, search from start_col, for others from beginning
+        char *match = (i == 0) ? strstr(line + start_col, search_term) : strstr(line, search_term);
+        
         if (match) {
             state->current_line = line_num;
             state->current_col = match - line;
             state->ideal_col = state->current_col;
-            snprintf(state->status_msg, sizeof(state->status_msg), "Find in %d:%d", state->current_line + 1, state->current_col + 1);
+            
+            // Ensure viewport is adjusted to show the found text
+            adjust_viewport(win, state);
+            
+            snprintf(state->status_msg, sizeof(state->status_msg),
+                    "Found at line %d, col %d", state->current_line + 1, state->current_col + 1);
             return;
-       }
-       
+        }
+        
+        // Reset start_col for subsequent lines
+        start_col = 0;
     }
-    snprintf(state->status_msg, sizeof(state->status_msg), "Word wasn't found: %s", search_term);
-
+    
+    snprintf(state->status_msg, sizeof(state->status_msg),
+            "Pattern not found: %s", search_term);
 }
 
 void editor_find_next(EditorState *state) {
