@@ -92,6 +92,7 @@ void criar_nova_janela(const char *filename) {
     if (getcwd(initial_cwd, sizeof(initial_cwd)) != NULL) {
         update_directory_access(state, initial_cwd);
     }
+
     load_syntax_file(state, "syntaxes/c.syntax");
 
     gerenciador.janelas[gerenciador.num_janelas - 1] = nova_janela;

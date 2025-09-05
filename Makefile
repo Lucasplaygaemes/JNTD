@@ -1,7 +1,7 @@
 # Compiler and flags
 CC = gcc
-CFLAGS = -Wall -Wextra -g -Iinclude # Good warnings, debug symbols, and include path
-LDFLAGS = -lcurl -lpthread -ldl -lncursesw # Libraries to link
+CFLAGS = -Wall -Wextra -g -I. -Iinclude # Good warnings, debug symbols, and include path
+LDFLAGS = -lcurl -lpthread -ldl -lncursesw -lssl -lcrypto # Libraries to link
 
 # Plugin compilation flags
 PLUGIN_CFLAGS = -fPIC -shared
@@ -21,8 +21,11 @@ all: $(TARGETS) $(PLUGIN_TARGETS)
 2bt: 2bt.c
 	$(CC) $(CFLAGS) -o 2bt 2bt.c $(LDFLAGS)
 
-a2: a2.c timer.c
-	$(CC) $(CFLAGS) -o a2 a2.c timer.c $(LDFLAGS)
+# Source files for the a2 editor
+A2_SRCS = a2.c timer.c
+
+a2: $(A2_SRCS)
+	$(CC) $(CFLAGS) -o a2 $(A2_SRCS) $(LDFLAGS)
 
 # A pattern rule to build any .so plugin from its .c source file
 # $@ is the target file (e.g., plugins/todo.so)
