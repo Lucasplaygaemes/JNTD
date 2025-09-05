@@ -10,6 +10,9 @@ There's no such thing as "right way to use". Because you can automate things whe
 The code access the Ollama via bash, the 2B it's trained to know how and what to respond when it's questioned within the terminal, it's has been trained in a personalized dataset, that's has previous commands and interactions between she and the user and the terminal. Ex: make an .txt file that has the firts 50 firts numbers from fibonacci sequence, and it's done.
 I want in the next updates make she possible to make complex interactions with the terminal, and codes, she may be possible to execute codes, and test them by herself, so she will have the possibility to know, where, why, and how a bug it's happening, she will also be able to search for directorys that may have a bug, when something is missing.
 
+# Refactoring!
+In the same way i made a refactor with the 2bt.c, i will also made with the a2.c it will be a "long" update, it will probably take from 3 to 7 days. If it's take more, it is what it is.
+
 # A2!
 What's A2 you might ask? It's my own file editor. The VIM is my main file editor, but with the develop of the A2 and it's improvments i'm slowing changing it to be my main editor.
 I have added functions that are not present in VIM or any text editor i have used in the past, functions like GCC, or diff, are functions that help my everyday development so i added them.
