@@ -3,8 +3,9 @@
 # Maps keywords to the core IDs defined in the editor
 # =============================================================
 
-# Color 3 (Yellow: Keywords of C
+# Color 3 (Yellow: Keywords of C)
 # -------------------------------------------------------------
+KEYWORD:PINTO
 KEYWORD:auto
 KEYWORD:break
 KEYWORD:case
