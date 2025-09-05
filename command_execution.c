@@ -1,0 +1,218 @@
+// ===================================================================
+// 6. Command Execution & Processing
+// ===================================================================
+
+void process_command(EditorState *state, bool *should_exit) {
+    if (state->command_buffer[0] == '!') {
+        execute_shell_command(state);
+        add_to_command_history(state, state->command_buffer);
+        state->mode = NORMAL;
+        return;
+    }
+    add_to_command_history(state, state->command_buffer);
+    char command[100], args[1024] = "";
+    char *buffer_ptr = state->command_buffer;
+    int i = 0;
+    while(i < 99 && *buffer_ptr && !isspace(*buffer_ptr)) command[i++] = *buffer_ptr++;
+    command[i] = '\0';
+    if(isspace(*buffer_ptr)) buffer_ptr++;
+    char *trimmed_args = trim_whitespace(buffer_ptr);
+    strncpy(args, trimmed_args, sizeof(args) - 1);
+    args[sizeof(args)-1] = '\0';
+
+    if (strcmp(command, "q") == 0) {
+        if (state->buffer_modified) {
+            snprintf(state->status_msg, sizeof(state->status_msg), "Warning: Unsaved changes! Use :q! to force quit.");
+            state->mode = NORMAL;
+            return;
+        }
+        fechar_janela_ativa(should_exit);
+        return; 
+    } else if (strcmp(command, "q!") == 0) {
+        state->buffer_modified = false;
+        fechar_janela_ativa(should_exit);
+        return;
+    } else if (strcmp(command, "wq") == 0) {
+        save_file(state);
+        fechar_janela_ativa(should_exit);
+        return;
+    } else if (strcmp(command, "w") == 0) {
+        if (strlen(args) > 0) strncpy(state->filename, args, sizeof(state->filename) - 1);
+        save_file(state);
+    } else if (strcmp(command, "help") == 0) {
+        display_help_screen();
+    } else if (strcmp(command, "gcc") == 0) {
+        compile_file(state, args);
+    } else if (strcmp(command, "rc") == 0) {
+        editor_reload_file(state);
+    } else if (strcmp(command, "rc!") == 0) {
+        if (strcmp(state->filename, "[No Name]") == 0) {
+            snprintf(state->status_msg, sizeof(state->status_msg), "No file name to reload.");
+    } else {
+            load_file(state, state->filename);
+            snprintf(state->status_msg, sizeof(state->status_msg), "File reloaded (force).");
+        }
+    } else if (strcmp(command, "open") == 0) {
+        if (strlen(args) > 0) load_file(state, args);
+        else snprintf(state->status_msg, sizeof(state->status_msg), "Usage: :open <filename>");
+    } else if (strcmp(command, "new") == 0) {
+        for (int i = 0; i < state->num_lines; i++) { if(state->lines[i]) 
+        free(state->lines[i]); state->lines[i] = NULL; }
+        state->num_lines = 1; state->lines[0] = calloc(1, 1); strcpy(state->filename, "[No Name]");
+        state->current_line = 0; state->current_col = 0; state->ideal_col = 0; state->top_line = 0; state->left_col = 0;
+        snprintf(state->status_msg, sizeof(state->status_msg), "New file opened.");
+    } else if (strcmp(command, "timer") == 0) {
+        def_prog_mode(); endwin();
+        display_work_summary();
+        reset_prog_mode(); refresh();
+    } else if (strcmp(command, "diff") == 0) {
+        diff_command(state, args);
+    } else if (strcmp(command, "set") == 0) {
+        if (strcmp(args, "paste") == 0) {
+            state->paste_mode = true;
+            state->auto_indent_on_newline = false;
+            snprintf(state->status_msg, sizeof(state->status_msg), "-- PASTE MODE ON --");
+        } else if (strcmp(args, "nopaste") == 0) {
+            state->paste_mode = false;
+            state->auto_indent_on_newline = true;
+            snprintf(state->status_msg, sizeof(state->status_msg), "-- PASTE MODE OFF --");
+        } else if (strcmp(args, "wrap") == 0) {
+            state->word_wrap_enabled = true;
+            snprintf(state->status_msg, sizeof(state->status_msg), "Word wrap ativado");
+        } else if (strcmp(args, "nowrap") == 0) {
+            state->word_wrap_enabled = false;
+            snprintf(state->status_msg, sizeof(state->status_msg), "Word wrap desativado");
+        } else {
+            snprintf(state->status_msg, sizeof(state->status_msg), "Argumento desconhecido para set: %s", args);
+        }
+    } else if (strcmp(command, "toggle_auto_indent") == 0) {
+        state->auto_indent_on_newline = !state->auto_indent_on_newline;
+        snprintf(state->status_msg, sizeof(state->status_msg), "Auto-indent on newline: %s", state->auto_indent_on_newline ? "ON" : "OFF");
+    } else {
+        snprintf(state->status_msg, sizeof(state->status_msg), "Unknown command: %s", command);
+    }
+    state->mode = NORMAL;
+}
+
+void execute_shell_command(EditorState *state) {
+    char *cmd = state->command_buffer + 1;
+    if (strncmp(cmd, "cd ", 3) == 0) {
+        char *path = cmd + 3;
+        if (chdir(path) != 0) {
+            snprintf(state->status_msg, sizeof(state->status_msg), "Erro ao mudar diretório: %s", strerror(errno));
+        } else {
+            char cwd[1024];
+            if (getcwd(cwd, sizeof(cwd)) != NULL) {
+                char display_cwd[80];
+                strncpy(display_cwd, cwd, sizeof(display_cwd) - 1);
+                display_cwd[sizeof(display_cwd) - 1] = '\0';
+                snprintf(state->status_msg, sizeof(state->status_msg), "Diretório atual: %s", display_cwd);
+            }
+        }
+        return;
+    }
+    char temp_output_file[] = "/tmp/editor_shell_output.XXXXXX";
+    int fd = mkstemp(temp_output_file);
+    if(fd == -1) { snprintf(state->status_msg, sizeof(state->status_msg), "Erro ao criar arquivo temporário."); return; }
+    close(fd);
+    char full_shell_command[2048];
+    snprintf(full_shell_command, sizeof(full_shell_command), "%s > %s 2>&1", cmd, temp_output_file);
+    def_prog_mode(); endwin();
+    system(full_shell_command);
+    reset_prog_mode(); refresh();
+    FILE *f = fopen(temp_output_file, "r");
+    if(f) {
+        fseek(f, 0, SEEK_END); long size = ftell(f); fclose(f);
+        if (size > 0 && size < 96) {
+            FILE *read_f = fopen(temp_output_file, "r");
+            char buffer[STATUS_MSG_LEN] = {0};
+            size_t n = fread(buffer, 1, sizeof(buffer) - 1, read_f);
+            fclose(read_f);
+            if (n > 0 && buffer[n-1] == '\n') buffer[n-1] = '\0';
+            if(strchr(buffer, '\n') == NULL) {
+                char display_output[80];
+                strncpy(display_output, buffer, sizeof(display_output) - 1);
+                display_output[sizeof(display_output) - 1] = '\0';
+                snprintf(state->status_msg, sizeof(state->status_msg), "Saída: %s", display_output);
+                remove(temp_output_file);
+                return;
+            }
+        }
+        display_output_screen("--- SAÍDA DO COMANDO ---", temp_output_file);
+        snprintf(state->status_msg, sizeof(state->status_msg), "Comando '%s' executado.", cmd);
+    } else {
+        snprintf(state->status_msg, sizeof(state->status_msg), "Comando executado, mas sem saída.");
+        remove(temp_output_file);
+    }
+}
+
+void compile_file(EditorState *state, char* args) {
+    save_file(state);
+    if (strcmp(state->filename, "[No Name]") == 0) {
+        snprintf(state->status_msg, sizeof(state->status_msg), "Salve o arquivo com um nome antes de compilar.");
+        return;
+    }
+    char output_filename[300];
+    strncpy(output_filename, state->filename, sizeof(output_filename) - 1);
+    char *dot = strrchr(output_filename, '.'); if (dot) *dot = '\0';
+    char command[1024];
+    snprintf(command, sizeof(command), "gcc %s -o %s %s", state->filename, output_filename, args);
+    char temp_output_file[] = "/tmp/editor_compile_output.XXXXXX";
+    int fd = mkstemp(temp_output_file); if(fd == -1) return; close(fd);
+    char full_shell_command[2048];
+    snprintf(full_shell_command, sizeof(full_shell_command), "%s > %s 2>&1", command, temp_output_file);
+    def_prog_mode(); endwin();
+    int ret = system(full_shell_command);
+    reset_prog_mode(); refresh();
+    if (WIFEXITED(ret) && WEXITSTATUS(ret) == 0) {
+        char display_output_name[40];
+        strncpy(display_output_name, output_filename, sizeof(display_output_name) - 1);
+        display_output_name[sizeof(display_output_name)-1] = '\0';
+        snprintf(state->status_msg, sizeof(state->status_msg), "Compilação bem-sucedida! Executável: %s", display_output_name);
+    } else {
+        display_output_screen("--- ERROS DE COMPILAÇÃO ---", temp_output_file);
+        snprintf(state->status_msg, sizeof(state->status_msg), "Compilação falhou. Veja os erros.");
+    }
+}
+
+void run_and_display_command(const char* command, const char* title) {
+    char temp_output_file[] = "/tmp/editor_cmd_output.XXXXXX";
+    int fd = mkstemp(temp_output_file);
+    if (fd == -1) return;
+    close(fd);
+
+    char full_shell_command[2048];
+    snprintf(full_shell_command, sizeof(full_shell_command), "%s > %s 2>&1", command, temp_output_file);
+
+    def_prog_mode(); endwin();
+    system(full_shell_command);
+    reset_prog_mode(); refresh();
+    
+    display_output_screen(title, temp_output_file);
+}
+
+void diff_command(EditorState *state, const char *args) {
+    char filename1[256] = {0}, filename2[256] = {0};
+    if (sscanf(args, "%255s %255s", filename1, filename2) != 2) {
+        snprintf(state->status_msg, sizeof(state->status_msg), "Uso: :diff <arquivo1> <arquivo2>");
+        return;
+    }
+    char diff_cmd_str[1024];
+    snprintf(diff_cmd_str, sizeof(diff_cmd_str), "git diff --no-index -- %s %s", filename1, filename2);
+    run_and_display_command(diff_cmd_str, "--- Diferenças ---");
+}
+
+void add_to_command_history(EditorState *state, const char* command) {
+    if (strlen(command) == 0) return;
+    if (state->history_count > 0 && strcmp(state->command_history[state->history_count - 1], command) == 0) return;
+    if (state->history_count < MAX_COMMAND_HISTORY) {
+        state->command_history[state->history_count++] = strdup(command);
+    } else {
+        free(state->command_history[0]);
+        for (int i = 0; i < MAX_COMMAND_HISTORY - 1; i++) {
+            state->command_history[i] = state->command_history[i + 1];
+        }
+        state->command_history[MAX_COMMAND_HISTORY - 1] = strdup(command);
+    }
+}
+
