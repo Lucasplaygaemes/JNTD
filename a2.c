@@ -16,7 +16,6 @@
 // ===================================================================
 // 1. Core Editor & Initialization
 // ===================================================================
-
 void inicializar_ncurses() {
     initscr(); cbreak(); noecho(); keypad(stdscr, TRUE);
     start_color();
