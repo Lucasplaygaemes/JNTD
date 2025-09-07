@@ -11,7 +11,7 @@ The code access the Ollama via bash, the 2B it's trained to know how and what to
 I want in the next updates make she possible to make complex interactions with the terminal, and codes, she may be possible to execute codes, and test them by herself, so she will have the possibility to know, where, why, and how a bug it's happening, she will also be able to search for directorys that may have a bug, when something is missing.
 
 # Refactoring!
-In the same way i made a refactor with the 2bt.c, i will also made with the a2.c it will be a "long" update, it will probably take from 3 to 7 days. If it's take more, it is what it is.
+The code was "refactored" and now is divided in main parts.
 
 # A2!
 What's A2 you might ask? It's my own file editor. The VIM is my main file editor, but with the develop of the A2 and it's improvments i'm slowing changing it to be my main editor.
