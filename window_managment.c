@@ -88,12 +88,17 @@ void criar_nova_janela(const char *filename) {
     state->num_recent_dirs = 0;
     state->recent_dirs = NULL;
     load_directory_history(state);
+
     char initial_cwd[1024];
     if (getcwd(initial_cwd, sizeof(initial_cwd)) != NULL) {
         update_directory_access(state, initial_cwd);
     }
-
-    load_syntax_file(state, "syntaxes/c.syntax");
+    
+    const char * syntax_file = "syntaxes/c.syntax";
+    if (filename) {
+        syntax_file = get_syntax_file_from_extension(filename);
+    }
+    load_syntax_file(state, syntax_file);
 
     gerenciador.janelas[gerenciador.num_janelas - 1] = nova_janela;
     gerenciador.janela_ativa_idx = gerenciador.num_janelas - 1;
