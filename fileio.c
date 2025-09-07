@@ -61,6 +61,8 @@ void load_file(EditorState *state, const char *filename) {
 		}
 	}
 	load_file_core(state, filename);
+        const char * syntax_file = get_syntax_file_from_extension(filename);
+        load_syntax_file(state, syntax_file);
 }
 
 void save_file(EditorState *state) {
