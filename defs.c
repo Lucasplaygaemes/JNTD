@@ -198,6 +198,63 @@ struct EditorState {
     int num_unmatched_brackets;
 };
 
+
+// Declarations to manage file type
+typedef struct {
+    const char *extension;
+    const char *syntax_file;
+} ExtensionSyntaxMap;
+
+const char * get_syntax_file_from_extension(const char* filename) {
+    const char* ext = strrchr(filename, '.');
+    if (!ext) return "syntaxes/c.syntax"; // Padrão para C
+    
+    // Usar switch com os primeiros caracteres da extensão para melhor performance
+    switch (ext[1]) {
+        case 'c':
+            if (strcmp(ext, ".c") == 0 || strcmp(ext, ".h") == 0)
+                return "syntaxes/c.syntax";
+            else if (strcmp(ext, ".cpp") == 0)
+                return "syntaxes/cpp.syntax";
+            break;
+        case 'p':
+            if (strcmp(ext, ".py") == 0)
+                return "syntaxes/python.syntax";
+            else if (strcmp(ext, ".php") == 0)
+                return "syntaxes/php.syntax";
+            break;
+        case 'j':
+            if (strcmp(ext, ".js") == 0)
+                return "syntaxes/javascript.syntax";
+            else if (strcmp(ext, ".java") == 0)
+                return "syntaxes/java.syntax";
+            break;
+        case 't':
+            if (strcmp(ext, ".ts") == 0)
+                return "syntaxes/typescript.syntax";
+            break;
+        case 'h':
+            if (strcmp(ext, ".html") == 0 || strcmp(ext, ".htm") == 0)
+                return "syntaxes/html.syntax";
+            break;
+        case 'cs':
+            if (strcmp(ext, ".css") == 0)
+                return "syntaxes/css.syntax";
+            break;
+        case 'r':
+            if (strcmp(ext, ".rb") == 0)
+                return "syntaxes/ruby.syntax";
+            else if (strcmp(ext, ".rs") == 0)
+                return "syntaxes/rust.syntax";
+            break;
+        case 'g':
+            if (strcmp(ext, ".go") == 0)
+                return "syntaxes/go.syntax";
+            break;
+    }
+    
+    return "syntaxes/c.syntax"; // Padrão
+}
 // --- Declarações de Funções ---
 
 // Funções de gerenciamento de janelas
