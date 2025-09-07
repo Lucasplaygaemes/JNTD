@@ -37,7 +37,11 @@ void process_command(EditorState *state, bool *should_exit) {
         fechar_janela_ativa(should_exit);
         return;
     } else if (strcmp(command, "w") == 0) {
-        if (strlen(args) > 0) strncpy(state->filename, args, sizeof(state->filename) - 1);
+        if (strlen(args) > 0) {
+            strncpy(state->filename, args, sizeof(state->filename) - 1);
+            const char * syntax_file =  get_syntax_file_from_extension(args);
+            load_syntax_file(state, syntax_file);
+            }
         save_file(state);
     } else if (strcmp(command, "help") == 0) {
         display_help_screen();
