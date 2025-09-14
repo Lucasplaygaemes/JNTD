@@ -1,3 +1,32 @@
+#include "others.h" // Include its own header
+#include "defs.h" // For EditorState, etc.
+#include "lsp_client.h" // For lsp_did_change
+#include "screen_ui.h" // For editor_redraw, redesenhar_todas_as_janelas, get_visual_pos, get_visual_col
+#include "fileio.h" // For load_last_line, save_last_line
+#include "window_managment.h" // For gerenciador
+#include "command_execution.h"
+#include <ctype.h>
+#include <dirent.h>
+
+// Dummy definitions for autocompletion symbols to allow compilation
+const char *editor_commands[] = {
+    "q", "q!", "w", "wq", "help", "gcc", "rc", "rc!", "open", "new", "timer", "diff", "set",
+    "lsp-restart", "lsp-diag", "lsp-definition", "lsp-references", "lsp-rename",
+    "lsp-status", "lsp-hover", "lsp-symbols", "lsp-refresh", "lsp-check", "lsp-debug",
+    "toggle_auto_indent"
+};
+const int num_editor_commands = sizeof(editor_commands) / sizeof(char*);
+
+typedef struct {
+    const char *header_name;
+    const char **symbols;
+    int count;
+} KnownHeader;
+
+const KnownHeader known_headers[] = {};
+const int num_known_headers = 0;
+
+
 // ===================================================================
 //  2. Bracket Matching
 // ===================================================================
@@ -7,6 +36,11 @@ void editor_find_unmatched_brackets(EditorState *state) {
     state->unmatched_brackets = NULL;
     state->num_unmatched_brackets = 0;
 
+    typedef struct {
+        int line;
+        int col;
+        char type;
+    } BracketStackItem;
     BracketStackItem *stack = NULL;
     int stack_top = 0;
     int stack_capacity = 0;
@@ -147,6 +181,9 @@ void editor_handle_enter(EditorState *state) {
     state->current_col = new_indent_len;
     state->ideal_col = new_indent_len;
     state->buffer_modified = true;
+    if (state->lsp_enabled) {
+        lsp_did_change(state);
+    }
 }
 
 void editor_handle_backspace(EditorState *state) {
@@ -197,6 +234,9 @@ void editor_handle_backspace(EditorState *state) {
         state->ideal_col = state->current_col;
     }
     state->buffer_modified = true;
+    if (state->lsp_enabled) {
+        lsp_did_change(state);
+    }
 }
 
 void editor_insert_char(EditorState *state, wint_t ch) {
@@ -223,6 +263,9 @@ void editor_insert_char(EditorState *state, wint_t ch) {
     state->ideal_col = state->current_col;
     new_line[line_len + char_len] = '\0';
     state->buffer_modified = true;
+    if (state->lsp_enabled) {
+        lsp_did_change(state);
+    }
 }
 
 void editor_delete_line(EditorState *state) {
@@ -245,6 +288,9 @@ void editor_delete_line(EditorState *state) {
     }
     state->current_col = 0; state->ideal_col = 0;
     state->buffer_modified = true;
+    if (state->lsp_enabled) {
+        lsp_did_change(state);
+    }
 }
 
 char* trim_whitespace(char *str) {
@@ -485,6 +531,9 @@ void do_undo(EditorState *state) {
     EditorSnapshot *undo_snap = state->undo_stack[--state->undo_count];
     restore_from_snapshot(state, undo_snap);
     state->buffer_modified = true;
+    if (state->lsp_enabled) {
+        lsp_did_change(state);
+    }
 }
 
 void do_redo(EditorState *state) {
@@ -493,6 +542,9 @@ void do_redo(EditorState *state) {
     push_undo(state);
     restore_from_snapshot(state, redo_snap);
     state->buffer_modified = true;
+    if (state->lsp_enabled) {
+        lsp_did_change(state);
+    }
 }
 
 // ===================================================================
