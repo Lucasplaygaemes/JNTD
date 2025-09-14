@@ -1,3 +1,12 @@
+#include "window_managment.h" // Include its own header
+#include "defs.h" // For EditorState, etc.
+#include "fileio.h" // For save_last_line, load_file, load_syntax_file
+#include "others.h" // For editor_end_completion, free_snapshot, push_undo
+#include "screen_ui.h" // For editor_redraw, posicionar_cursor_ativo, get_visual_pos, editor_draw_completion_win
+#include "lsp_client.h" // For lsp_shutdown
+#include "direct_navigation.h"
+#include <unistd.h>
+
 // ===================================================================
 //  1. Window Management
 // ===================================================================
@@ -18,6 +27,12 @@ void free_editor_state(EditorState* state) {
         free(state->recent_dirs[j]->path);
         free(state->recent_dirs[j]);
     }
+    
+    if (state->unmatched_brackets) {
+        free(state->unmatched_brackets);
+        state->unmatched_brackets = NULL;
+    }
+    
     free(state->recent_dirs);
     for (int j = 0; j < state->num_lines; j++) {
         if (state->lines[j]) free(state->lines[j]);
@@ -94,12 +109,6 @@ void criar_nova_janela(const char *filename) {
         update_directory_access(state, initial_cwd);
     }
     
-    const char * syntax_file = "syntaxes/c.syntax";
-    if (filename) {
-        syntax_file = get_syntax_file_from_extension(filename);
-    }
-    load_syntax_file(state, syntax_file);
-
     gerenciador.janelas[gerenciador.num_janelas - 1] = nova_janela;
     gerenciador.janela_ativa_idx = gerenciador.num_janelas - 1;
 
@@ -109,6 +118,8 @@ void criar_nova_janela(const char *filename) {
     if (filename) {
         load_file(state, filename);
     } else {
+        // For a new, empty file, load a default syntax
+        load_syntax_file(state, "c.syntax");
         state->lines[0] = calloc(1, 1);
         state->num_lines = 1;
     }
@@ -123,7 +134,6 @@ void redesenhar_todas_as_janelas() {
     for (int i = 0; i < gerenciador.num_janelas; i++) {
         JanelaEditor *jw = gerenciador.janelas[i];
         editor_redraw(jw->win, jw->estado);
-        wnoutrefresh(jw->win);
     }
 
     posicionar_cursor_ativo();
@@ -171,8 +181,10 @@ void fechar_janela_ativa(bool *should_exit) {
 
     int idx = gerenciador.janela_ativa_idx;
     JanelaEditor *jw = gerenciador.janelas[idx];
-    EditorState *state = jw->estado;
-
+    EditorState *state = gerenciador.janelas[gerenciador.janela_ativa_idx]->estado;
+    if (state->lsp_enabled) {
+        lsp_shutdown(state);
+    }
     if (state->buffer_modified) {
         snprintf(state->status_msg, sizeof(state->status_msg), "Warning: Unsaved changes! Use :q! to force quit.");
         return;
@@ -199,7 +211,7 @@ void fechar_janela_ativa(bool *should_exit) {
         exit(1);
     }
     gerenciador.janelas = new_janelas;
-    
+
     if (gerenciador.janela_ativa_idx >= gerenciador.num_janelas) {
         gerenciador.janela_ativa_idx = gerenciador.num_janelas - 1;
     }
