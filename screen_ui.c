@@ -1,8 +1,113 @@
+#include "screen_ui.h" // Include its own header
+#include "defs.h" // For EditorState, etc.
+#include "others.h" // For editor_find_unmatched_brackets
+#include "lsp_client.h" // For lsp_draw_diagnostics, get_diagnostic_under_cursor
+#include "window_managment.h" // For gerenciador
+#include <ctype.h>
+
 // ===================================================================
 // Screen & UI
 // ===================================================================
 
+void draw_diagnostic_popup(WINDOW *main_win, EditorState *state, const char *message) {
+    if (!message || !*message) {
+        return;
+    }
+
+    int max_width = 0;
+    int num_lines = 0;
+    const char *ptr = message;
+
+    // Calcula as dimensões da janela
+    while (*ptr) {
+        num_lines++;
+        const char *line_start = ptr;
+        const char *line_end = strchr(ptr, '\n');
+        int line_len;
+
+        if (line_end) {
+            line_len = line_end - line_start;
+            ptr = line_end + 1;
+        } else {
+            line_len = strlen(line_start);
+            ptr += line_len;
+        }
+
+        if (line_len > max_width) {
+            max_width = line_len;
+        }
+    }
+
+    // Adiciona padding
+    int win_height = num_lines + 2;
+    int win_width = max_width + 4;
+
+    int term_rows, term_cols;
+    getmaxyx(stdscr, term_rows, term_cols);
+    if (win_width > term_cols) win_width = term_cols;
+    if (win_height > term_rows) win_height = term_rows;
+    if (win_width > term_cols - 2) win_width = term_cols - 2;
+
+    // Posiciona a janela
+    int win_y, win_x;
+    int cursor_y, cursor_x;
+    int visual_y, visual_x;
+    get_visual_pos(main_win, state, &visual_y, &visual_x);
+    
+    extern GerenciadorJanelas gerenciador;
+    int border_offset = gerenciador.num_janelas > 1 ? 1 : 0;
+    cursor_y = (visual_y - state->top_line) + border_offset;
+    cursor_x = (visual_x - state->left_col) + border_offset;
+
+    win_y = getbegy(main_win) + cursor_y + 1;
+    win_x = getbegx(main_win) + cursor_x;
+
+    if (win_y + win_height > term_rows) {
+        win_y = getbegy(main_win) + cursor_y - win_height;
+    }
+    if (win_x + win_width > term_cols) {
+        win_x = term_cols - win_width - 1;
+    }
+    if (win_x < 0) win_x = 0;
+    if (win_y < 0) win_y = 0;
+
+    state->diagnostic_popup = newwin(win_height, win_width, win_y, win_x);
+    wbkgd(state->diagnostic_popup, COLOR_PAIR(8));
+    box(state->diagnostic_popup, 0, 0);
+
+    // Imprime a mensagem
+    ptr = message;
+    for (int i = 0; i < num_lines; i++) {
+        const char *line_start = ptr;
+        const char *line_end = strchr(ptr, '\n');
+        int line_len;
+
+        if (line_end) {
+            line_len = line_end - line_start;
+            ptr = line_end + 1;
+        } else {
+            line_len = strlen(line_start);
+            ptr += line_len;
+        }
+        
+        if (line_len > win_width - 4) {
+            line_len = win_width - 4;
+        }
+
+        mvwprintw(state->diagnostic_popup, i + 1, 2, "%.*s", line_len, line_start);
+    }
+
+    // Marca o popup para atualização, mas não o desenha ainda
+    wnoutrefresh(state->diagnostic_popup);
+}
+
+
 void editor_redraw(WINDOW *win, EditorState *state) {
+    if (state->diagnostic_popup) {
+        delwin(state->diagnostic_popup);
+        state->diagnostic_popup = NULL;
+    }
+
     if (state->buffer_modified) {
         editor_find_unmatched_brackets(state);
     }
@@ -11,6 +116,7 @@ void editor_redraw(WINDOW *win, EditorState *state) {
     int rows, cols;
     getmaxyx(win, rows, cols);
 
+    extern GerenciadorJanelas gerenciador;
     int border_offset = gerenciador.num_janelas > 1 ? 1 : 0;
 
     if (border_offset) {
@@ -28,6 +134,8 @@ void editor_redraw(WINDOW *win, EditorState *state) {
     const char *delimiters = " \t\n\r,;()[]{}<>=+-*/%&|!^.";
     int content_height = rows - (border_offset + 1); 
     int screen_y = 0;
+
+    state->status_msg[0] = '\0';
 
     if (state->word_wrap_enabled) {
         state->left_col = 0;
@@ -62,7 +170,7 @@ void editor_redraw(WINDOW *win, EditorState *state) {
                 while (line[line_offset + current_bytes] != '\0') {
                     wchar_t wc;
                     int bytes_consumed = mbtowc(&wc, &line[line_offset + current_bytes], MB_CUR_MAX);
-                    if (bytes_consumed <= 0) { bytes_consumed = 1; wc = ' '; }
+                    if (bytes_consumed <= 0) { bytes_consumed = 1; wc = ' '; } 
                     
                     int char_width = wcwidth(wc);
                     if (char_width < 0) char_width = 1;
@@ -133,6 +241,42 @@ void editor_redraw(WINDOW *win, EditorState *state) {
                     for (int i = x; i < end_col; i++) {
                         mvwaddch(win, y, i, ' ');
                     }
+                    
+                    if (state->lsp_document) {
+                        for (int d = 0; d < state->lsp_document->diagnostics_count; d++) {
+                            LspDiagnostic *diag = &state->lsp_document->diagnostics[d];
+                            if (diag->range.start.line == file_line_idx) {
+                                int diag_start_col = diag->range.start.character;
+                                int diag_end_col = diag->range.end.character;
+                                int segment_start_col = line_offset;
+                                int segment_end_col = line_offset + break_pos;
+
+                                if (max(segment_start_col, diag_start_col) < min(segment_end_col, diag_end_col)) {
+                                    int y_pos = screen_y + border_offset;
+                                    int start_x = border_offset + get_visual_col(line + segment_start_col, max(0, diag_start_col - segment_start_col));
+                                    int end_x = border_offset + get_visual_col(line + segment_start_col, min(break_pos, diag_end_col - segment_start_col));
+                                    
+                                    int color_pair;
+                                    switch (diag->severity) {
+                                        case LSP_SEVERITY_ERROR: color_pair = 11; break;
+                                        case LSP_SEVERITY_WARNING: color_pair = 3; break;
+                                        default: color_pair = 8; break;
+                                    }
+
+                                    wattron(win, COLOR_PAIR(color_pair));
+                                    if (start_x >= 1) mvwaddch(win, y_pos, start_x - 1, '[');
+                                    wattroff(win, COLOR_PAIR(color_pair));
+
+                                    mvwchgat(win, y_pos, start_x, end_x - start_x, A_UNDERLINE, color_pair, NULL);
+
+                                    wattron(win, COLOR_PAIR(color_pair));
+                                    if (end_x < cols) mvwaddch(win, y_pos, end_x, ']');
+                                    wattroff(win, COLOR_PAIR(color_pair));
+                                }
+                            }
+                        }
+                    }
+
                     screen_y++;
                 }
                 visual_line_idx++;
@@ -140,7 +284,7 @@ void editor_redraw(WINDOW *win, EditorState *state) {
                 if (line_len == 0) break;
             }
         }
-    } else {
+    } else { // NO WORD WRAP
         for (int line_idx = state->top_line; line_idx < state->num_lines && screen_y < content_height; line_idx++) {
             char *line = state->lines[line_idx];
             if (!line) continue;
@@ -193,7 +337,7 @@ void editor_redraw(WINDOW *win, EditorState *state) {
                 if (token_len > 0) wprintw(win, "%.*s", token_len, token_ptr);
 
                 if (color_pair) wattroff(win, COLOR_PAIR(color_pair));
-
+                
                 current_col += token_len;
             }
             int y, x;
@@ -202,22 +346,64 @@ void editor_redraw(WINDOW *win, EditorState *state) {
             for (int i = x; i < end_col; i++) {
                 mvwaddch(win, y, i, ' ');
             }
+
+            if (state->lsp_document) {
+                for (int d = 0; d < state->lsp_document->diagnostics_count; d++) {
+                    LspDiagnostic *diag = &state->lsp_document->diagnostics[d];
+                    if (diag->range.start.line == line_idx) {
+                        int y_pos = screen_y + border_offset;
+                        int start_x = border_offset + get_visual_col(line, diag->range.start.character) - state->left_col;
+                        int end_x = border_offset + get_visual_col(line, diag->range.end.character) - state->left_col;
+
+                        if (start_x < border_offset) start_x = border_offset;
+                        if (end_x > cols - border_offset) end_x = cols - border_offset;
+
+                        if (start_x < end_x) {
+                            int color_pair;
+                            switch (diag->severity) {
+                                case LSP_SEVERITY_ERROR: color_pair = 11; break;
+                                case LSP_SEVERITY_WARNING: color_pair = 3; break;
+                                default: color_pair = 8; break;
+                            }
+
+                            wattron(win, COLOR_PAIR(color_pair));
+                            if (start_x >= 1 + border_offset) mvwaddch(win, y_pos, start_x - 1, '[');
+                            wattroff(win, COLOR_PAIR(color_pair));
+
+                            mvwchgat(win, y_pos, start_x, end_x - start_x, A_UNDERLINE, color_pair, NULL);
+
+                            wattron(win, COLOR_PAIR(color_pair));
+                            if (end_x < cols - border_offset) mvwaddch(win, y_pos, end_x, ']');
+                            wattroff(win, COLOR_PAIR(color_pair));
+                        }
+                    }
+                }
+            }
+
             screen_y++;
         }
     }
 
+    // Lógica de status e pop-up
+    LspDiagnostic *diag = NULL;
+    if (state->lsp_enabled) {
+        diag = get_diagnostic_under_cursor(state);
+        if (diag) {
+            snprintf(state->status_msg, STATUS_MSG_LEN, "[%s] %s", diag->code, diag->message);
+        }
+    }
+
+    // Desenha a barra de status
     int color_pair = 1; // Padrão: azul
-    if (strstr(state->status_msg, "Warning:") != NULL || 
-        strstr(state->status_msg, "Error:") != NULL) {
+    if (strstr(state->status_msg, "Warning:") != NULL || strstr(state->status_msg, "Error:") != NULL) {
         color_pair = 3; // Amarelo para avisos
     }
     
     wattron(win, COLOR_PAIR(color_pair));
-    
     for (int i = 1; i < cols - 1; i++) {
         mvwaddch(win, rows - 1, i, ' ');
     }
-    
+
     if (state->mode == COMMAND) {
         mvwprintw(win, rows - 1, 1, ":%.*s", cols-2, state->command_buffer);
     } else {
@@ -239,17 +425,26 @@ void editor_redraw(WINDOW *win, EditorState *state) {
 
         mvwprintw(win, rows - 1, 1, "%.*s", cols - 2, final_bar);
     }
-    wattroff(win, COLOR_PAIR(color_pair)); 
+    wattroff(win, COLOR_PAIR(color_pair));
+
+    // Marca a janela principal (com todo o seu conteúdo) para atualização.
+    wnoutrefresh(win);
+
+    // AGORA, se houver um diagnóstico, desenha o pop-up por cima.
+    if (diag) {
+        draw_diagnostic_popup(win, state, diag->message);
+    }
 }
+
 
 
 void adjust_viewport(WINDOW *win, EditorState *state) {
     int rows, cols;
     getmaxyx(win, rows, cols);
     
-    // Account for window borders
+    extern GerenciadorJanelas gerenciador;
     int border_offset = gerenciador.num_janelas > 1 ? 1 : 0;
-    int content_height = rows - border_offset - 1; // Subtract status line
+    int content_height = rows - border_offset - 1;
     int content_width = cols - 2 * border_offset;
 
     int visual_y, visual_x;
@@ -282,7 +477,7 @@ void get_visual_pos(WINDOW *win, EditorState *state, int *visual_y, int *visual_
     int rows, cols;
     getmaxyx(win, rows, cols);
     
-    // Account for window borders in multi-window mode
+    extern GerenciadorJanelas gerenciador;
     int border_offset = gerenciador.num_janelas > 1 ? 1 : 0;
     int content_width = cols - 2 * border_offset;
 
@@ -478,4 +673,3 @@ void destroy_file_viewer(FileViewer* viewer) {
     free(viewer->lines);
     free(viewer);
 }
-
