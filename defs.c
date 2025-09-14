@@ -19,6 +19,10 @@
 #include <sys/stat.h>
 #include <time.h>
 #include <limits.h>
+#include <jansson.h>
+#include <strings.h>
+#include <string.h>
+
 
 typedef struct EditorState EditorState;
 
@@ -39,12 +43,81 @@ typedef struct {
 GerenciadorJanelas gerenciador;
 
 
+// ===================================================================
+// Definições para suporte a LSP (Language Server Protocol)
+// ===================================================================
+
+// Estrutura para representar uma posição no documento (LSP)
+typedef struct {
+    int line;
+    int character;
+} LspPosition;
+
+// Estrutura para representar um intervalo no documento (LSP)
+typedef struct {
+    LspPosition start;
+    LspPosition end;
+} LspRange;
+
+// Estrutura para representar uma mensagem de diagnóstico do LSP
+typedef struct {
+    LspRange range;
+    int severity; // 1=Error, 2=Warning, 3=Info, 4=Hint
+    char *message;
+    char *code;
+} LspDiagnostic;
+
+// Estrutura para representar uma sugestão de completion do LSP
+typedef struct {
+    char *label;
+    char *detail;
+    char *documentation;
+    char *insertText;
+    int kind; // LSP CompletionItemKind
+} LspCompletionItem;
+
+// Estrutura para representar um símbolo (LSP)
+typedef struct {
+    char *name;
+    int kind; // LSP SymbolKind
+    LspRange range;
+    LspRange selectionRange;
+    char *containerName;
+} LspSymbolInformation;
+
+// Estrutura para o cliente LSP
+typedef struct {
+    pid_t server_pid;
+    int stdin_fd;
+    int stdout_fd;
+    int stderr_fd;
+    bool initialized;
+    char *rootUri;
+    char *workspaceFolders;
+    char *languageId;
+    char *compilerFlags;
+    char *compilationDatabase;
+} LspClient;
+
+
+// Estrutura para armazenar o estado do LSP para um arquivo
+typedef struct {
+    char *uri;
+    int version;
+    LspDiagnostic *diagnostics;
+    int diagnostics_count;
+    bool needs_update;
+} LspDocumentState;
+
+
+
 // --- Definições do Editor ---
 #define MAX_LINES 16486
 #define MAX_LINE_LEN 4096
 #define STATUS_MSG_LEN 250
 #define PAGE_JUMP 10
 #define TAB_SIZE 4
+#define MAX_JANELAS 15 
 #define MAX_COMMAND_HISTORY 50 
 #define AUTO_SAVE_INTERVAL 1 // Segundos
 #define AUTO_SAVE_EXTENSION ".sv"
@@ -58,6 +131,92 @@ GerenciadorJanelas gerenciador;
 #define KEY_CTRL_G 7
 #define KEY_CTRL_RIGHT_BRACKET 29
 #define KEY_CTRL_LEFT_BRACKET 27
+
+
+
+
+// Constantes para LSP
+#define LSP_SEVERITY_ERROR 1
+#define LSP_SEVERITY_WARNING 2
+#define LSP_SEVERITY_INFO 3
+#define LSP_SEVERITY_HINT 4
+
+
+// Completion Item Kinds (LSP Specification 3.17)
+#define LSP_COMPLETION_KIND_TEXT 1
+#define LSP_COMPLETION_KIND_METHOD 2
+#define LSP_COMPLETION_KIND_FUNCTION 3
+#define LSP_COMPLETION_KIND_CONSTRUCTOR 4
+#define LSP_COMPLETION_KIND_FIELD 5
+#define LSP_COMPLETION_KIND_VARIABLE 6
+#define LSP_COMPLETION_KIND_CLASS 7
+#define LSP_COMPLETION_KIND_INTERFACE 8
+#define LSP_COMPLETION_KIND_MODULE 9
+#define LSP_COMPLETION_KIND_PROPERTY 10
+#define LSP_COMPLETION_KIND_UNIT 11
+#define LSP_COMPLETION_KIND_VALUE 12
+#define LSP_COMPLETION_KIND_ENUM 13
+#define LSP_COMPLETION_KIND_KEYWORD 14
+#define LSP_COMPLETION_KIND_SNIPPET 15
+#define LSP_COMPLETION_KIND_COLOR 16
+#define LSP_COMPLETION_KIND_FILE 17
+#define LSP_COMPLETION_KIND_REFERENCE 18
+#define LSP_COMPLETION_KIND_FOLDER 19
+#define LSP_COMPLETION_KIND_ENUM_MEMBER 20
+#define LSP_COMPLETION_KIND_CONSTANT 21
+#define LSP_COMPLETION_KIND_STRUCT 22
+#define LSP_COMPLETION_KIND_EVENT 23
+#define LSP_COMPLETION_KIND_OPERATOR 24
+#define LSP_COMPLETION_KIND_TYPE_PARAMETER 25
+
+// Symbol Kinds (LSP Specification 3.17)
+#define LSP_SYMBOL_KIND_FILE 1
+#define LSP_SYMBOL_KIND_MODULE 2
+#define LSP_SYMBOL_KIND_NAMESPACE 3
+#define LSP_SYMBOL_KIND_PACKAGE 4
+#define LSP_SYMBOL_KIND_CLASS 5
+#define LSP_SYMBOL_KIND_METHOD 6
+#define LSP_SYMBOL_KIND_PROPERTY 7
+#define LSP_SYMBOL_KIND_FIELD 8
+#define LSP_SYMBOL_KIND_CONSTRUCTOR 9
+#define LSP_SYMBOL_KIND_ENUM 10
+#define LSP_SYMBOL_KIND_INTERFACE 11
+#define LSP_SYMBOL_KIND_FUNCTION 12
+#define LSP_SYMBOL_KIND_VARIABLE 13
+#define LSP_SYMBOL_KIND_CONSTANT 14
+#define LSP_SYMBOL_KIND_STRING 15
+#define LSP_SYMBOL_KIND_NUMBER 16
+#define LSP_SYMBOL_KIND_BOOLEAN 17
+#define LSP_SYMBOL_KIND_ARRAY 18
+#define LSP_SYMBOL_KIND_OBJECT 19
+#define LSP_SYMBOL_KIND_KEY 20
+#define LSP_SYMBOL_KIND_NULL 21
+#define LSP_SYMBOL_KIND_ENUM_MEMBER 22
+#define LSP_SYMBOL_KIND_STRUCT 23
+#define LSP_SYMBOL_KIND_EVENT 24
+#define LSP_SYMBOL_KIND_OPERATOR 25
+#define LSP_SYMBOL_KIND_TYPE_PARAMETER 26
+
+// Estrutura para representar uma mensagem LSP
+typedef struct {
+    char *jsonrpc;
+    char *id;
+    char *method;
+    json_t *params;
+    json_t *result;
+    json_t *error;
+} LspMessage;
+
+// Função para criar uma mensagem LSP
+LspMessage* lsp_create_message();
+// Função para liberar uma mensagem LSP
+void lsp_free_message(LspMessage *msg);
+// Função para parsear uma mensagem JSON em LspMessage
+LspMessage* lsp_parse_message(const char *json_str);
+// Função para serializar uma LspMessage para JSON
+char* lsp_serialize_message(LspMessage *msg);
+
+
 
 typedef struct {
     char **lines;
@@ -196,6 +355,27 @@ struct EditorState {
     // Campos para destaque de brackets
     BracketInfo *unmatched_brackets;
     int num_unmatched_brackets;
+    //EditorState state;
+    LspClient *lsp_client;
+    LspDocumentState *lsp_document;
+    bool lsp_enabled;
+    
+    
+    double last_change_time;
+    time_t lsp_init_time;
+    int lsp_init_retries;
+ 
+    // Para tooltip de erro
+    double hover_start_time;
+    int hover_line;
+    int hover_col;
+    bool hover_showing;
+    char hover_message[STATUS_MSG_LEN];
+    WINDOW *hover_win;
+    LspDiagnostic *current_hover_diag;
+    
+    // Para debouncing e atualização
+    bool force_redraw;
 };
 
 
@@ -209,52 +389,37 @@ const char * get_syntax_file_from_extension(const char* filename) {
     const char* ext = strrchr(filename, '.');
     if (!ext) return "syntaxes/c.syntax"; // Padrão para C
     
-    // Usar switch com os primeiros caracteres da extensão para melhor performance
-    switch (ext[1]) {
-        case 'c':
-            if (strcmp(ext, ".c") == 0 || strcmp(ext, ".h") == 0)
-                return "syntaxes/c.syntax";
-            else if (strcmp(ext, ".cpp") == 0)
-                return "syntaxes/cpp.syntax";
-            break;
-        case 'p':
-            if (strcmp(ext, ".py") == 0)
-                return "syntaxes/python.syntax";
-            else if (strcmp(ext, ".php") == 0)
-                return "syntaxes/php.syntax";
-            break;
-        case 'j':
-            if (strcmp(ext, ".js") == 0)
-                return "syntaxes/javascript.syntax";
-            else if (strcmp(ext, ".java") == 0)
-                return "syntaxes/java.syntax";
-            break;
-        case 't':
-            if (strcmp(ext, ".ts") == 0)
-                return "syntaxes/typescript.syntax";
-            break;
-        case 'h':
-            if (strcmp(ext, ".html") == 0 || strcmp(ext, ".htm") == 0)
-                return "syntaxes/html.syntax";
-            break;
-        case 'cs':
-            if (strcmp(ext, ".css") == 0)
-                return "syntaxes/css.syntax";
-            break;
-        case 'r':
-            if (strcmp(ext, ".rb") == 0)
-                return "syntaxes/ruby.syntax";
-            else if (strcmp(ext, ".rs") == 0)
-                return "syntaxes/rust.syntax";
-            break;
-        case 'g':
-            if (strcmp(ext, ".go") == 0)
-                return "syntaxes/go.syntax";
-            break;
-    }
+    if (strcmp(ext, ".c") == 0 || strcmp(ext, ".h") == 0)
+        return "syntaxes/c.syntax";
+    else if (strcmp(ext, ".cpp") == 0 || strcmp(ext, ".hpp") == 0)
+        return "syntaxes/cpp.syntax";
+    else if (strcmp(ext, ".py") == 0)
+        return "syntaxes/python.syntax";
+    else if (strcmp(ext, ".php") == 0)
+        return "syntaxes/php.syntax";
+    else if (strcmp(ext, ".js") == 0)
+        return "syntaxes/javascript.syntax";
+    else if (strcmp(ext, ".java") == 0)
+        return "syntaxes/java.syntax";
+    else if (strcmp(ext, ".ts") == 0)
+        return "syntaxes/typescript.syntax";
+    else if (strcmp(ext, ".html") == 0 || strcmp(ext, ".htm") == 0)
+        return "syntaxes/html.syntax";
+    else if (strcmp(ext, ".css") == 0)
+        return "syntaxes/css.syntax";
+    else if (strcmp(ext, ".rb") == 0)
+        return "syntaxes/ruby.syntax";
+    else if (strcmp(ext, ".rs") == 0)
+        return "syntaxes/rust.syntax";
+    else if (strcmp(ext, ".go") == 0)
+        return "syntaxes/go.syntax";
     
     return "syntaxes/c.syntax"; // Padrão
 }
+
+
+
+
 // --- Declarações de Funções ---
 
 // Funções de gerenciamento de janelas
@@ -335,3 +500,49 @@ void add_suggestion(EditorState *state, const char *suggestion);
 void save_last_line(const char *filename, int line);
 int load_last_line(const char *filename);
 
+// Protótipos de funções para LSP
+void lsp_initialize(EditorState *state);
+void lsp_shutdown(EditorState *state);
+void lsp_did_open(EditorState *state);
+void lsp_did_change(EditorState *state);
+void lsp_did_save(EditorState *state);
+void lsp_did_close(EditorState *state);
+void lsp_request_completion(EditorState *state, int line, int col);
+void lsp_goto_definition(EditorState *state);
+void lsp_goto_references(EditorState *state);
+void lsp_format_document(EditorState *state);
+void lsp_rename_symbol(EditorState *state, const char *new_name);
+void lsp_process_messages(EditorState *state);
+bool lsp_is_available(EditorState *state);
+char* lsp_get_uri_from_path(const char *path);
+void lsp_parse_diagnostics(EditorState *state, const char *json_response);
+void lsp_parse_completion(EditorState *state, const char *json_response);
+void lsp_draw_diagnostics(WINDOW *win, EditorState *state);
+void lsp_cleanup_diagnostics(EditorState *state);
+char* json_escape_string(const char *str);
+
+// Adicione estas declarações na seção de protótipos de funções LSP
+void lsp_init_document_state(EditorState *state);
+void lsp_free_document_state(EditorState *state);
+char* lsp_get_uri_from_path(const char *path);
+void lsp_send_initialize(EditorState *state);
+void lsp_send_did_change(EditorState *state);
+void process_lsp_status(EditorState *state);
+void process_lsp_symbols(EditorState *state);
+void process_lsp_hover(EditorState *state);
+void lsp_log(const char *format, ...);
+void lsp_request_diagnostics(EditorState *state);
+void lsp_force_diagnostics(EditorState *state);
+void lsp_send_message(EditorState *state, const char *json_message);
+void lsp_process_received_data(EditorState *state, const char *buffer, size_t buffer_len);
+char* json_escape_string(const char *str);
+
+void lsp_send_did_change(EditorState *state);
+void lsp_force_diagnostics(EditorState *state);
+
+
+
+
+void create_hover_window(EditorState *state);
+void destroy_hover_window(EditorState *state);
+void draw_hover_tooltip(WINDOW *win, EditorState *state);
