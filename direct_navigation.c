@@ -1,3 +1,14 @@
+#include "direct_navigation.h" // Include its own header
+#include "defs.h" // For EditorState, etc.
+#include "screen_ui.h" // For redesenhar_todas_as_janelas
+#include "window_managment.h" // For redesenhar_todas_as_janelas
+
+#include <limits.h> // For PATH_MAX
+#include <unistd.h> // For chdir, getcwd
+#include <errno.h> // For errno
+#include <ctype.h> // For tolower
+#include <stdio.h> // For sscanf, fgets, fopen, fclose
+
 // ===================================================================
 // 4. Directory Navigation
 // ===================================================================
@@ -6,7 +17,8 @@ void get_history_filename(char *buffer, size_t size) {
     const char *home_dir = getenv("HOME");
     if (home_dir) {
         snprintf(buffer, size, "%s/.jntd_dir_history", home_dir);
-    } else {
+    }
+    else {
         snprintf(buffer, size, ".jntd_dir_history");
     }
 }
@@ -28,10 +40,11 @@ void load_directory_history(EditorState *state) {
     if (!f) return;
 
     char line[MAX_LINE_LEN];
+    const char* sscanf_format = "%d %1023[^\n]"; // Declared format string
     while (fgets(line, sizeof(line), f)) {
         int count;
         char path[1024];
-        if (sscanf(line, "%d %1023[^\n]", &count, path) == 2) {
+        if (sscanf(line, sscanf_format, &count, path) == 2) { // Used variable here
             DirectoryInfo *new_dir = malloc(sizeof(DirectoryInfo));
             if (!new_dir) continue;
             
@@ -52,7 +65,7 @@ void load_directory_history(EditorState *state) {
             state->recent_dirs[state->num_recent_dirs - 1] = new_dir;
         }
     }
-    fclose(f);
+    fclose(f); // Moved fclose inside the function
 
     if (state->num_recent_dirs > 0) {
         qsort(state->recent_dirs, state->num_recent_dirs, sizeof(DirectoryInfo*), compare_dirs);
@@ -108,7 +121,8 @@ void change_directory(EditorState *state, const char *new_path) {
         if (getcwd(cwd, sizeof(cwd)) != NULL) {
             snprintf(state->status_msg, sizeof(state->status_msg), "Diretório mudado para: %s", cwd);
         }
-    } else {
+    }
+    else {
         snprintf(state->status_msg, sizeof(state->status_msg), "Erro ao mudar para: %s", strerror(errno));
     }
 }
@@ -123,8 +137,8 @@ void display_directory_navigator(EditorState *state) {
     int rows, cols;
     getmaxyx(stdscr, rows, cols);
 
-    int win_h = min(state->num_recent_dirs + 4, rows - 4);
-    if (win_h < 10) win_h = 10;
+    int win_h = max(state->num_recent_dirs + 4, 10); // Use max from defs.h
+    win_h = min(win_h, rows - 4); // Use min from defs.h
     int win_w = cols - 10;
     if (win_w < 50) win_w = 50;
     int win_y = (rows - win_h) / 2;
@@ -244,10 +258,10 @@ void prompt_for_directory_change(EditorState *state) {
 
     if (strlen(path_buffer) > 0) {
         change_directory(state, path_buffer);
-    } else {
+    }
+    else {
         snprintf(state->status_msg, sizeof(state->status_msg), "No path entered. Cancelled.");
     }
     
     redesenhar_todas_as_janelas();
 }
-
