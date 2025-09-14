@@ -1,21 +1,17 @@
-#ifndef max
-#define max(a, b) ((a) > (b) ? (a) : (b))
-#endif
-#ifndef min
-#define min(a, b) ((a) < (b) ? (a) : (b))
-#endif
+#include "defs.h"
+#include "screen_ui.h"
+#include "window_managment.h"
+#include "fileio.h"
+#include "direct_navigation.h"
+#include "command_execution.h"
+#include "others.h"
+#include "lsp_client.h"
+#include "timer.h"
+#include <locale.h>
 
-#include "defs.c"
-#include "screen_ui.c"
-#include "window_managment.c"
-#include "fileio.c"
-#include "direct_navigation.c"
-#include "command_execution.c"
-#include "others.c"
+// Global variable definition
+GerenciadorJanelas gerenciador;
 
-// ===================================================================
-// 1. Core Editor & Initialization
-// ===================================================================
 void inicializar_ncurses() {
     initscr(); cbreak(); noecho(); keypad(stdscr, TRUE);
     start_color();
@@ -31,8 +27,10 @@ void inicializar_ncurses() {
 }
 
 int main(int argc, char *argv[]) {
+    EditorState state;
+    memset(&state, 0, sizeof(EditorState));
     start_work_timer();
-    setlocale(LC_ALL, ""); 
+    setlocale(LC_ALL, "");
     inicializar_ncurses();
     
     inicializar_gerenciador_janelas();
@@ -40,6 +38,13 @@ int main(int argc, char *argv[]) {
     if (argc > 1) {
         criar_nova_janela(argv[1]);
         EditorState *state = gerenciador.janelas[0]->estado;
+    
+        napms(100);
+        
+        lsp_initialize(state);
+        // Esperar um pouco pela inicialização antes de didOpen
+        napms(500);
+
         if (argc > 2) {
             state->current_line = atoi(argv[2]) - 1;
             if (state->current_line >= state->num_lines) {
@@ -74,16 +79,28 @@ int main(int argc, char *argv[]) {
 
         ensure_cursor_in_bounds(state);
         check_external_modification(state);
-        
+
         time_t now = time(NULL);
         if (now - state->last_auto_save_time >= AUTO_SAVE_INTERVAL) {
             auto_save(state);
             state->last_auto_save_time = now;
         }
         
+
+        if (state->lsp_enabled) {
+            lsp_process_messages(state);
+        }
         redesenhar_todas_as_janelas();
         wint_t ch;
         wget_wch(active_win, &ch);
+        
+        static int check_counter = 0;
+        if (check_counter++ % 10 == 0) {
+            if (state->lsp_enabled && !lsp_process_alive(state)) {
+                snprintf(state->status_msg, STATUS_MSG_LEN, "LSP terminou inesperadamente");
+                state->lsp_enabled = false;
+            }
+        }
 
         if (state->completion_mode != COMPLETION_NONE) {
             int win_h = 0;
@@ -103,7 +120,7 @@ int main(int argc, char *argv[]) {
                         state->completion_scroll_top = state->selected_suggestion;
                     }
                     break;
-                case ' 	':
+                case ' ':
                 case KEY_DOWN:
                     state->selected_suggestion++;
                     if (state->selected_suggestion >= state->num_suggestions) {
@@ -226,15 +243,18 @@ int main(int argc, char *argv[]) {
                 handle_command_mode_key(state, ch, &should_exit);
                 break;
         }
-    }
-
+    }    
+        
     for (int i = 0; i < gerenciador.num_janelas; i++) {
+        EditorState *estado_janela = gerenciador.janelas[i]->estado;
+        if (estado_janela->lsp_enabled) {
+            lsp_shutdown(estado_janela);
+        }
         free_janela_editor(gerenciador.janelas[i]);
     }
     free(gerenciador.janelas);
-
+    
     stop_and_log_work();
     endwin(); 
     return 0;
 }
-
