@@ -1,0 +1,158 @@
+# =============================================================
+# Syntax Configuration File for C Language
+# Maps keywords to the core IDs defined in the editor
+# =============================================================
+
+# Color 3 (Yellow: Keywords of C)
+# -------------------------------------------------------------
+KEYWORD:PINTO
+KEYWORD:auto
+KEYWORD:break
+KEYWORD:case
+KEYWORD:const
+KEYWORD:continue
+KEYWORD:default
+KEYWORD:do
+KEYWORD:else
+KEYWORD:enum
+KEYWORD:extern
+KEYWORD:for
+KEYWORD:goto
+KEYWORD:if
+KEYWORD:inline
+KEYWORD:register
+KEYWORD:restrict
+KEYWORD:return
+KEYWORD:sizeof
+KEYWORD:static
+KEYWORD:struct
+KEYWORD:switch
+KEYWORD:typedef
+KEYWORD:union
+KEYWORD:volatile
+KEYWORD:while
+
+# Color 4 (Green): Data types and modifers
+# -------------------------------------------------------------
+TYPE:char
+TYPE:double
+TYPE:float
+TYPE:int
+TYPE:long
+TYPE:short
+TYPE:signed
+TYPE:unsigned
+TYPE:void
+TYPE:_Bool
+TYPE:_Complex
+TYPE:_Imaginary
+TYPE:FILE
+TYPE:size_t
+TYPE:time_t
+TYPE:va_list
+TYPE:ptrdiff_t
+TYPE:fpos_t
+
+# Color 5 (Blue): Functios of deafult libraly
+# -------------------------------------------------------------
+
+# <stdio.h> - IO
+STD_FUNCTION:printf
+STD_FUNCTION:scanf
+STD_FUNCTION:fprintf
+STD_FUNCTION:sprintf
+STD_FUNCTION:sscanf
+STD_FUNCTION:fscanf
+STD_FUNCTION:fopen
+STD_FUNCTION:fclose
+STD_FUNCTION:fgetc
+STD_FUNCTION:fgets
+STD_FUNCTION:fputc
+STD_FUNCTION:fputs
+STD_FUNCTION:getchar
+STD_FUNCTION:gets
+STD_FUNCTION:putchar
+STD_FUNCTION:puts
+STD_FUNCTION:fread
+STD_FUNCTION:fwrite
+STD_FUNCTION:fseek
+STD_FUNCTION:ftell
+STD_FUNCTION:rewind
+STD_FUNCTION:perror
+STD_FUNCTION:remove
+STD_FUNCTION:rename
+
+# <stdlib.h> - General utility functions
+STD_FUNCTION:malloc
+STD_FUNCTION:calloc
+STD_FUNCTION:realloc
+STD_FUNCTION:free
+STD_FUNCTION:atoi
+STD_FUNCTION:atof
+STD_FUNCTION:atol
+STD_FUNCTION:strtol
+STD_FUNCTION:strtoul
+STD_FUNCTION:strtod
+STD_FUNCTION:rand
+STD_FUNCTION:srand
+STD_FUNCTION:system
+STD_FUNCTION:exit
+STD_FUNCTION:abort
+STD_FUNCTION:getenv
+STD_FUNCTION:qsort
+STD_FUNCTION:bsearch
+STD_FUNCTION:abs
+STD_FUNCTION:labs
+
+# <string.h> - Strings manipulation
+STD_FUNCTION:strcpy
+STD_FUNCTION:strncpy
+STD_FUNCTION:strcat
+STD_FUNCTION:strncat
+STD_FUNCTION:strcmp
+STD_FUNCTION:strncmp
+STD_FUNCTION:strlen
+STD_FUNCTION:strchr
+STD_FUNCTION:strrchr
+STD_FUNCTION:strstr
+STD_FUNCTION:strtok
+STD_FUNCTION:memset
+STD_FUNCTION:memcpy
+STD_FUNCTION:memmove
+STD_FUNCTION:memcmp
+STD_FUNCTION:strerror
+
+# <math.h> - Matemathical functions
+STD_FUNCTION:sin
+STD_FUNCTION:cos
+STD_FUNCTION:tan
+STD_FUNCTION:asin
+STD_FUNCTION:acos
+STD_FUNCTION:atan
+STD_FUNCTION:sqrt
+STD_FUNCTION:pow
+STD_FUNCTION:exp
+STD_FUNCTION:log
+STD_FUNCTION:log10
+STD_FUNCTION:fabs
+STD_FUNCTION:ceil
+STD_FUNCTION:floor
+
+# <ctype.h> - Carachter functions
+STD_FUNCTION:isalpha
+STD_FUNCTION:isdigit
+STD_FUNCTION:isalnum
+STD_FUNCTION:isspace
+STD_FUNCTION:isupper
+STD_FUNCTION:islower
+STD_FUNCTION:toupper
+STD_FUNCTION:tolower
+
+# <time.h> - Time functions
+STD_FUNCTION:time
+STD_FUNCTION:difftime
+STD_FUNCTION:mktime
+STD_FUNCTION:strftime
+STD_FUNCTION:localtime
+STD_FUNCTION:gmtime
+STD_FUNCTION:clock
