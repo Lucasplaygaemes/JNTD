@@ -10,7 +10,7 @@
 #include <locale.h>
 
 // Global variable definition
-GerenciadorJanelas gerenciador;
+// GerenciadorJanelas gerenciador; // Definido em defs.c
 
 void inicializar_ncurses() {
     initscr(); cbreak(); noecho(); keypad(stdscr, TRUE);
