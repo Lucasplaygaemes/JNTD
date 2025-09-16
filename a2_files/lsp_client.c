@@ -812,6 +812,15 @@ void lsp_initialize(EditorState *state) {
         state->lsp_client = NULL;
         return;
     }
+
+    // Se a linguagem for plaintext, não inicie o servidor LSP.
+    if (strcmp(state->lsp_client->languageId, "plaintext") == 0) {
+        free(state->lsp_client->languageId);
+        free(state->lsp_client);
+        state->lsp_client = NULL;
+        state->lsp_enabled = false;
+        return;
+    }
     
     // Iniciar o servidor LSP (clangd para C/C++)
     int stdin_pipe[2], stdout_pipe[2], stderr_pipe[2];

@@ -20,7 +20,7 @@
 // Helper function to determine syntax file based on extension
 const char * get_syntax_file_from_extension(const char* filename) {
     const char* ext = strrchr(filename, '.');
-    if (!ext) return "c.syntax"; // Default to C
+    if (!ext) return NULL; // Default to no syntax highlighting
     
     if (strcmp(ext, ".c") == 0 || strcmp(ext, ".h") == 0)
         return "c.syntax";
@@ -47,7 +47,7 @@ const char * get_syntax_file_from_extension(const char* filename) {
     else if (strcmp(ext, ".go") == 0)
         return "go.syntax";
     
-    return "c.syntax"; // Default
+    return NULL; // Default to no syntax highlighting for unknown extensions
 }
 
 void load_file_core(EditorState *state, const char *filename) {
@@ -249,12 +249,6 @@ void editor_reload_file(EditorState *state) {
 }
 
 void load_syntax_file(EditorState *state, const char *filename) {
-    FILE *file = fopen(filename, "r");
-    if (!file) {
-        snprintf(state->status_msg, sizeof(state->status_msg), "Erro: sintaxe '%s' nao encontrada.", filename);
-        return;
-    }
-
     // Limpa as regras de sintaxe existentes antes de carregar novas
     if (state->syntax_rules) {
         for (int i = 0; i < state->num_syntax_rules; i++) {
@@ -263,6 +257,16 @@ void load_syntax_file(EditorState *state, const char *filename) {
         free(state->syntax_rules);
         state->syntax_rules = NULL;
         state->num_syntax_rules = 0;
+    }
+
+    if (!filename) {
+        return; // No syntax file to load, just clear old rules.
+    }
+
+    FILE *file = fopen(filename, "r");
+    if (!file) {
+        snprintf(state->status_msg, sizeof(state->status_msg), "Erro: sintaxe '%s' nao encontrada.", filename);
+        return;
     }
 
     char line_buffer[256];
