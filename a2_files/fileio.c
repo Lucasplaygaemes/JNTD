@@ -263,10 +263,17 @@ void load_syntax_file(EditorState *state, const char *filename) {
         return; // No syntax file to load, just clear old rules.
     }
 
-    FILE *file = fopen(filename, "r");
+    char path[512];
+    snprintf(path, sizeof(path), "syntaxes/%s", filename);
+
+    FILE *file = fopen(path, "r");
     if (!file) {
-        snprintf(state->status_msg, sizeof(state->status_msg), "Erro: sintaxe '%s' nao encontrada.", filename);
-        return;
+        // Fallback to current directory if not found in syntaxes/
+        file = fopen(filename, "r");
+        if (!file) {
+            snprintf(state->status_msg, sizeof(state->status_msg), "Erro: sintaxe '%s' nao encontrada.", filename);
+            return;
+        }
     }
 
     char line_buffer[256];
