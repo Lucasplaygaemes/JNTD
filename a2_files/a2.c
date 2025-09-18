@@ -8,6 +8,8 @@
 #include "lsp_client.h"
 #include "timer.h"
 #include <locale.h>
+#include <libgen.h> // For dirname()
+#include <limits.h> // For PATH_MAX
 
 // Global variable definition
 // GerenciadorJanelas gerenciador; // Definido em defs.c
@@ -27,6 +29,16 @@ void inicializar_ncurses() {
 }
 
 int main(int argc, char *argv[]) {
+    // Find and store the executable's directory path
+    char exe_path_buf[PATH_MAX];
+    if (realpath(argv[0], exe_path_buf)) {
+        char* dir = dirname(exe_path_buf);
+        if (dir) {
+            strncpy(executable_dir, dir, PATH_MAX - 1);
+            executable_dir[PATH_MAX - 1] = '\0';
+        }
+    }
+
     EditorState state;
     memset(&state, 0, sizeof(EditorState));
     start_work_timer();

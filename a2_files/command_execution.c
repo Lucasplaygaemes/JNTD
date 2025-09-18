@@ -91,9 +91,7 @@ void process_command(EditorState *state, bool *should_exit) {
         state->current_line = 0; state->current_col = 0; state->ideal_col = 0; state->top_line = 0; state->left_col = 0;
         snprintf(state->status_msg, sizeof(state->status_msg), "New file opened.");
     } else if (strcmp(command, "timer") == 0) {
-        def_prog_mode(); endwin();
         display_work_summary();
-        reset_prog_mode(); refresh();
     } else if (strcmp(command, "diff") == 0) {
         diff_command(state, args);
     } else if (strcmp(command, "set") == 0) {

@@ -263,8 +263,14 @@ void load_syntax_file(EditorState *state, const char *filename) {
         return; // No syntax file to load, just clear old rules.
     }
 
-    char path[512];
-    snprintf(path, sizeof(path), "syntaxes/%s", filename);
+    char path[PATH_MAX];
+    // If the executable path is known, construct an absolute path to syntaxes
+    if (executable_dir[0] != '\0') {
+        snprintf(path, sizeof(path), "%s/syntaxes/%s", executable_dir, filename);
+    } else {
+        // Fallback to the old relative path method
+        snprintf(path, sizeof(path), "syntaxes/%s", filename);
+    }
 
     FILE *file = fopen(path, "r");
     if (!file) {
