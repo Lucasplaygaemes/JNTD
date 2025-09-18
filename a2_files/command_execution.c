@@ -208,22 +208,26 @@ void execute_shell_command(EditorState *state) {
     FILE *f = fopen(temp_output_file, "r");
     if(f) {
         fseek(f, 0, SEEK_END); long size = ftell(f); fclose(f);
-        if (size > 0 && size < 96) {
+        long max_status_bar_size = 70;
+        if (size > 0 && size <= max_status_bar_size) {
             FILE *read_f = fopen(temp_output_file, "r");
-            char buffer[STATUS_MSG_LEN] = {0};
+            char buffer[max_status_bar_size + 2];
             size_t n = fread(buffer, 1, sizeof(buffer) - 1, read_f);
             fclose(read_f);
-            if (n > 0 && buffer[n-1] == '\n') buffer[n-1] = '\0';
+            buffer[n] = '\0';
+
+            if (n > 0 && buffer[n-1] == '\n') {
+                buffer[n-1] = '\0';
+            }
+
             if(strchr(buffer, '\n') == NULL) {
-                char display_output[80];
-                strncpy(display_output, buffer, sizeof(display_output) - 1);
-                display_output[sizeof(display_output) - 1] = '\0';
-                snprintf(state->status_msg, sizeof(state->status_msg), "Saída: %s", display_output);
+                snprintf(state->status_msg, sizeof(state->status_msg), "Saída: %s", buffer);
                 remove(temp_output_file);
                 return;
             }
         }
-        display_output_screen("---SAÍDA DO COMANDO---", temp_output_file);
+        display_output_screen("---\
+SAÍDA DO COMANDO---", temp_output_file);
         snprintf(state->status_msg, sizeof(state->status_msg), "Comando '%s' executado.", cmd);
     } else {
         snprintf(state->status_msg, sizeof(state->status_msg), "Comando executado, mas sem saída.");

@@ -135,8 +135,6 @@ void editor_redraw(WINDOW *win, EditorState *state) {
     int content_height = rows - (border_offset + 1); 
     int screen_y = 0;
 
-    state->status_msg[0] = '\0';
-
     if (state->word_wrap_enabled) {
         state->left_col = 0;
         int visual_line_idx = 0;
@@ -434,6 +432,9 @@ void editor_redraw(WINDOW *win, EditorState *state) {
     if (diag) {
         draw_diagnostic_popup(win, state, diag->message);
     }
+
+    // Clear the status message for the next redraw cycle
+    state->status_msg[0] = '\0';
 }
 
 
