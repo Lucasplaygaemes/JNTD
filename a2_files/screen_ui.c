@@ -8,6 +8,77 @@
 // ===================================================================
 // Screen & UI
 // ===================================================================
+WINDOW *draw_pop_up(const char *message, int y, int x) {
+    if (!message || !*message) {
+        return NULL;
+    }
+    int max_width = 0;
+    int num_lines = 0;
+    const char *ptr = message;
+    
+    while (*ptr) {
+        num_lines++;
+        const char *line_start = ptr;
+        const char *line_end = strchr(ptr, '\n');
+        int line_len;
+                
+        if (line_end) {
+            line_len = line_end - line_start;
+            ptr = line_end + 1;
+       } else {
+           line_len = strlen(line_start);
+           ptr += line_len;
+       }
+       if (line_len > max_width) {
+           max_width = line_len;
+       }
+   }        
+   
+   int win_height = num_lines + 2;
+   int win_width = max_width + 4;
+   
+   int term_rows, term_cols;
+   getmaxyx(stdscr, term_rows, term_cols);
+   
+   if (win_width > term_cols) win_width = term_cols;
+   if (win_height > term_cols) win_height = term_cols;
+   if (win_width >  term_cols - 2) win_width = term_cols - 2;
+   
+   if (y + win_height > term_rows) {
+       y = term_rows - win_height;
+   }
+   if (x + win_width > term_cols) {
+       x = term_cols;
+   }
+   if (x < 0) x = 0;
+   if (y < 0) y = 0;
+   
+   WINDOW *popup_win = newwin(win_height, win_width, y, x);
+   wbkgd(popup_win, COLOR_PAIR(8));
+   box(popup_win, 0, 0);
+   
+   ptr = message;
+   for (int i = 0; i < num_lines; i++) {
+       const char *line_start = ptr;
+       const char *line_end = strchr(ptr, '\n');
+       int line_len;
+       
+       if (line_end) {
+           line_len = line_end - line_start;
+           ptr = line_end + 1;
+       } else {
+           line_len = strlen(line_start);
+           ptr += line_len;
+       }                    
+       
+       if (line_len > win_width - 4) {
+           line_len = win_width - 4;
+       }
+       
+       mvwprintw(popup_win, i + 1, 2, "%.*s", line_len, line_start);
+   }
+   return popup_win;
+}
 
 void draw_diagnostic_popup(WINDOW *main_win, EditorState *state, const char *message) {
     if (!message || !*message) {

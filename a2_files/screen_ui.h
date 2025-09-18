@@ -13,5 +13,5 @@ void display_help_screen();
 void display_output_screen(const char *title, const char *filename);
 FileViewer* create_file_viewer(const char* filename);
 void destroy_file_viewer(FileViewer* viewer);
-
+WINDOW* draw_pop_up(const char *message, int y, int x);
 #endif // SCREEN_UI_H
