@@ -3,6 +3,7 @@
 
 #define _XOPEN_SOURCE 700
 #define NCURSES_WIDECHAR 1
+#include <limits.h> // Para PATH_MAX
 
 #include <ncurses.h>
 #include <stdlib.h>
@@ -264,5 +265,7 @@ typedef struct {
 #endif
 
 extern GerenciadorJanelas gerenciador;
+
+extern char executable_dir[PATH_MAX];
 
 #endif // DEFS_H
