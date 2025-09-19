@@ -270,7 +270,6 @@ void clear_redo_stack(EditorState *state);
 void editor_find_unmatched_brackets(EditorState *state);
 bool is_unmatched_bracket(EditorState *state, int line, int col);
 
-
 // Funções para recuperação de arquivo
 FileRecoveryChoice display_recovery_prompt(WINDOW *win, EditorState *state);
 void handle_file_recovery(EditorState *state, const char *original_filename, const char *sv_filename);
