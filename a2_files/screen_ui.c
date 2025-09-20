@@ -336,10 +336,10 @@ void editor_redraw(WINDOW *win, EditorState *state) {
                                     if (start_x >= 1) mvwaddch(win, y_pos, start_x - 1, '[');
                                     wattroff(win, COLOR_PAIR(color_pair));
 
-                                    mvwchgat(win, y_pos, start_x, end_x - start_x, A_UNDERLINE, color_pair, NULL);
+                                    mvwchgat(win, y_pos, start_x, (end_x - start_x) + 1, A_UNDERLINE, color_pair, NULL);
 
                                     wattron(win, COLOR_PAIR(color_pair));
-                                    if (end_x < cols) mvwaddch(win, y_pos, end_x, ']');
+                                    if (end_x < cols - 1) mvwaddch(win, y_pos, end_x + 1, ']');
                                     wattroff(win, COLOR_PAIR(color_pair));
                                 }
                             }
@@ -436,13 +436,13 @@ void editor_redraw(WINDOW *win, EditorState *state) {
                             }
 
                             wattron(win, COLOR_PAIR(color_pair));
-                            if (start_x >= 1 + border_offset) mvwaddch(win, y_pos, start_x - 1, '[');
+                            if (start_x > border_offset) mvwaddch(win, y_pos, start_x - 1, '[');
                             wattroff(win, COLOR_PAIR(color_pair));
 
-                            mvwchgat(win, y_pos, start_x, end_x - start_x, A_UNDERLINE, color_pair, NULL);
+                            mvwchgat(win, y_pos, start_x, (end_x - start_x) + 1, A_UNDERLINE, color_pair, NULL);
 
                             wattron(win, COLOR_PAIR(color_pair));
-                            if (end_x < cols - border_offset) mvwaddch(win, y_pos, end_x, ']');
+                            if (end_x < cols - 1 - border_offset) mvwaddch(win, y_pos, end_x + 1, ']');
                             wattroff(win, COLOR_PAIR(color_pair));
                         }
                     }
@@ -638,18 +638,27 @@ void display_help_screen() {
     static const CommandInfo commands[] = {
         { ":w", "Save the current file." },
         { ":w <name>", "Save with a new name." },
-        { ":q", "Exit." },
-        { ":wq", "Save and exit" },
-        { ":open <name>", "Open a file" },
+        { ":q", "Exit the editor." },
+        { ":wq", "Save and exit." },
+        { ":open <name>", "Open a file." },
         { ":new", "Creates a blank file." },
-        { ":help", "Show this help screen" },
-        { ":gcc [libs]", "Compile the current file, (ex: :gcc -lm)." },
-        { "![cmd]", "Execute a command in the shell, (ex: !ls -l)." },
-        { ":rc", "Reload the current file." } ,
-        { ":diff", "Show the difference between 2 files, <ex: (diff a2.c a1.c)," },
-        { ":set paste", "Enable paste mode to prevent auto-indent on paste." } ,
-        { ":set nopaste", "Disable paste mode and re-enable auto-indent." } ,
-        { ":timer", "Show the timer, it count the passed time using the editor." }
+        { ":help", "Show this help screen." },
+        { ":gcc [libs]", "Compile the current file (e.g., :gcc -lm)." },
+        { "![cmd]", "Execute a shell command (e.g., !ls -l)." },
+        { ":rc", "Reload the current file." },
+        { ":diff <f1> <f2>", "Show the difference between two files." },
+        { ":set paste", "Enable paste mode (disables auto-indent)." },
+        { ":set nopaste", "Disable paste mode." },
+        { ":timer", "Show the work time report." },
+        { ":lsp-status", "Check the status of the LSP server." },
+        { ":lsp-restart", "Restart the LSP server." },
+        { ":lsp-diag", "Show diagnostics (errors/warnings)." },
+        { ":lsp-definition", "Go to the definition of a symbol." },
+        { ":lsp-hover", "Show information about the symbol under the cursor." },
+        { ":lsp-references", "List all references to a symbol." },
+        { ":lsp-rename <n>", "Rename the symbol under the cursor to <new_name>." },
+        { ":lsp-symbols", "List symbols in the current document." },
+        { ":lsp-refresh", "Force a refresh of LSP diagnostics." }
     };
     
     int num_commands = sizeof(commands) / sizeof(commands[0]);

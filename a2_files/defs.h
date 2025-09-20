@@ -239,12 +239,23 @@ typedef struct JanelaEditor {
 } JanelaEditor;
 #endif
 
+#ifndef LAYOUT_MODE_DEFINED
+#define LAYOUT_MODE_DEFINED
+typedef enum {
+    LAYOUT_VERTICAL_SPLIT,
+    LAYOUT_HORIZONTAL_SPLIT,
+    LAYOUT_MAIN_AND_STACK,
+    LAYOUT_GRID
+} LayoutMode;
+#endif
+
 #ifndef GERENCIADOR_JANELAS_DEFINED
 #define GERENCIADOR_JANELAS_DEFINED
 typedef struct {
     JanelaEditor **janelas;
     int num_janelas;
     int janela_ativa_idx;
+    LayoutMode current_layout;
 } GerenciadorJanelas;
 #endif
 

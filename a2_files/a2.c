@@ -189,6 +189,13 @@ int main(int argc, char *argv[]) {
                     editor_move_to_previous_word(state);
                 } else if (next_ch == 'g' || next_ch == 'G') {
                     prompt_for_directory_change(state);
+                } else if (next_ch == '.' || next_ch == '>') {
+                    ciclar_layout();
+                } else if (next_ch >= '1' && next_ch <= '9') {
+                    int target_pos = next_ch - '1';
+                    mover_janela_para_posicao(target_pos);
+                } else if (next_ch == 'r' || next_ch == 'R') {
+                    rotacionar_janelas();
                 }
             }
             continue;

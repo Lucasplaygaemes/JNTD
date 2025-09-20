@@ -51,6 +51,46 @@ void inicializar_gerenciador_janelas() {
     gerenciador.janelas = NULL;
     gerenciador.num_janelas = 0;
     gerenciador.janela_ativa_idx = -1;
+    gerenciador.current_layout = LAYOUT_VERTICAL_SPLIT; // Layout padrão
+}
+
+// Adicione esta nova função em a2_files/window_managment.c
+void ciclar_layout() {
+    if (gerenciador.num_janelas <= 1) return; // Não faz nada com 1 ou 0 janelas
+
+    switch (gerenciador.num_janelas) {
+        case 2:
+            // Alterna entre Vertical e Horizontal
+            if (gerenciador.current_layout == LAYOUT_VERTICAL_SPLIT) {
+                gerenciador.current_layout = LAYOUT_HORIZONTAL_SPLIT;
+            } else {
+                gerenciador.current_layout = LAYOUT_VERTICAL_SPLIT;
+            }
+            break;
+        case 3:
+            // Alterna entre Vertical e Principal + Empilhado
+            if (gerenciador.current_layout == LAYOUT_VERTICAL_SPLIT) {
+                gerenciador.current_layout = LAYOUT_MAIN_AND_STACK;
+            } else {
+                gerenciador.current_layout = LAYOUT_VERTICAL_SPLIT;
+            }
+            break;
+        case 4:
+            // Alterna entre Vertical e Grade
+            if (gerenciador.current_layout == LAYOUT_VERTICAL_SPLIT) {
+                gerenciador.current_layout = LAYOUT_GRID;
+            } else {
+                gerenciador.current_layout = LAYOUT_VERTICAL_SPLIT;
+            }
+            break;
+        default:
+            // Para 5+ janelas, força o layout vertical
+            gerenciador.current_layout = LAYOUT_VERTICAL_SPLIT;
+            break;
+    }
+
+    recalcular_layout_janelas();
+    redesenhar_todas_as_janelas();
 }
 
 void recalcular_layout_janelas() {
@@ -59,14 +99,83 @@ void recalcular_layout_janelas() {
 
     if (gerenciador.num_janelas == 0) return;
 
-    int largura_janela = screen_cols / gerenciador.num_janelas;
+    // Se um layout for inválido para o número atual de janelas, volte ao padrão.
+    if ((gerenciador.num_janelas != 2 && gerenciador.current_layout == LAYOUT_HORIZONTAL_SPLIT) ||
+        (gerenciador.num_janelas != 3 && gerenciador.current_layout == LAYOUT_MAIN_AND_STACK) ||
+        (gerenciador.num_janelas != 4 && gerenciador.current_layout == LAYOUT_GRID)) {
+        gerenciador.current_layout = LAYOUT_VERTICAL_SPLIT;
+    }
+
+    switch (gerenciador.current_layout) {
+        case LAYOUT_HORIZONTAL_SPLIT: // 2 Janelas: uma em cima, outra embaixo
+            if (gerenciador.num_janelas == 2) {
+                int altura_janela = screen_rows / 2;
+                for (int i = 0; i < 2; i++) {
+                    gerenciador.janelas[i]->y = i * altura_janela;
+                    gerenciador.janelas[i]->x = 0;
+                    gerenciador.janelas[i]->largura = screen_cols;
+                    gerenciador.janelas[i]->altura = (i == 1) ? (screen_rows - altura_janela) : altura_janela;
+                }
+            }
+            break;
+
+        case LAYOUT_MAIN_AND_STACK: // 3 Janelas: 1 grande à esquerda, 2 pequenas à direita
+            if (gerenciador.num_janelas == 3) {
+                int main_width = screen_cols / 2;
+                int stack_width = screen_cols - main_width;
+                int stack_height = screen_rows / 2;
+
+                // Janela principal
+                gerenciador.janelas[0]->y = 0;
+                gerenciador.janelas[0]->x = 0;
+                gerenciador.janelas[0]->largura = main_width;
+                gerenciador.janelas[0]->altura = screen_rows;
+
+                // Duas janelas empilhadas
+                gerenciador.janelas[1]->y = 0;
+                gerenciador.janelas[1]->x = main_width;
+                gerenciador.janelas[1]->largura = stack_width;
+                gerenciador.janelas[1]->altura = stack_height;
+
+                gerenciador.janelas[2]->y = stack_height;
+                gerenciador.janelas[2]->x = main_width;
+                gerenciador.janelas[2]->largura = stack_width;
+                gerenciador.janelas[2]->altura = screen_rows - stack_height;
+            }
+            break;
+
+        case LAYOUT_GRID: // 4 Janelas: grade 2x2
+            if (gerenciador.num_janelas == 4) {
+                int win_w = screen_cols / 2;
+                int win_h = screen_rows / 2;
+                gerenciador.janelas[0]->y = 0;     gerenciador.janelas[0]->x = 0;     // Top-left
+                gerenciador.janelas[1]->y = 0;     gerenciador.janelas[1]->x = win_w; // Top-right
+                gerenciador.janelas[2]->y = win_h; gerenciador.janelas[2]->x = 0;     // Bottom-left
+                gerenciador.janelas[3]->y = win_h; gerenciador.janelas[3]->x = win_w; // Bottom-right
+
+                for(int i=0; i<4; i++) {
+                    gerenciador.janelas[i]->altura = (i >= 2) ? screen_rows - win_h : win_h;
+                    gerenciador.janelas[i]->largura = (i % 2 != 0) ? screen_cols - win_w : win_w;
+                }
+            }
+            break;
+
+        case LAYOUT_VERTICAL_SPLIT: // Layout padrão (todas lado a lado)
+        default: {
+            int largura_janela = screen_cols / gerenciador.num_janelas;
+            for (int i = 0; i < gerenciador.num_janelas; i++) {
+                gerenciador.janelas[i]->y = 0;
+                gerenciador.janelas[i]->x = i * largura_janela;
+                gerenciador.janelas[i]->altura = screen_rows;
+                gerenciador.janelas[i]->largura = (i == gerenciador.num_janelas - 1) ? (screen_cols - gerenciador.janelas[i]->x) : largura_janela;
+            }
+            break;
+        }
+    }
+
+    // Redimensiona e recria as janelas ncurses
     for (int i = 0; i < gerenciador.num_janelas; i++) {
         JanelaEditor *jw = gerenciador.janelas[i];
-        jw->y = 0;
-        jw->x = i * largura_janela;
-        jw->altura = screen_rows;
-        jw->largura = (i == gerenciador.num_janelas - 1) ? (screen_cols - jw->x) : largura_janela;
-
         if (jw->win) {
             delwin(jw->win);
         }
@@ -74,6 +183,44 @@ void recalcular_layout_janelas() {
         keypad(jw->win, TRUE);
         scrollok(jw->win, FALSE);
     }
+}
+
+void rotacionar_janelas() {
+    if (gerenciador.num_janelas <= 1) {
+        return;
+    }
+    JanelaEditor *ultima_janela = gerenciador.janelas[gerenciador.num_janelas - 1];
+    
+    for (int i = gerenciador.num_janelas - 1; i > 0; i--) {
+        gerenciador.janelas[i] = gerenciador.janelas[i - 1];
+    }
+    
+    gerenciador.janelas[0] = ultima_janela;
+    
+    gerenciador.janela_ativa_idx = (gerenciador.janela_ativa_idx + 1) % gerenciador.num_janelas;
+    
+    recalcular_layout_janelas();
+    redesenhar_todas_as_janelas();
+}
+
+void mover_janela_para_posicao(int target_idx) {
+    int active_idx = gerenciador.janela_ativa_idx;
+
+    // Validação: verifica se o movimento é possível e necessário
+    if (gerenciador.num_janelas <= 1 || target_idx < 0 || target_idx >= gerenciador.num_janelas || target_idx == active_idx) {
+        return;
+    }
+
+    // Troca os ponteiros no array
+    JanelaEditor *janela_ativa_ptr = gerenciador.janelas[active_idx];
+    gerenciador.janelas[active_idx] = gerenciador.janelas[target_idx];
+    gerenciador.janelas[target_idx] = janela_ativa_ptr;
+
+    // Atualiza o índice da janela ativa, pois ela se moveu
+    gerenciador.janela_ativa_idx = target_idx;
+
+    recalcular_layout_janelas();
+    redesenhar_todas_as_janelas();
 }
 
 void criar_nova_janela(const char *filename) {

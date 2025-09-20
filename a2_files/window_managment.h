@@ -14,5 +14,8 @@ void posicionar_cursor_ativo();
 void fechar_janela_ativa(bool *should_exit);
 void proxima_janela();
 void janela_anterior();
+void ciclar_layout();
+void rotacionar_janelas();
+void mover_janela_para_posicao(int target_idx);
 
 #endif // WINDOW_MANAGMENT_H
