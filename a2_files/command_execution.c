@@ -168,6 +168,8 @@ void process_command(EditorState *state, bool *should_exit) {
          else {
               snprintf(state->status_msg, STATUS_MSG_LEN, "LSP não está ativo");
           }
+    } else if (strcmp(command, "lsp-list") == 0) {
+        display_diagnostics_list(state); 
     } else if (strcmp(command, "toggle_auto_indent") == 0) {
         state->auto_indent_on_newline = !state->auto_indent_on_newline;
         snprintf(state->status_msg, sizeof(state->status_msg), "Auto-indent on newline: %s", state->auto_indent_on_newline ? "ON" : "OFF");
