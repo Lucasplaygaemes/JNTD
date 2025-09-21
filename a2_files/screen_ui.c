@@ -4,6 +4,7 @@
 #include "lsp_client.h" // For lsp_draw_diagnostics, get_diagnostic_under_cursor
 #include "window_managment.h" // For gerenciador
 #include <ctype.h>
+#include <unistd.h>
 
 // ===================================================================
 // Screen & UI
@@ -548,62 +549,112 @@ void adjust_viewport(WINDOW *win, EditorState *state) {
 void get_visual_pos(WINDOW *win, EditorState *state, int *visual_y, int *visual_x) {
     int rows, cols;
     getmaxyx(win, rows, cols);
-    
+
     extern GerenciadorJanelas gerenciador;
     int border_offset = gerenciador.num_janelas > 1 ? 1 : 0;
-    int content_width = cols - 2 * border_offset;
+    int content_width = cols - (2 * border_offset);
+    if (content_width <= 0) content_width = 1;
 
     int y = 0;
     int x = 0;
 
     if (state->word_wrap_enabled) {
+        // Itera sobre as linhas ANTERIORES à do cursor para calcular o offset vertical
         for (int i = 0; i < state->current_line; i++) {
-            char* line = state->lines[i];
+            char *line = state->lines[i];
+            if (!line) continue;
             int line_len = strlen(line);
             if (line_len == 0) {
                 y++;
+                continue;
+            }
+
+            int line_offset = 0;
+            while (line_offset < line_len) {
+                y++;
+                int current_bytes = 0;
+                int current_width = 0;
+                int last_space_bytes = -1;
+
+                // Lógica de quebra de linha (idêntica à de editor_redraw)
+                while (line[line_offset + current_bytes] != '\0') {
+                    wchar_t wc;
+                    int bytes_consumed = mbtowc(&wc, &line[line_offset + current_bytes], MB_CUR_MAX);
+                    if (bytes_consumed <= 0) { bytes_consumed = 1; wc = ' '; }
+                    
+                    int char_width = wcwidth(wc);
+                    if (char_width < 0) char_width = 1;
+                    if (current_width + char_width > content_width) break;
+
+                    current_width += char_width;
+                    if (iswspace(wc)) {
+                        last_space_bytes = current_bytes + bytes_consumed;
+                    }
+                    current_bytes += bytes_consumed;
+                }
+
+                int break_pos;
+                if (line[line_offset + current_bytes] != '\0' && last_space_bytes != -1) {
+                    break_pos = last_space_bytes;
+                } else {
+                    break_pos = current_bytes;
+                }
+                if (break_pos == 0 && line_offset + current_bytes < line_len) {
+                    break_pos = current_bytes;
+                }
+                line_offset += break_pos;
+            }
+        }
+
+        // Agora, calcula a posição DENTRO da linha atual
+        char *current_line_str = state->lines[state->current_line];
+        int line_offset = 0;
+        while (line_offset < state->current_col) {
+            int segment_start_offset = line_offset;
+            int current_bytes = 0;
+            int current_width = 0;
+            int last_space_bytes = -1;
+
+            while (current_line_str[line_offset + current_bytes] != '\0') {
+                wchar_t wc;
+                int bytes_consumed = mbtowc(&wc, &current_line_str[line_offset + current_bytes], MB_CUR_MAX);
+                if (bytes_consumed <= 0) { bytes_consumed = 1; wc = ' '; }
+                
+                int char_width = wcwidth(wc);
+                if (char_width < 0) char_width = 1;
+                if (current_width + char_width > content_width) break;
+
+                current_width += char_width;
+                if (iswspace(wc)) {
+                    last_space_bytes = current_bytes + bytes_consumed;
+                }
+                current_bytes += bytes_consumed;
+            }
+            
+            int break_pos;
+            if (current_line_str[line_offset + current_bytes] != '\0' && last_space_bytes != -1) {
+                break_pos = last_space_bytes;
             } else {
-                int line_offset = 0;
-                while(line_offset < line_len) {
-                    int break_pos = (line_len - line_offset > content_width) ? content_width : line_len - line_offset;
-                    if (line_offset + break_pos < line_len) {
-                        int temp_break = -1;
-                        for (int j = break_pos - 1; j >= 0; j--) {
-                            if (isspace(line[line_offset + j])) {
-                                temp_break = j;
-                                break;
-                            }
-                        }
-                        if (temp_break != -1) break_pos = temp_break + 1;
-                    }
-                    line_offset += break_pos;
-                    y++;
-                }
+                break_pos = current_bytes;
+            }
+            if (break_pos == 0 && line_offset + current_bytes < strlen(current_line_str)) {
+                break_pos = current_bytes;
+            }
+
+            if (line_offset + break_pos < state->current_col) {
+                y++;
+                line_offset += break_pos;
+            } else {
+                break; // O cursor está neste segmento da linha
             }
         }
-        
-        int current_line_offset = 0;
-        while(current_line_offset + content_width < state->current_col) {
-            int break_pos = content_width;
-            if (current_line_offset + content_width < strlen(state->lines[state->current_line])) {
-                int temp_break = -1;
-                for (int j = content_width - 1; j >= 0; j--) {
-                    if (isspace(state->lines[state->current_line][current_line_offset + j])) {
-                        temp_break = j;
-                        break;
-                    }
-                }
-                if (temp_break != -1) break_pos = temp_break + 1;
-            }
-            current_line_offset += break_pos;
-            y++;
-        }
-        x = get_visual_col(state->lines[state->current_line] + current_line_offset, 
-                          state->current_col - current_line_offset);
-    } else {
+        x = get_visual_col(current_line_str + line_offset, state->current_col - line_offset);
+
+    } else { // Lógica para quando word wrap está desativado
         y = state->current_line;
         x = get_visual_col(state->lines[state->current_line], state->current_col);
     }
+
     *visual_y = y;
     *visual_x = x;
 }
@@ -754,3 +805,49 @@ void destroy_file_viewer(FileViewer* viewer) {
     free(viewer->lines);
     free(viewer);
 }
+
+void display_diagnostics_list(EditorState *state) {
+    if (!state->lsp_enabled || !state->lsp_document || state->lsp_document->diagnostics_count == 0) {
+        snprintf(state->status_msg, sizeof(state->status_msg), "No diagnostics to display.");
+        return;
+    }
+
+    char temp_filename[] = "/tmp/diag_list.XXXXXX";
+    int fd = mkstemp(temp_filename);
+    if (fd == -1) {
+        snprintf(state->status_msg, sizeof(state->status_msg), "Error creating temporary file.");
+        return;
+    }
+
+    FILE *temp_file = fdopen(fd, "w");
+    if (!temp_file) {
+        close(fd);
+        snprintf(state->status_msg, sizeof(state->status_msg), "Error opening temporary file.");
+        return;
+    }
+
+    fprintf(temp_file, "--- LSP Diagnostics ---\n\n");
+
+    for (int i = 0; i < state->lsp_document->diagnostics_count; i++) {
+        LspDiagnostic *diag = &state->lsp_document->diagnostics[i];
+        char severity_str[20];
+        switch (diag->severity) {
+            case LSP_SEVERITY_ERROR:   strcpy(severity_str, "[Error]");   break;
+            case LSP_SEVERITY_WARNING: strcpy(severity_str, "[Warning]"); break;
+            case LSP_SEVERITY_INFO:    strcpy(severity_str, "[Info]");    break;
+            case LSP_SEVERITY_HINT:    strcpy(severity_str, "[Hint]");    break;
+            default:                   strcpy(severity_str, "[Unknown]"); break;
+        }
+        fprintf(temp_file, "%s %s:%d:%d: %s\n", 
+                severity_str, 
+                state->filename, 
+                diag->range.start.line + 1, 
+                diag->range.start.character + 1, 
+                diag->message);
+    }
+
+    fclose(temp_file);
+
+    display_output_screen("--- LSP Diagnostics List ---", temp_filename);
+}
+

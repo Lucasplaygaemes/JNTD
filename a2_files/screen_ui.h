@@ -11,6 +11,7 @@ void get_visual_pos(WINDOW *win, EditorState *state, int *visual_y, int *visual_
 int get_visual_col(const char *line, int byte_col);
 void display_help_screen();
 void display_output_screen(const char *title, const char *filename);
+void display_diagnostics_list(EditorState *state);
 FileViewer* create_file_viewer(const char* filename);
 void destroy_file_viewer(FileViewer* viewer);
 WINDOW* draw_pop_up(const char *message, int y, int x);
