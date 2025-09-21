@@ -220,8 +220,13 @@ int main(int argc, char *argv[]) {
                                 state->current_line--;
                                 state->current_col = state->ideal_col;
                             }
-                            break;
+                        } else {
+                            if (state->current_line > 0) {
+                                state->current_line--;
+                                state->current_col = state->ideal_col;
+                            }
                         }
+                        break;
                     case KEY_DOWN: {
                         if (state->current_line < state->num_lines - 1) {
                             state->current_line++;

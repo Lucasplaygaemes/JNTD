@@ -13,7 +13,7 @@ const char *editor_commands[] = {
     "q", "q!", "w", "wq", "help", "gcc", "rc", "rc!", "open", "new", "timer", "diff", "set",
     "lsp-restart", "lsp-diag", "lsp-definition", "lsp-references", "lsp-rename",
     "lsp-status", "lsp-hover", "lsp-symbols", "lsp-refresh", "lsp-check", "lsp-debug",
-    "toggle_auto_indent"
+    "lsp-list", "toggle_auto_indent"
 };
 const int num_editor_commands = sizeof(editor_commands) / sizeof(char*);
 
