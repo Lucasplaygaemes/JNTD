@@ -798,6 +798,8 @@ void lsp_initialize(EditorState *state) {
             state->lsp_client->languageId = strdup("c");
         } else if (strcmp(ext, ".cpp") == 0 || strcmp(ext, ".hpp") == 0) {
             state->lsp_client->languageId = strdup("cpp");
+        } else if (strcmp(ext, ".py") == 0) {
+            state->lsp_client->languageId = strdup("python");
         } else {
             state->lsp_client->languageId = strdup("plaintext");
         }
@@ -851,12 +853,16 @@ void lsp_initialize(EditorState *state) {
         
         // Inicia o servidor LSP
         // Em lsp_initialize, use argumentos otimizados:
-        execlp("clangd", "clangd", 
-               "--background-index", 
-               "--log=error",
-               "--compile-commands-dir=.",
-               "--pretty",
-               NULL);
+        
+        if (strcmp(state->lsp_client->languageId, "c") == 0 || strcmp(state->lsp_client->languageId, "cpp") == 0) {
+            execlp("clangd", "clangd", 
+                   "--background-index", 
+                   "--log=error",
+                   "--pretty",
+                   NULL);
+        } else if (strcmp(state->lsp_client->languageId, "python") == 0) {
+            execlp("pylsp", "pylsp", NULL);
+        }
         exit(1);
     } else if (pid > 0) {
         // Processo pai
@@ -1086,7 +1092,7 @@ void lsp_send_initialize(EditorState *state) {
     } else {
         json_object_set_new(params, "rootUri", json_string("file:///tmp"));
     }
-    
+/*
     // Check for compile_commands.json
     char compile_commands_path[PATH_MAX];
     if (getcwd(cwd, sizeof(cwd)) != NULL) {
@@ -1105,9 +1111,35 @@ void lsp_send_initialize(EditorState *state) {
             json_object_set_new(params, "compilerArgs", args);
         }
     }
-    
-    json_object_set_new(params, "capabilities", capabilities);
-    
+*/
+    json_t *initOptions = json_object();
+    if (strcmp(state->lsp_client->languageId, "c") == 0 || strcmp(state->lsp_client->languageId, "cpp") == 0) {
+        if (getcwd(cwd, sizeof(cwd)) != NULL) {
+            json_object_set_new(initOptions, "compilationDatabasePath", json_string(cwd));
+            }
+        } else if (strcmp(state->lsp_client->languageId, "python") == 0) {
+            json_t *pylsp_plugins = json_object();
+            
+            json_t *ruff_plugin = json_object();
+            json_object_set_new(ruff_plugin, "enabled", json_true());
+            json_object_set_new(pylsp_plugins, "ruff", ruff_plugin);
+            
+            json_t *pycodestyle_plugin = json_object();
+            json_object_set_new(pycodestyle_plugin, "enabled", json_true());
+            json_object_set_new(pylsp_plugins, "pycodestyle", pycodestyle_plugin);
+            
+            json_t *pyflakes_plugin = json_object();
+            json_object_set_new(pyflakes_plugin, "enabled", json_true());
+            json_object_set_new(pylsp_plugins, "pyflakes", pyflakes_plugin);
+                
+            json_object_set_new(initOptions, "plugins", pylsp_plugins);
+        }
+        if (json_object_size(initOptions) > 0) {
+            json_object_set_new(params, "initializationOptions", initOptions);
+        } else {
+            json_decref(initOptions);
+     }
+            
     // Create and send message
     LspMessage *msg = lsp_create_message();
     msg->id = strdup("1");
@@ -1140,6 +1172,7 @@ void lsp_send_initialize(EditorState *state) {
     free(json_str);
     lsp_free_message(msg);
 }
+
 
 void lsp_send_message(EditorState *state, const char *json_message) {
     if (!lsp_is_available(state) || !json_message) return;
