@@ -10,11 +10,16 @@ There's no such thing as "right way to use". Because you can automate things whe
 The code access the Ollama via bash, the 2B it's trained to know how and what to respond when it's questioned within the terminal, it's has been trained in a personalized dataset, that's has previous commands and interactions between she and the user and the terminal. Ex: make an .txt file that has the firts 50 firts numbers from fibonacci sequence, and it's done.
 I want in the next updates make she possible to make complex interactions with the terminal, and codes, she may be possible to execute codes, and test them by herself, so she will have the possibility to know, where, why, and how a bug it's happening, she will also be able to search for directorys that may have a bug, when something is missing.
 
+
+#Now it's getting good!
+Adding a lot of new functions! Now with ctrl "." or ">" you can change the multi-windows layout, but have few for now.
+With ctrl r you rotate then, with alt number you change the current window for the one with the number.
+Will add a visual mod so you can copy and cut files just like in vim.
+
+
 # LSP
-I'm working non-stop in adding a lsp server for c in the past 4 to 5 days, i'm close to make it fully work, i'm about 70% on it.
-Next release will be at sunday, probably.
-Will try to make it as fast as possible, and fix the most bugs before the next release.
-Wish me luck;
+LSP is on! it's being on a while now, i forgot to update the README.
+I have currently the C and Python lsp, but will add for other languages in the future.
 
 # Refactoring!
 The code was "refactored" and now is divided in main parts.
