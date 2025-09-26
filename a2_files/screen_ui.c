@@ -500,13 +500,14 @@ void editor_redraw(WINDOW *win, EditorState *state) {
     // Marca a janela principal (com todo o seu conteúdo) para atualização.
     wnoutrefresh(win);
 
-    // AGORA, se houver um diagnóstico, desenha o pop-up por cima.
-    if (diag) {
-        draw_diagnostic_popup(win, state, diag->message);
-    }
+    // A lógica de desenhar o pop-up foi movida para redesenhar_todas_as_janelas()
+    // para garantir que ele seja desenhado por cima de todas as janelas.
 
-    // Clear the status message for the next redraw cycle
-    state->status_msg[0] = '\0';
+    // Limpa a mensagem de status para o próximo ciclo de redesenho,
+    // mas somente se não houver um diagnóstico a ser exibido no pop-up.
+    if (!diag) {
+        state->status_msg[0] = '\0';
+    }
 }
 
 

@@ -283,6 +283,21 @@ void redesenhar_todas_as_janelas() {
         editor_redraw(jw->win, jw->estado);
     }
 
+    // Lógica para desenhar o pop-up de diagnóstico por último
+    if (gerenciador.num_janelas > 0) {
+        JanelaEditor* active_jw = gerenciador.janelas[gerenciador.janela_ativa_idx];
+        EditorState* state = active_jw->estado;
+        if (state->lsp_enabled) {
+            LspDiagnostic *diag = get_diagnostic_under_cursor(state);
+            if (diag) {
+                // A mensagem de status já foi definida em editor_redraw
+                draw_diagnostic_popup(active_jw->win, state, diag->message);
+            }
+        }
+        // Limpa a mensagem de status da janela ativa após o desenho
+        state->status_msg[0] = '\0';
+    }
+
     posicionar_cursor_ativo();
     doupdate();
 }
