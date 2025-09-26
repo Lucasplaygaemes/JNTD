@@ -63,7 +63,8 @@ typedef struct {
 typedef enum {
     NORMAL,
     INSERT,
-    COMMAND
+    COMMAND,
+    VISUAL
 } EditorMode;
 #endif
 
@@ -86,6 +87,15 @@ typedef enum {
     RECOVER_IGNORE,
     RECOVER_ABORT
 } FileRecoveryChoice;
+#endif
+
+#ifndef VISUALSELECTIONMODE_DEFINED
+#define VISUALSELECTIONMODE_DEFINED
+typedef enum {
+    VISUAL_MODE_NONE,
+    VISUAL_MODE_YANK,
+    VISUAL_MODE_SELECT
+} VisualSelectionMode;
 #endif
 
 #ifndef EDITORSNAPSHOT_DEFINED
@@ -191,6 +201,10 @@ typedef struct {
 #ifndef EDITORSTATE_DEFINED
 #define EDITORSTATE_DEFINED
 typedef struct EditorState {
+    int selection_start_line;
+    int selection_start_col;
+    VisualSelectionMode visual_selection_mode;
+    char* yank_register;
     char *lines[MAX_LINES];
     int num_lines, current_line, current_col, ideal_col, top_line, left_col, command_pos;
     EditorMode mode;
@@ -278,5 +292,6 @@ typedef struct {
 extern GerenciadorJanelas gerenciador;
 
 extern char executable_dir[PATH_MAX];
+extern char* global_yank_register;
 
 #endif // DEFS_H
