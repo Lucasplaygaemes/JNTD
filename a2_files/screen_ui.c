@@ -283,8 +283,11 @@ void editor_redraw(WINDOW *win, EditorState *state) {
                         if (token_len > 0) {
                             char *token_ptr = &line[token_start_in_line];
                             int color_pair = 0;
+                            bool selected = is_selected(state, file_line_idx, token_start_in_line);
 
-                            if (token_len == 1 && is_unmatched_bracket(state, file_line_idx, token_start_in_line)) {
+                            if (selected && state->visual_selection_mode == VISUAL_MODE_SELECT) {
+                                color_pair = 1;
+                            } else if (token_len == 1 && is_unmatched_bracket(state, file_line_idx, token_start_in_line)) {
                                 color_pair = 11; // Red
                             } else if (!strchr(delimiters, *token_ptr)) {
                                 for (int j = 0; j < state->num_syntax_rules; j++) {
@@ -381,8 +384,11 @@ void editor_redraw(WINDOW *win, EditorState *state) {
 
                 char *token_ptr = &line[token_start];
                 int color_pair = 0;
+                bool selected = is_selected(state, line_idx, token_start);
 
-                if (token_len == 1 && is_unmatched_bracket(state, line_idx, token_start)) {
+                if (selected && state->visual_selection_mode == VISUAL_MODE_SELECT) {
+                    color_pair = 1;
+                } else if (token_len == 1 && is_unmatched_bracket(state, line_idx, token_start)) {
                     color_pair = 11; // Red
                 } else if (current_char == '#' || (current_char == '/' && (size_t)token_start + 1 < strlen(line) && line[token_start + 1] == '/')) {
                     color_pair = 6;
@@ -481,6 +487,9 @@ void editor_redraw(WINDOW *win, EditorState *state) {
         switch (state->mode) {
             case NORMAL: strcpy(mode_str, "-- NORMAL --"); break; 
             case INSERT: strcpy(mode_str, "-- INSERT --"); break;
+            case VISUAL: 
+                strcpy(mode_str, "-- VISUAL --"); 
+                break;
             default: strcpy(mode_str, "--          --"); break;
         }
         char display_filename[40];
@@ -686,6 +695,37 @@ int get_visual_col(const char *line, int byte_col) {
    return visual_col;
 }
 
+bool is_selected(EditorState *state, int line_idx, int col_idx) {
+    if (state->visual_selection_mode == VISUAL_MODE_NONE) {
+        return false;
+    }
+
+    int start_line, start_col, end_line, end_col;
+    if (state->selection_start_line < state->current_line ||
+        (state->selection_start_line == state->current_line && state->selection_start_col <= state->current_col)) {
+        start_line = state->selection_start_line;
+        start_col = state->selection_start_col;
+        end_line = state->current_line;
+        end_col = state->current_col;
+    } else {
+        start_line = state->current_line;
+        start_col = state->current_col;
+        end_line = state->selection_start_line;
+        end_col = state->selection_start_col;
+    }
+
+    if (line_idx < start_line || line_idx > end_line) {
+        return false;
+    }
+    if (line_idx == start_line && col_idx < start_col) {
+        return false;
+    }
+    if (line_idx == end_line && col_idx >= end_col) {
+        return false;
+    }
+    return true;
+}
+
 void display_help_screen() {
     static const CommandInfo commands[] = {
         { ":w", "Save the current file." },
@@ -712,13 +752,21 @@ void display_help_screen() {
         { ":lsp-symbols", "List symbols in the current document." },
         { ":lsp-refresh", "Force a refresh of LSP diagnostics." }
     };
-    
     int num_commands = sizeof(commands) / sizeof(commands[0]);
-    
+
+    static const CommandInfo visual_commands[] = {
+        { "v", "Enter/Exit visual mode." },
+        { "y", "Yank (copy) selected text." },
+        { "s", "Select text with blue highlight." },
+        { "p", "Paste yanked text." },
+        { "Ctrl+Y", "Yank selection to global register." }
+    };
+    int num_visual_commands = sizeof(visual_commands) / sizeof(visual_commands[0]);
+
     WINDOW *help_win = newwin(0, 0, 0, 0);
     wbkgd(help_win, COLOR_PAIR(8));
 
-    wattron(help_win, A_BOLD); mvwprintw(help_win, 2, 2, "--- AJUDA DO EDITOR ---"); wattroff(help_win, A_BOLD);
+    wattron(help_win, A_BOLD); mvwprintw(help_win, 2, 2, "--- EDITOR HELP ---"); wattroff(help_win, A_BOLD);
     
     for (int i = 0; i < num_commands; i++) {
         wmove(help_win, 4 + i, 4);
@@ -727,8 +775,19 @@ void display_help_screen() {
         wattroff(help_win, COLOR_PAIR(3) | A_BOLD);
         wprintw(help_win, ": %s", commands[i].description);
     }
+
+    int visual_start_y = 4 + num_commands + 2;
+    wattron(help_win, A_BOLD); mvwprintw(help_win, visual_start_y, 2, "--- VISUAL MODE ---"); wattroff(help_win, A_BOLD);
+
+    for (int i = 0; i < num_visual_commands; i++) {
+        wmove(help_win, visual_start_y + 2 + i, 4);
+        wattron(help_win, COLOR_PAIR(3) | A_BOLD);
+        wprintw(help_win, "% -15s", visual_commands[i].command);
+        wattroff(help_win, COLOR_PAIR(3) | A_BOLD);
+        wprintw(help_win, ": %s", visual_commands[i].description);
+    }
     
-    wattron(help_win, A_REVERSE); mvwprintw(help_win, 6 + num_commands, 2, " Pressione qualquer tecla para voltar ao editor "); wattroff(help_win, A_REVERSE);
+    wattron(help_win, A_REVERSE); mvwprintw(help_win, visual_start_y + 2 + num_visual_commands + 2, 2, " Press any key to return to the editor "); wattroff(help_win, A_REVERSE);
     wrefresh(help_win); wgetch(help_win);
     delwin(help_win);
 }
@@ -851,4 +910,3 @@ void display_diagnostics_list(EditorState *state) {
 
     display_output_screen("--- LSP Diagnostics List ---", temp_filename);
 }
-

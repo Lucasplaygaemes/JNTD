@@ -34,7 +34,9 @@ void stop_and_log_work() {
         return;
     }
 
-    FILE* file = fopen(LOG_FILE, "a");
+    char log_path[PATH_MAX];
+    snprintf(log_path, sizeof(log_path), "%s/%s", executable_dir, LOG_FILE);
+    FILE* file = fopen(log_path, "a");
     if (!file) {
         perror("Could not open the timer log file");
         return;
@@ -49,7 +51,9 @@ void stop_and_log_work() {
 }
 
 void display_work_summary() {
-    FILE* file = fopen(LOG_FILE, "r");
+    char log_path[PATH_MAX];
+    snprintf(log_path, sizeof(log_path), "%s/%s", executable_dir, LOG_FILE);
+    FILE* file = fopen(log_path, "r");
     if (!file) {
         display_output_screen("Work Time Report", "/tme/no_log.tmp");
         return;

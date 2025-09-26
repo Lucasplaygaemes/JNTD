@@ -167,7 +167,7 @@ int main(int argc, char *argv[]) {
             nodelay(active_win, FALSE);
 
             if (next_ch == ERR) { // Just a single ESC press
-                 if (state->mode == INSERT) {
+                 if (state->mode == INSERT || state->mode == VISUAL) {
                     state->mode = NORMAL;
                 }
             } else { // Alt key sequence
@@ -202,8 +202,108 @@ int main(int argc, char *argv[]) {
         }
 
         switch (state->mode) {
+            case VISUAL:
+                switch (ch) {
+                    case 25: // Ctrl+Y
+                        if (state->visual_selection_mode == VISUAL_MODE_NONE) {
+                            state->selection_start_line = state->current_line;
+                            state->selection_start_col = state->current_col;
+                            state->visual_selection_mode = VISUAL_MODE_YANK;
+                            snprintf(state->status_msg, sizeof(state->status_msg), "Global visual selection started");
+                        } else {
+                            editor_global_yank(state);
+                            state->visual_selection_mode = VISUAL_MODE_NONE;
+                        }
+                        break;
+                    case 'p': editor_paste(state); break;
+                    case 's':
+                        if (state->visual_selection_mode == VISUAL_MODE_NONE) {
+                            state->selection_start_line = state->current_line;
+                            state->selection_start_col = state->current_col;
+                            state->visual_selection_mode = VISUAL_MODE_SELECT;
+                            snprintf(state->status_msg, sizeof(state->status_msg), "Visual selection started");
+                        } else {
+                            state->visual_selection_mode = VISUAL_MODE_NONE;
+                        }
+                        break;
+                    case 'y':
+                        if (state->visual_selection_mode == VISUAL_MODE_NONE) {
+                            state->selection_start_line = state->current_line;
+                            state->selection_start_col = state->current_col;
+                            state->visual_selection_mode = VISUAL_MODE_YANK;
+                            snprintf(state->status_msg, sizeof(state->status_msg), "Visual selection for yank started");
+                        } else {
+                            editor_yank_selection(state);
+                            state->visual_selection_mode = VISUAL_MODE_NONE;
+                        }
+                        break;
+                    default: // Fallback to normal mode keys
+                        // (The original NORMAL mode switch case is now here)
+                        switch (ch) {
+                            case 'v': state->visual_selection_mode = VISUAL_MODE_NONE; state->mode = NORMAL; break;
+                            case 'i': state->mode = INSERT; break;
+                            case ':': state->mode = COMMAND; state->history_pos = state->history_count; state->command_buffer[0] = '\0'; state->command_pos = 0; break;
+                            case KEY_CTRL_RIGHT_BRACKET: proxima_janela(); break;
+                            case KEY_CTRL_LEFT_BRACKET: janela_anterior(); break;
+                            case KEY_CTRL_F: editor_find(state); break;
+                            case KEY_CTRL_DEL: editor_delete_line(state); break;
+                            case KEY_CTRL_K: editor_delete_line(state); break;
+                            case KEY_CTRL_D: editor_find_next(state); break;
+                            case KEY_CTRL_A: editor_find_previous(state); break;
+                            case KEY_CTRL_G: display_directory_navigator(state); break;
+                            case KEY_UP:
+                                if (state->word_wrap_enabled) {
+                                    if (state->current_line > 0) {
+                                        state->current_line--;
+                                        state->current_col = state->ideal_col;
+                                    }
+                                } else {
+                                    if (state->current_line > 0) {
+                                        state->current_line--;
+                                        state->current_col = state->ideal_col;
+                                    }
+                                }
+                                break;
+                            case KEY_DOWN: {
+                                if (state->current_line < state->num_lines - 1) {
+                                    state->current_line++;
+                                    state->current_col = state->ideal_col;
+                                }
+                                break;
+                            }
+                            case KEY_LEFT:
+                                if (state->current_col > 0) {
+                                    state->current_col--;
+                                    while (state->current_col > 0 && (state->lines[state->current_line][state->current_col] & 0xC0) == 0x80) {
+                                        state->current_col--;
+                                    }
+                                }
+                                state->ideal_col = state->current_col;
+                                break;
+                            case KEY_RIGHT: {
+                                char* line = state->lines[state->current_line];
+                                if (line && state->current_col < strlen(line)) {
+                                    state->current_col++;
+                                    while (line[state->current_col] != '\0' && (line[state->current_col] & 0xC0) == 0x80) {
+                                        state->current_col++;
+                                    }
+                                }
+                                state->ideal_col = state->current_col;
+                                } break;
+                            case KEY_PPAGE: case KEY_SR: for (int i = 0; i < PAGE_JUMP; i++) if (state->current_line > 0) state->current_line--; state->current_col = state->ideal_col; break;
+                            case KEY_NPAGE: case KEY_SF: for (int i = 0; i < PAGE_JUMP; i++) if (state->current_line < state->num_lines - 1) state->current_line++; state->current_col = state->ideal_col; break;
+                            case KEY_HOME: state->current_col = 0; state->ideal_col = 0; break;
+                            case KEY_END: { char* line = state->lines[state->current_line]; if(line) state->current_col = strlen(line); state->ideal_col = state->current_col; } break;
+                            case KEY_SDC: editor_delete_line(state); break;
+                        }
+                }
+                break;
             case NORMAL:
                 switch (ch) {
+                    case 16: // Ctrl+P
+                        editor_global_paste(state);
+                        break;
+                    case 'v': state->mode = VISUAL; break;
                     case 'i': state->mode = INSERT; break;
                     case ':': state->mode = COMMAND; state->history_pos = state->history_count; state->command_buffer[0] = '\0'; state->command_pos = 0; break;
                     case KEY_CTRL_RIGHT_BRACKET: proxima_janela(); break;

@@ -15,4 +15,5 @@ void display_diagnostics_list(EditorState *state);
 FileViewer* create_file_viewer(const char* filename);
 void destroy_file_viewer(FileViewer* viewer);
 WINDOW* draw_pop_up(const char *message, int y, int x);
+bool is_selected(EditorState *state, int line_idx, int col_idx);
 #endif // SCREEN_UI_H

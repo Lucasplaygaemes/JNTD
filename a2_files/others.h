@@ -9,6 +9,10 @@ void editor_find_unmatched_brackets(EditorState *state);
 bool is_unmatched_bracket(EditorState *state, int line, int col);
 
 // Text Editing & Manipulation
+void editor_yank_selection(EditorState *state);
+void editor_global_yank(EditorState *state);
+void editor_paste(EditorState *state);
+void editor_global_paste(EditorState *state);
 void editor_handle_enter(EditorState *state);
 void editor_handle_backspace(EditorState *state);
 void editor_insert_char(EditorState *state, wint_t ch);
