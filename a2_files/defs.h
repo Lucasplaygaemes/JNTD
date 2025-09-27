@@ -205,6 +205,8 @@ typedef struct EditorState {
     int selection_start_col;
     VisualSelectionMode visual_selection_mode;
     char* yank_register;
+    char* move_register;
+    bool is_moving;
     char *lines[MAX_LINES];
     int num_lines, current_line, current_col, ideal_col, top_line, left_col, command_pos;
     EditorMode mode;

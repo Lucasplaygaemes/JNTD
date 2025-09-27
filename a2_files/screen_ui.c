@@ -471,7 +471,9 @@ void editor_redraw(WINDOW *win, EditorState *state) {
 
     // Desenha a barra de status
     int color_pair = 1; // Padrão: azul
-    if (strstr(state->status_msg, "Warning:") != NULL || strstr(state->status_msg, "Error:") != NULL) {
+    if (state->is_moving) {
+        color_pair = 2; // Amarelo para indicar o modo de movimento
+    } else if (strstr(state->status_msg, "Warning:") != NULL || strstr(state->status_msg, "Error:") != NULL) {
         color_pair = 3; // Amarelo para avisos
     }
     

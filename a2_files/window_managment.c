@@ -32,6 +32,9 @@ void free_editor_state(EditorState* state) {
         free(state->unmatched_brackets);
         state->unmatched_brackets = NULL;
     }
+
+    if (state->yank_register) free(state->yank_register);
+    if (state->move_register) free(state->move_register);
     
     free(state->recent_dirs);
     for (int j = 0; j < state->num_lines; j++) {

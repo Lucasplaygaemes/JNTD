@@ -17,6 +17,9 @@ void editor_handle_enter(EditorState *state);
 void editor_handle_backspace(EditorState *state);
 void editor_insert_char(EditorState *state, wint_t ch);
 void editor_delete_line(EditorState *state);
+void editor_delete_selection(EditorState *state);
+void editor_yank_to_move_register(EditorState *state);
+void editor_paste_from_move_register(EditorState *state);
 char* trim_whitespace(char *str);
 
 // Cursor Movement & Navigation

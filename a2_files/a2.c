@@ -25,6 +25,7 @@ void inicializar_ncurses() {
     init_pair(9, COLOR_BLACK, COLOR_MAGENTA);
     init_pair(10, COLOR_GREEN, COLOR_BLACK);
     init_pair(11, COLOR_RED, COLOR_BLACK);
+    init_pair(12, COLOR_BLACK, COLOR_YELLOW);
     bkgd(COLOR_PAIR(8));
 }
 
@@ -170,6 +171,12 @@ int main(int argc, char *argv[]) {
                  if (state->mode == INSERT || state->mode == VISUAL) {
                     state->mode = NORMAL;
                 }
+                 if (state->is_moving) {
+                     state->is_moving = false;
+                     free(state->move_register);
+                     state->move_register = NULL;
+                     snprintf(state->status_msg, sizeof(state->status_msg), "Move cancelled.");
+                 }
             } else { // Alt key sequence
                 if (next_ch == '[') { // This is Alt+[ for previous window
                     janela_anterior();
@@ -237,6 +244,14 @@ int main(int argc, char *argv[]) {
                             state->visual_selection_mode = VISUAL_MODE_NONE;
                         }
                         break;
+                    case 'm':
+                        if (state->visual_selection_mode != VISUAL_MODE_NONE) {
+                            editor_yank_to_move_register(state);
+                            editor_delete_selection(state);
+                            state->is_moving = true;
+                            snprintf(state->status_msg, sizeof(state->status_msg), "Text cut. Press 'm' again to paste.");
+                        }
+                        break;
                     default: // Fallback to normal mode keys
                         // (The original NORMAL mode switch case is now here)
                         switch (ch) {
@@ -300,6 +315,15 @@ int main(int argc, char *argv[]) {
                 break;
             case NORMAL:
                 switch (ch) {
+                    case 'm':
+                        if (state->is_moving) {
+                            editor_paste_from_move_register(state);
+                            state->is_moving = false;
+                            free(state->move_register);
+                            state->move_register = NULL;
+                            snprintf(state->status_msg, sizeof(state->status_msg), "Text moved.");
+                        }
+                        break;
                     case 16: // Ctrl+P
                         editor_global_paste(state);
                         break;

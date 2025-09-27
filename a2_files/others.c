@@ -1126,3 +1126,168 @@ void handle_command_mode_key(EditorState *state, wint_t ch, bool *should_exit) {
             break;
     }
 }
+void editor_delete_selection(EditorState *state) {
+    push_undo(state);
+    clear_redo_stack(state);
+
+    int start_line, start_col, end_line, end_col;
+    if (state->selection_start_line < state->current_line ||
+        (state->selection_start_line == state->current_line && state->selection_start_col <= state->current_col)) {
+        start_line = state->selection_start_line;
+        start_col = state->selection_start_col;
+        end_line = state->current_line;
+        end_col = state->current_col;
+    } else {
+        start_line = state->current_line;
+        start_col = state->current_col;
+        end_line = state->selection_start_line;
+        end_col = state->selection_start_col;
+    }
+
+    if (start_line == end_line) {
+        char *line = state->lines[start_line];
+        int len = end_col - start_col;
+        if (len > 0) {
+            memmove(&line[start_col], &line[end_col], strlen(line) - end_col + 1);
+            char *resized_line = realloc(line, strlen(line) + 1);
+            if(resized_line) state->lines[start_line] = resized_line;
+        }
+    } else {
+        char *first_line = state->lines[start_line];
+        char *last_line = state->lines[end_line];
+
+        char *last_line_suffix = strdup(&last_line[end_col]);
+
+        char *new_line = realloc(first_line, start_col + strlen(last_line_suffix) + 1);
+        if (!new_line) { free(last_line_suffix); return; }
+        new_line[start_col] = '\0';
+        strcat(new_line, last_line_suffix);
+        state->lines[start_line] = new_line;
+        free(last_line_suffix);
+
+        for (int i = start_line + 1; i <= end_line; i++) {
+            free(state->lines[i]);
+        }
+
+        int num_deleted = end_line - start_line;
+        if (state->num_lines > end_line + 1) {
+            memmove(&state->lines[start_line + 1], &state->lines[end_line + 1], (state->num_lines - end_line - 1) * sizeof(char*));
+        }
+        state->num_lines -= num_deleted;
+    }
+    state->buffer_modified = true;
+    state->current_line = start_line;
+    state->current_col = start_col;
+    state->visual_selection_mode = VISUAL_MODE_NONE;
+    state->mode = NORMAL;
+}
+
+void editor_yank_to_move_register(EditorState *state) {
+    if (state->move_register) {
+        free(state->move_register);
+        state->move_register = NULL;
+    }
+
+    int start_line, start_col, end_line, end_col;
+    if (state->selection_start_line < state->current_line ||
+        (state->selection_start_line == state->current_line && state->selection_start_col <= state->current_col)) {
+        start_line = state->selection_start_line;
+        start_col = state->selection_start_col;
+        end_line = state->current_line;
+        end_col = state->current_col;
+    } else {
+        start_line = state->current_line;
+        start_col = state->current_col;
+        end_line = state->selection_start_line;
+        end_col = state->selection_start_col;
+    }
+
+    size_t total_len = 0;
+    for (int i = start_line; i <= end_line; i++) {
+        total_len += strlen(state->lines[i]) + 1;
+    }
+
+    state->move_register = malloc(total_len);
+    if (!state->move_register) return;
+    state->move_register[0] = '\0';
+
+    if (start_line == end_line) {
+        int len = end_col - start_col;
+        if (len > 0) {
+            strncat(state->move_register, state->lines[start_line] + start_col, len);
+        }
+    } else {
+        strcat(state->move_register, state->lines[start_line] + start_col);
+        strcat(state->move_register, "\n");
+
+        for (int i = start_line + 1; i < end_line; i++) {
+            strcat(state->move_register, state->lines[i]);
+            strcat(state->move_register, "\n");
+        }
+
+        strncat(state->move_register, state->lines[end_line], end_col);
+    }
+}
+
+void editor_paste_from_move_register(EditorState *state) {
+    if (!state->move_register || state->move_register[0] == '\0') {
+        return;
+    }
+
+    push_undo(state);
+    clear_redo_stack(state);
+
+    char *move_copy = strdup(state->move_register);
+    if (!move_copy) return;
+
+    char *line = strtok(move_copy, "\n");
+
+    if (strchr(state->move_register, '\n') == NULL) {
+        char *current_line_content = state->lines[state->current_line];
+        int paste_len = strlen(line);
+        int old_len = strlen(current_line_content);
+        char *new_line_content = realloc(current_line_content, old_len + paste_len + 1);
+        if (!new_line_content) { free(move_copy); return; }
+
+        memmove(new_line_content + state->current_col + paste_len,
+                new_line_content + state->current_col,
+                old_len - state->current_col + 1);
+        memcpy(new_line_content + state->current_col, line, paste_len);
+
+        state->lines[state->current_line] = new_line_content;
+        state->current_col += paste_len;
+    } else {
+        int paste_line_count = 0;
+        char *temp_move_copy = strdup(state->move_register);
+        for (const char *p = temp_move_copy; *p; p++) {
+            if (*p == '\n') paste_line_count++;
+        }
+        if (temp_move_copy[strlen(temp_move_copy)-1] != '\n') paste_line_count++;
+        free(temp_move_copy);
+
+        for (int i = 0; i < paste_line_count; i++) {
+            if (state->num_lines >= MAX_LINES) break;
+            for (int j = state->num_lines; j > state->current_line + 1 + i; j--) {
+                state->lines[j] = state->lines[j-1];
+            }
+            state->num_lines++;
+            state->lines[state->current_line + 1 + i] = NULL;
+        }
+
+        int insert_at_line = state->current_line + 1;
+        while (line != NULL && paste_line_count > 0) {
+            state->lines[insert_at_line] = strdup(line);
+            line = strtok(NULL, "\n");
+            insert_at_line++;
+            paste_line_count--;
+        }
+        state->current_line++;
+        state->current_col = 0;
+    }
+
+    free(move_copy);
+    state->buffer_modified = true;
+    if (state->lsp_enabled) {
+        lsp_did_change(state);
+    }
+}
