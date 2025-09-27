@@ -203,6 +203,12 @@ int main(int argc, char *argv[]) {
                     mover_janela_para_posicao(target_pos);
                 } else if (next_ch == 'r' || next_ch == 'R') {
                     rotacionar_janelas();
+                } else if (next_ch == 'o' || next_ch == 'O') {
+                    if (state->mode == VISUAL && state->visual_selection_mode != VISUAL_MODE_NONE) {
+                        copy_selection_to_clipboard(state);
+                    } else if (state->mode == NORMAL || state->mode == INSERT) {
+                        paste_from_clipboard(state);
+                    }
                 }
             }
             continue;

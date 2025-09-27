@@ -11,6 +11,9 @@ void run_and_display_command(const char* command, const char* title);
 void diff_command(EditorState *state, const char *args);
 void add_to_command_history(EditorState *state, const char* command);
 
+void copy_selection_to_clipboard(EditorState *state);
+void paste_from_clipboard(EditorState *state);
+
 // LSP related command processing functions
 void process_lsp_restart(EditorState *state);
 void process_lsp_diagnostics(EditorState *state);

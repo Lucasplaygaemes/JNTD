@@ -226,8 +226,7 @@ void execute_shell_command(EditorState *state) {
                 return;
             }
         }
-        display_output_screen("---\
-SAÍDA DO COMANDO---", temp_output_file);
+        display_output_screen("---　SAÍDA DO COMANDO---", temp_output_file);
         snprintf(state->status_msg, sizeof(state->status_msg), "Comando '%s' executado.", cmd);
     } else {
         snprintf(state->status_msg, sizeof(state->status_msg), "Comando executado, mas sem saída.");
@@ -307,3 +306,129 @@ void add_to_command_history(EditorState *state, const char* command) {
         state->command_history[MAX_COMMAND_HISTORY - 1] = strdup(command);
     }
 }
+
+void copy_selection_to_clipboard(EditorState *state) {
+    char* copy_cmd = NULL;
+    if (system("command -v wl-copy > /dev/null 2>&1") == 0) {
+        copy_cmd = "wl-copy";
+    } else if (system("command -v xclip > /dev/null 2>&1") == 0) {
+        copy_cmd = "xclip -selection clipboard";
+    } else if (system("command -v xsel > /dev/null 2>&1") == 0) {
+        copy_cmd = "xsel --clipboard --input";
+    } else {
+        snprintf(state->status_msg, sizeof(state->status_msg), "No clipboard utility found (wl-clipboard, xclip, or xsel).");
+        return;
+    }
+
+    int start_line, start_col, end_line, end_col;
+    if (state->selection_start_line < state->current_line ||
+        (state->selection_start_line == state->current_line && state->selection_start_col <= state->current_col)) {
+        start_line = state->selection_start_line;
+        start_col = state->selection_start_col;
+        end_line = state->current_line;
+        end_col = state->current_col;
+    } else {
+        start_line = state->current_line;
+        start_col = state->current_col;
+        end_line = state->selection_start_line;
+        end_col = state->selection_start_col;
+    }
+
+    size_t total_len = 0;
+    for (int i = start_line; i <= end_line; i++) {
+        total_len += strlen(state->lines[i]) + 1;
+    }
+
+    char* selected_text = malloc(total_len + 1);
+    if (!selected_text) return;
+    selected_text[0] = '\0';
+
+    if (start_line == end_line) {
+        int len = end_col - start_col;
+        if (len > 0) {
+            strncat(selected_text, state->lines[start_line] + start_col, len);
+        }
+    } else {
+        strcat(selected_text, state->lines[start_line] + start_col);
+        strcat(selected_text, "\n");
+        for (int i = start_line + 1; i < end_line; i++) {
+            strcat(selected_text, state->lines[i]);
+            strcat(selected_text, "\n");
+        }
+        strncat(selected_text, state->lines[end_line], end_col);
+    }
+
+    char temp_filename[] = "/tmp/a2_clip.XXXXXX";
+    int fd = mkstemp(temp_filename);
+    if (fd == -1) {
+        snprintf(state->status_msg, sizeof(state->status_msg), "Error creating temp file.");
+        free(selected_text);
+        return;
+    }
+    write(fd, selected_text, strlen(selected_text));
+    close(fd);
+    free(selected_text);
+
+    char command[1024];
+    snprintf(command, sizeof(command), "%s < %s", copy_cmd, temp_filename);
+    
+    system(command);
+    remove(temp_filename);
+    snprintf(state->status_msg, sizeof(state->status_msg), "Copied to clipboard.");
+}
+
+void paste_from_clipboard(EditorState *state) {
+    char* paste_cmd = NULL;
+    if (system("command -v wl-paste > /dev/null 2>&1") == 0) {
+        paste_cmd = "wl-paste";
+    } else if (system("command -v xclip > /dev/null 2>&1") == 0) {
+        paste_cmd = "xclip -selection clipboard -o";
+    } else if (system("command -v xsel > /dev/null 2>&1") == 0) {
+        paste_cmd = "xsel --clipboard --output";
+    } else {
+        snprintf(state->status_msg, sizeof(state->status_msg), "No clipboard utility found (wl-clipboard, xclip, or xsel).");
+        return;
+    }
+
+    char temp_filename[] = "/tmp/a2_paste.XXXXXX";
+    int fd = mkstemp(temp_filename);
+    if (fd == -1) { 
+        snprintf(state->status_msg, sizeof(state->status_msg), "Error creating temp file.");
+        return; 
+    }
+    close(fd);
+
+    char command[1024];
+    snprintf(command, sizeof(command), "%s > %s", paste_cmd, temp_filename);
+    system(command);
+
+    FILE *f = fopen(temp_filename, "r");
+    if (!f) { 
+        snprintf(state->status_msg, sizeof(state->status_msg), "Error reading from temp file.");
+        remove(temp_filename); 
+        return; 
+    }
+    fseek(f, 0, SEEK_END);
+    long size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    char *pasted_text = malloc(size + 1);
+    if (!pasted_text) {
+        fclose(f);
+        remove(temp_filename);
+        return;
+    }
+    fread(pasted_text, 1, size, f);
+    fclose(f);
+    pasted_text[size] = '\0';
+    remove(temp_filename);
+
+    if (state->yank_register) {
+        free(state->yank_register);
+    }
+    state->yank_register = pasted_text;
+
+    editor_paste(state);
+
+    snprintf(state->status_msg, sizeof(state->status_msg), "Pasted from clipboard.");
+}
+
