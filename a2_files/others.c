@@ -310,60 +310,85 @@ void editor_paste(EditorState *state) {
     char *yank_copy = strdup(state->yank_register);
     if (!yank_copy) return;
 
-    char *line = strtok(yank_copy, "\n");
-    bool first_line = true;
-
-    // Se o texto copiado não contém nova linha (é uma única linha)
-    if (strchr(state->yank_register, '\n') == NULL) {
-        char *current_line_content = state->lines[state->current_line];
-        int paste_len = strlen(line);
-        int old_len = strlen(current_line_content);
-        char *new_line_content = realloc(current_line_content, old_len + paste_len + 1);
-        if (!new_line_content) { free(yank_copy); return; }
-
-        memmove(new_line_content + state->current_col + paste_len, 
-                new_line_content + state->current_col, 
-                old_len - state->current_col + 1);
-        memcpy(new_line_content + state->current_col, line, paste_len);
-
-        state->lines[state->current_line] = new_line_content;
-        state->current_col += paste_len;
-    } else { // Colar múltiplas linhas
-        int paste_line_count = 0;
-        char *temp_yank_copy = strdup(state->yank_register);
-        for (const char *p = temp_yank_copy; *p; p++) {
-            if (*p == '\n') paste_line_count++;
-        }
-        if (temp_yank_copy[strlen(temp_yank_copy)-1] != '\n') paste_line_count++;
-        free(temp_yank_copy);
-
-        // Abrir espaço para as novas linhas
-        for (int i = 0; i < paste_line_count; i++) {
-            if (state->num_lines >= MAX_LINES) break;
-            for (int j = state->num_lines; j > state->current_line + 1 + i; j--) {
-                state->lines[j] = state->lines[j-1];
-            }
-            state->num_lines++;
-            state->lines[state->current_line + 1 + i] = NULL;
-        }
-
-        int insert_at_line = state->current_line + 1;
-        while (line != NULL && paste_line_count > 0) {
-            state->lines[insert_at_line] = strdup(line);
-            line = strtok(NULL, "\n");
-            insert_at_line++;
-            paste_line_count--;
-        }
-        state->current_line++; // Mover cursor para a primeira linha colada
-        state->current_col = 0;
+    // Normalize line endings (remove \r)
+    char *p = yank_copy;
+    while ((p = strstr(p, "\r\n"))) {
+        memmove(p, p + 1, strlen(p));
+    }
+    p = yank_copy;
+    while ((p = strchr(p, '\r'))) {
+        *p = '\n';
     }
 
+    char *rest_of_line = strdup(state->lines[state->current_line] + state->current_col);
+    state->lines[state->current_line][state->current_col] = '\0';
+
+    char *line = strtok(yank_copy, "\n");
+
+    // 1. First line of paste
+    if (line) {
+        char *current_line = state->lines[state->current_line];
+        char *new_line = realloc(current_line, strlen(current_line) + strlen(line) + 1);
+        if (!new_line) { free(yank_copy); free(rest_of_line); return; }
+        strcat(new_line, line);
+        state->lines[state->current_line] = new_line;
+    }
+
+    // 2. Middle lines
+    int num_new_lines = 0;
+    char *lines_to_insert[MAX_LINES];
+    while((line = strtok(NULL, "\n")) != NULL) {
+        if (state->num_lines + num_new_lines >= MAX_LINES) break;
+        lines_to_insert[num_new_lines++] = strdup(line);
+    }
+
+    bool ends_with_newline = state->yank_register[strlen(state->yank_register)-1] == '\n';
+    if (ends_with_newline && (strchr(state->yank_register, '\n') == (state->yank_register + strlen(state->yank_register) - 1))) {
+        if (state->num_lines + num_new_lines < MAX_LINES) {
+             lines_to_insert[num_new_lines++] = strdup("");
+        }
+    }
+
+    if (num_new_lines > 0) {
+        if (state->num_lines + num_new_lines > MAX_LINES) {
+            for(int i=0; i<num_new_lines; i++) free(lines_to_insert[i]);
+            free(yank_copy); free(rest_of_line); return;
+        }
+        
+        if (state->num_lines > state->current_line + 1) {
+            memmove(&state->lines[state->current_line + 1 + num_new_lines],
+                    &state->lines[state->current_line + 1],
+                    (state->num_lines - (state->current_line + 1)) * sizeof(char*));
+        }
+
+        for(int i=0; i<num_new_lines; i++) {
+            state->lines[state->current_line + 1 + i] = lines_to_insert[i];
+        }
+        state->num_lines += num_new_lines;
+    }
+
+    // 3. Last line
+    int last_line_idx = state->current_line + num_new_lines;
+    char *last_line_content = state->lines[last_line_idx];
+    int old_len = strlen(last_line_content);
+    char *new_last_line = realloc(last_line_content, old_len + strlen(rest_of_line) + 1);
+    if (!new_last_line) { free(yank_copy); free(rest_of_line); return; }
+    strcat(new_last_line, rest_of_line);
+    state->lines[last_line_idx] = new_last_line;
+
+    state->current_line = last_line_idx;
+    state->current_col = old_len;
+    state->ideal_col = state->current_col;
+
+    free(rest_of_line);
     free(yank_copy);
     state->buffer_modified = true;
     if (state->lsp_enabled) {
         lsp_did_change(state);
     }
 }
+
+
 
 
 
@@ -1233,61 +1258,11 @@ void editor_paste_from_move_register(EditorState *state) {
     if (!state->move_register || state->move_register[0] == '\0') {
         return;
     }
-
-    push_undo(state);
-    clear_redo_stack(state);
-
-    char *move_copy = strdup(state->move_register);
-    if (!move_copy) return;
-
-    char *line = strtok(move_copy, "\n");
-
-    if (strchr(state->move_register, '\n') == NULL) {
-        char *current_line_content = state->lines[state->current_line];
-        int paste_len = strlen(line);
-        int old_len = strlen(current_line_content);
-        char *new_line_content = realloc(current_line_content, old_len + paste_len + 1);
-        if (!new_line_content) { free(move_copy); return; }
-
-        memmove(new_line_content + state->current_col + paste_len,
-                new_line_content + state->current_col,
-                old_len - state->current_col + 1);
-        memcpy(new_line_content + state->current_col, line, paste_len);
-
-        state->lines[state->current_line] = new_line_content;
-        state->current_col += paste_len;
-    } else {
-        int paste_line_count = 0;
-        char *temp_move_copy = strdup(state->move_register);
-        for (const char *p = temp_move_copy; *p; p++) {
-            if (*p == '\n') paste_line_count++;
-        }
-        if (temp_move_copy[strlen(temp_move_copy)-1] != '\n') paste_line_count++;
-        free(temp_move_copy);
-
-        for (int i = 0; i < paste_line_count; i++) {
-            if (state->num_lines >= MAX_LINES) break;
-            for (int j = state->num_lines; j > state->current_line + 1 + i; j--) {
-                state->lines[j] = state->lines[j-1];
-            }
-            state->num_lines++;
-            state->lines[state->current_line + 1 + i] = NULL;
-        }
-
-        int insert_at_line = state->current_line + 1;
-        while (line != NULL && paste_line_count > 0) {
-            state->lines[insert_at_line] = strdup(line);
-            line = strtok(NULL, "\n");
-            insert_at_line++;
-            paste_line_count--;
-        }
-        state->current_line++;
-        state->current_col = 0;
+    
+    if (state->yank_register) {
+        free(state->yank_register);
     }
-
-    free(move_copy);
-    state->buffer_modified = true;
-    if (state->lsp_enabled) {
-        lsp_did_change(state);
-    }
+    state->yank_register = strdup(state->move_register);
+    
+    editor_paste(state);
 }

@@ -35,11 +35,6 @@ void process_command(EditorState *state, bool *should_exit) {
     args[sizeof(args)-1] = '\0';
 
     if (strcmp(command, "q") == 0) {
-        if (state->buffer_modified) {
-            snprintf(state->status_msg, sizeof(state->status_msg), "Warning: Unsaved changes! Use :q! to force quit.");
-            state->mode = NORMAL;
-            return;
-        }
         fechar_janela_ativa(should_exit);
         return; 
     } else if (strcmp(command, "q!") == 0) {

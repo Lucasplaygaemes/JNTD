@@ -206,7 +206,12 @@ int main(int argc, char *argv[]) {
                 } else if (next_ch == 'o' || next_ch == 'O') {
                     if (state->mode == VISUAL && state->visual_selection_mode != VISUAL_MODE_NONE) {
                         copy_selection_to_clipboard(state);
-                    } else if (state->mode == NORMAL || state->mode == INSERT) {
+                    }
+                } else if (next_ch == 'p' || next_ch == 'P') {
+                    if (state->mode == NORMAL || state->mode == INSERT) {
+                        paste_from_clipboard(state);
+                    } else if (state->mode == VISUAL && state->visual_selection_mode != VISUAL_MODE_NONE) {
+                        editor_delete_selection(state);
                         paste_from_clipboard(state);
                     }
                 }
