@@ -197,35 +197,24 @@ void check_external_modification(EditorState *state) {
     time_t on_disk_mod_time = get_file_mod_time(state->filename);
 
     if (on_disk_mod_time != 0 && on_disk_mod_time != state->last_file_mod_time) {
-        WINDOW *win = gerenciador.janelas[gerenciador.janela_ativa_idx]->win;
+        bool decision = false;
         if (state->buffer_modified) {
-            snprintf(state->status_msg, sizeof(state->status_msg), "Warning: File on disk has changed! (S)ave, (L)oad, or (C)ancel?");
+            decision = confirm_action("File on disk changed! Discard your changes and reload?");
         } else {
-            snprintf(state->status_msg, sizeof(state->status_msg), "File on disk has changed. Reload? (Y/N)");
+            decision = confirm_action("File on disk changed. Reload?");
         }
-        editor_redraw(win, state);
-        wint_t ch;
-        wget_wch(win, &ch);
-        if (state->buffer_modified) {
-             switch (tolower(ch)) {
-                case 's':
-                    save_file(state);
-                    break;
-                case 'l':
-                    load_file(state, state->filename);
-                    break;
-                default:
-                    state->last_file_mod_time = on_disk_mod_time;
-                    snprintf(state->status_msg, sizeof(state->status_msg), "Action cancelled. In-memory version kept.");
-                    break;
-            }
+
+        if (decision) {
+            // Força o recarregamento do arquivo do disco
+            load_file_core(state, state->filename);
+            const char* syntax_file = get_syntax_file_from_extension(state->filename);
+            load_syntax_file(state, syntax_file);
+            snprintf(state->status_msg, sizeof(state->status_msg), "File reloaded from disk.");
         } else {
-            if (tolower(ch) == 'y') {
-                load_file(state, state->filename);
-            } else {
-                state->last_file_mod_time = on_disk_mod_time;
-                 snprintf(state->status_msg, sizeof(state->status_msg), "Reload cancelled.");
-            }
+            // Se o usuário escolher "não", apenas atualizamos o tempo de modificação
+            // para não perguntar novamente, mantendo a versão em memória.
+            state->last_file_mod_time = on_disk_mod_time;
+            snprintf(state->status_msg, sizeof(state->status_msg), "Reload cancelled. In-memory version kept.");
         }
     }
 }

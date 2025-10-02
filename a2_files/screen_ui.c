@@ -6,6 +6,40 @@
 #include <ctype.h>
 #include <unistd.h>
 
+bool confirm_action(const char *prompt) {
+    int rows, cols;
+    getmaxyx(stdscr, rows, cols);
+    int win_h = 3;
+    int win_w = strlen(prompt) + 8;
+    int win_y = (rows - win_h) / 2;
+    int win_x = (cols - win_w) / 2;
+
+    WINDOW *confirm_win = newwin(win_h, win_w, win_y, win_x);
+    wbkgd(confirm_win, COLOR_PAIR(8)); 
+    box(confirm_win, 0, 0);
+    mvwprintw(confirm_win, 1, 2, "%s (y/n)", prompt);
+    wrefresh(confirm_win);
+
+    wint_t ch;
+    keypad(confirm_win, TRUE);
+    curs_set(0);
+    while(1) {
+        wget_wch(confirm_win, &ch);
+        if (ch == 'y' || ch == 'Y') {
+            delwin(confirm_win);
+            touchwin(stdscr);
+            redesenhar_todas_as_janelas();
+            return true;
+        }
+        if (ch == 'n' || ch == 'N' || ch == 27) {
+            delwin(confirm_win);
+            touchwin(stdscr);
+            redesenhar_todas_as_janelas();
+            return false;
+        }
+    }
+}
+
 // ===================================================================
 // Screen & UI
 // ===================================================================

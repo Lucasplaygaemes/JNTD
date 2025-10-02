@@ -350,33 +350,6 @@ void janela_anterior() {
     }
 }
 
-bool confirm_action(const char *prompt) {
-    int rows, cols;
-    getmaxyx(stdscr, rows, cols);
-    int win_h = 3;
-    int win_w = strlen(prompt) + 8;
-    int win_y = (rows - win_h) / 2;
-    int win_x = (cols - win_w) / 2;
-    WINDOW *confirm_win = newwin(win_h, win_w, win_y, win_x);
-    wbkgd(confirm_win, COLOR_PAIR(9));
-    box(confirm_win, 0, 0);
-    mvwprintw(confirm_win, 1, 2, "%s (y/n)", prompt);
-    wrefresh(confirm_win);
-    wint_t ch;
-    keypad(confirm_win, TRUE);
-    curs_set(0);
-    while(1) {
-        wget_wch(confirm_win, &ch);
-        if (ch == 'y' || ch == 'Y') {
-            delwin(confirm_win);
-            return true;
-        }
-        if (ch == 'n' || ch == 'N' || ch == 27) {
-            delwin(confirm_win);
-            return false;
-        }
-    }
-}
 
 typedef struct {
     char* path;
@@ -512,27 +485,12 @@ void display_recent_files() {
 
         int ch = wgetch(switcher_win);
 
-        if (search_mode) {
-            if (ch == KEY_ENTER || ch == '\n' || ch == 27) {
-                search_mode = false;
-                curs_set(0);
-            } else if (ch == KEY_BACKSPACE || ch == 127) {
-                if (search_pos > 0) search_term[--search_pos] = '\0';
-            } else if (isprint(ch)) {
-                if (search_pos < (int)sizeof(search_term) - 1) {
-                    search_term[search_pos++] = ch;
-                    search_term[search_pos] = '\0';
-                }
-            }
-            current_selection = 0;
-            top_of_list = 0;
-            continue;
-        }
-
         switch(ch) {
             case '/':
-                search_mode = true;
-                curs_set(1);
+                if (!search_mode) {
+                    search_mode = true;
+                    curs_set(1);
+                }
                 break;
             case KEY_UP: case 'k':
                 if (current_selection > 0) current_selection--;
@@ -542,32 +500,72 @@ void display_recent_files() {
                 break;
             case KEY_ENTER: case '\n':
                 {
-                    if (list_size == 0) goto end_switcher;
-                    
-                    char* selected_file;
-                    if (search_term[0] != '\0') {
-                        selected_file = results[current_selection].path;
-                    } else {
-                        selected_file = active_state->recent_files[current_selection]->path;
+                    if (list_size == 0 && search_term[0] == '\0') goto end_switcher;
+
+                    if (search_mode) {
+                        search_mode = false;
+                        curs_set(0);
+                        // After pressing Enter in search mode, we stay in the dialog
+                        // to allow navigation of the filtered list.
+                        // Another Enter will select the file.
+                        break;
                     }
-
-                    if (active_state->buffer_modified) {
-                        delwin(switcher_win);
-                        touchwin(stdscr);
-                        redesenhar_todas_as_janelas();
-
-                        if (!confirm_action("Unsaved changes. Open file anyway?")) {
-                            goto end_switcher;
+                    
+                    char* selected_file = NULL;
+                    if (list_size > 0) {
+                        if (search_term[0] != '\0') {
+                            selected_file = results[current_selection].path;
+                        } else {
+                            selected_file = active_state->recent_files[current_selection]->path;
                         }
                     }
-                    
-                    load_file(active_state, selected_file);
-                    const char * syntax_file = get_syntax_file_from_extension(selected_file);
-                    load_syntax_file(active_state, syntax_file);
+
+                    if (selected_file) {
+                        if (active_state->buffer_modified) {
+                            delwin(switcher_win);
+                            touchwin(stdscr);
+                            redesenhar_todas_as_janelas();
+
+                            if (!confirm_action("Unsaved changes. Open file anyway?")) {
+                                goto end_switcher;
+                            }
+                        }
+                        
+                        load_file(active_state, selected_file);
+                        const char * syntax_file = get_syntax_file_from_extension(selected_file);
+                        load_syntax_file(active_state, syntax_file);
+                    }
                     goto end_switcher;
                 }
-            case 27: case 'q':
-                goto end_switcher;
+            case 27: case 'q': // ESC or q
+                if (search_mode) {
+                    search_mode = false;
+                    search_term[0] = '\0';
+                    search_pos = 0;
+                    curs_set(0);
+                    current_selection = 0;
+                    top_of_list = 0;
+                } else {
+                    goto end_switcher;
+                }
+                break;
+            case KEY_BACKSPACE: case 127:
+                if (search_mode && search_pos > 0) {
+                    search_term[--search_pos] = '\0';
+                    current_selection = 0;
+                    top_of_list = 0;
+                }
+                break;
+            default:
+                if (search_mode && isprint(ch)) {
+                    if (search_pos < (int)sizeof(search_term) - 1) {
+                        search_term[search_pos++] = ch;
+                        search_term[search_pos] = '\0';
+                        current_selection = 0;
+                        top_of_list = 0;
+                    }
+                }
+                break;
         }
     }
 
