@@ -382,7 +382,7 @@ FileRecoveryChoice display_recovery_prompt(WINDOW *parent_win, EditorState *stat
 }
 
 void handle_file_recovery(EditorState *state, const char *original_filename, const char *sv_filename) {
-    WINDOW *win = gerenciador.janelas[gerenciador.janela_ativa_idx]->win;
+    WINDOW *win = ACTIVE_WS->janelas[ACTIVE_WS->janela_ativa_idx]->win;
     
     while (1) {
         FileRecoveryChoice choice = display_recovery_prompt(win, state);

@@ -168,6 +168,13 @@ void process_command(EditorState *state, bool *should_exit) {
     } else if (strcmp(command, "toggle_auto_indent") == 0) {
         state->auto_indent_on_newline = !state->auto_indent_on_newline;
         snprintf(state->status_msg, sizeof(state->status_msg), "Auto-indent on newline: %s", state->auto_indent_on_newline ? "ON" : "OFF");
+    } else if (strcmp(command, "mtw") == 0) {
+        if (strlen(args) > 0) {
+            int target_ws = atoi(args);
+            mover_janela_para_workspace(target_ws - 1); // Subtract 1 for 0-based index
+        } else {
+            snprintf(state->status_msg, sizeof(state->status_msg), "Usage: :mtw <workspace_number>");
+        }
     } else {
         snprintf(state->status_msg, sizeof(state->status_msg), "Unknown command: %s", command);
     }

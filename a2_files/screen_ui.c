@@ -1,8 +1,8 @@
-#include "screen_ui.h" // Include its own header
-#include "defs.h" // For EditorState, etc.
-#include "others.h" // For editor_find_unmatched_brackets
-#include "lsp_client.h" // For lsp_draw_diagnostics, get_diagnostic_under_cursor
-#include "window_managment.h" // For gerenciador
+#include "screen_ui.h"
+#include "defs.h"
+#include "others.h"
+#include "lsp_client.h"
+#include "window_managment.h"
 #include <ctype.h>
 #include <unistd.h>
 
@@ -124,7 +124,6 @@ void draw_diagnostic_popup(WINDOW *main_win, EditorState *state, const char *mes
     int num_lines = 0;
     const char *ptr = message;
 
-    // Calcula as dimensões da janela
     while (*ptr) {
         num_lines++;
         const char *line_start = ptr;
@@ -144,7 +143,6 @@ void draw_diagnostic_popup(WINDOW *main_win, EditorState *state, const char *mes
         }
     }
 
-    // Adiciona padding
     int win_height = num_lines + 2;
     int win_width = max_width + 4;
 
@@ -154,14 +152,12 @@ void draw_diagnostic_popup(WINDOW *main_win, EditorState *state, const char *mes
     if (win_height > term_rows) win_height = term_rows;
     if (win_width > term_cols - 2) win_width = term_cols - 2;
 
-    // Posiciona a janela
     int win_y, win_x;
     int cursor_y, cursor_x;
     int visual_y, visual_x;
     get_visual_pos(main_win, state, &visual_y, &visual_x);
     
-    extern GerenciadorJanelas gerenciador;
-    int border_offset = gerenciador.num_janelas > 1 ? 1 : 0;
+    int border_offset = ACTIVE_WS->num_janelas > 1 ? 1 : 0;
     cursor_y = (visual_y - state->top_line) + border_offset;
     cursor_x = (visual_x - state->left_col) + border_offset;
 
@@ -181,7 +177,6 @@ void draw_diagnostic_popup(WINDOW *main_win, EditorState *state, const char *mes
     wbkgd(state->diagnostic_popup, COLOR_PAIR(8));
     box(state->diagnostic_popup, 0, 0);
 
-    // Imprime a mensagem
     ptr = message;
     for (int i = 0; i < num_lines; i++) {
         const char *line_start = ptr;
@@ -203,7 +198,6 @@ void draw_diagnostic_popup(WINDOW *main_win, EditorState *state, const char *mes
         mvwprintw(state->diagnostic_popup, i + 1, 2, "%.*s", line_len, line_start);
     }
 
-    // Marca o popup para atualização, mas não o desenha ainda
     wnoutrefresh(state->diagnostic_popup);
 }
 
@@ -222,11 +216,10 @@ void editor_redraw(WINDOW *win, EditorState *state) {
     int rows, cols;
     getmaxyx(win, rows, cols);
 
-    extern GerenciadorJanelas gerenciador;
-    int border_offset = gerenciador.num_janelas > 1 ? 1 : 0;
+    int border_offset = ACTIVE_WS->num_janelas > 1 ? 1 : 0;
 
     if (border_offset) {
-        if (gerenciador.janelas[gerenciador.janela_ativa_idx]->estado == state) {
+        if (ACTIVE_WS->janelas[ACTIVE_WS->janela_ativa_idx]->estado == state) {
             wattron(win, COLOR_PAIR(3) | A_BOLD);
             box(win, 0, 0);
             wattroff(win, COLOR_PAIR(3) | A_BOLD);
@@ -294,7 +287,7 @@ void editor_redraw(WINDOW *win, EditorState *state) {
                     break_pos = current_bytes;
                 }
 
-                if (break_pos == 0 && line_offset + current_bytes < line_len) {
+                if (break_pos == 0 && (size_t)(line_offset + current_bytes) < strlen(line)) {
                     break_pos = current_bytes;
                 }
 
@@ -494,7 +487,6 @@ void editor_redraw(WINDOW *win, EditorState *state) {
         }
     }
 
-    // Lógica de status e pop-up
     LspDiagnostic *diag = NULL;
     if (state->lsp_enabled) {
         diag = get_diagnostic_under_cursor(state);
@@ -503,12 +495,11 @@ void editor_redraw(WINDOW *win, EditorState *state) {
         }
     }
 
-    // Desenha a barra de status
-    int color_pair = 1; // Padrão: azul
+    int color_pair = 1;
     if (state->is_moving) {
-        color_pair = 2; // Amarelo para indicar o modo de movimento
+        color_pair = 2;
     } else if (strstr(state->status_msg, "Warning:") != NULL || strstr(state->status_msg, "Error:") != NULL) {
-        color_pair = 3; // Amarelo para avisos
+        color_pair = 3;
     }
     
     wattron(win, COLOR_PAIR(color_pair));
@@ -534,22 +525,16 @@ void editor_redraw(WINDOW *win, EditorState *state) {
         int visual_col = get_visual_col(state->lines[state->current_line], state->current_col);
         
         char final_bar[cols + 1];
-        snprintf(final_bar, sizeof(final_bar), "%s | %s%s | %s | Line %d/%d, Col %d", 
-            mode_str, display_filename, state->buffer_modified ? "*" : "", 
+        snprintf(final_bar, sizeof(final_bar), "WS %d | %s | %s%s | %s | Line %d/%d, Col %d", 
+            gerenciador_workspaces.workspace_ativo_idx + 1, mode_str, display_filename, state->buffer_modified ? "*" : "", 
             state->status_msg, state->current_line + 1, state->num_lines, visual_col + 1);
 
         mvwprintw(win, rows - 1, 1, "%.*s", cols - 2, final_bar);
     }
     wattroff(win, COLOR_PAIR(color_pair));
 
-    // Marca a janela principal (com todo o seu conteúdo) para atualização.
     wnoutrefresh(win);
 
-    // A lógica de desenhar o pop-up foi movida para redesenhar_todas_as_janelas()
-    // para garantir que ele seja desenhado por cima de todas as janelas.
-
-    // Limpa a mensagem de status para o próximo ciclo de redesenho,
-    // mas somente se não houver um diagnóstico a ser exibido no pop-up.
     if (!diag) {
         state->status_msg[0] = '\0';
     }
@@ -561,8 +546,7 @@ void adjust_viewport(WINDOW *win, EditorState *state) {
     int rows, cols;
     getmaxyx(win, rows, cols);
     
-    extern GerenciadorJanelas gerenciador;
-    int border_offset = gerenciador.num_janelas > 1 ? 1 : 0;
+    int border_offset = ACTIVE_WS->num_janelas > 1 ? 1 : 0;
     int content_height = rows - border_offset - 1;
     int content_width = cols - 2 * border_offset;
 
@@ -596,8 +580,7 @@ void get_visual_pos(WINDOW *win, EditorState *state, int *visual_y, int *visual_
     int rows, cols;
     getmaxyx(win, rows, cols);
 
-    extern GerenciadorJanelas gerenciador;
-    int border_offset = gerenciador.num_janelas > 1 ? 1 : 0;
+    int border_offset = ACTIVE_WS->num_janelas > 1 ? 1 : 0;
     int content_width = cols - (2 * border_offset);
     if (content_width <= 0) content_width = 1;
 
@@ -605,7 +588,6 @@ void get_visual_pos(WINDOW *win, EditorState *state, int *visual_y, int *visual_
     int x = 0;
 
     if (state->word_wrap_enabled) {
-        // Itera sobre as linhas ANTERIORES à do cursor para calcular o offset vertical
         for (int i = 0; i < state->current_line; i++) {
             char *line = state->lines[i];
             if (!line) continue;
@@ -622,7 +604,6 @@ void get_visual_pos(WINDOW *win, EditorState *state, int *visual_y, int *visual_
                 int current_width = 0;
                 int last_space_bytes = -1;
 
-                // Lógica de quebra de linha (idêntica à de editor_redraw)
                 while (line[line_offset + current_bytes] != '\0') {
                     wchar_t wc;
                     int bytes_consumed = mbtowc(&wc, &line[line_offset + current_bytes], MB_CUR_MAX);
@@ -645,18 +626,16 @@ void get_visual_pos(WINDOW *win, EditorState *state, int *visual_y, int *visual_
                 } else {
                     break_pos = current_bytes;
                 }
-                if (break_pos == 0 && line_offset + current_bytes < line_len) {
+                if (break_pos == 0 && (size_t)(line_offset + current_bytes) < strlen(line)) {
                     break_pos = current_bytes;
                 }
                 line_offset += break_pos;
             }
         }
 
-        // Agora, calcula a posição DENTRO da linha atual
         char *current_line_str = state->lines[state->current_line];
         int line_offset = 0;
         while (line_offset < state->current_col) {
-            int segment_start_offset = line_offset;
             int current_bytes = 0;
             int current_width = 0;
             int last_space_bytes = -1;
@@ -683,20 +662,20 @@ void get_visual_pos(WINDOW *win, EditorState *state, int *visual_y, int *visual_
             } else {
                 break_pos = current_bytes;
             }
-            if (break_pos == 0 && line_offset + current_bytes < strlen(current_line_str)) {
+            if (break_pos == 0 && (size_t)(line_offset + current_bytes) < strlen(current_line_str)) {
                 break_pos = current_bytes;
             }
 
             if (line_offset + break_pos < state->current_col) {
                 y++;
                 line_offset += break_pos;
-            } else {
-                break; // O cursor está neste segmento da linha
+            } else { 
+                break; 
             }
         }
         x = get_visual_col(current_line_str + line_offset, state->current_col - line_offset);
 
-    } else { // Lógica para quando word wrap está desativado
+    } else { 
         y = state->current_line;
         x = get_visual_col(state->lines[state->current_line], state->current_col);
     }

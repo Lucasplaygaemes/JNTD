@@ -602,7 +602,7 @@ void editor_move_to_previous_word(EditorState *state) {
 
 
 void editor_find(EditorState *state) {
-    JanelaEditor *active_jw = gerenciador.janelas[gerenciador.janela_ativa_idx];
+    JanelaEditor *active_jw = ACTIVE_WS->janelas[ACTIVE_WS->janela_ativa_idx];
     WINDOW *win = active_jw->win;
     int rows, cols;
     getmaxyx(win, rows, cols);
@@ -1042,7 +1042,7 @@ void editor_draw_completion_win(WINDOW *win, EditorState *state) {
 // ===================================================================
 
 void handle_insert_mode_key(EditorState *state, wint_t ch) {
-    WINDOW *win = gerenciador.janelas[gerenciador.janela_ativa_idx]->win;
+    WINDOW *win = ACTIVE_WS->janelas[ACTIVE_WS->janela_ativa_idx]->win;
     switch (ch) {
         case KEY_CTRL_P: editor_start_completion(state); break;
         case KEY_CTRL_DEL: case KEY_CTRL_K: editor_delete_line(state); break;

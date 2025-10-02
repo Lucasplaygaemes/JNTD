@@ -228,7 +228,7 @@ void prompt_for_directory_change(EditorState *state) {
         snprintf(state->status_msg, sizeof(state->status_msg), "Unsaved changes. Proceed with directory change? (y/n)");
         redesenhar_todas_as_janelas();
         wint_t ch;
-        wget_wch(gerenciador.janelas[gerenciador.janela_ativa_idx]->win, &ch);
+        wget_wch(ACTIVE_WS->janelas[ACTIVE_WS->janela_ativa_idx]->win, &ch);
         if (tolower(ch) != 'y') {
             snprintf(state->status_msg, sizeof(state->status_msg), "Cancelled.");
             redesenhar_todas_as_janelas();
@@ -279,9 +279,7 @@ void get_file_history_filename(char *buffer, size_t size) {
 int compare_files(const void *a, const void *b) {
     FileInfo *file_a = *(FileInfo**)a;
     FileInfo *file_b = *(FileInfo**)b;
-    if (file_b->last_access > file_a->last_access) return 1;
-    if (file_b->last_access < file_a->last_access) return -1;
-    return 0;
+    return file_b->access_count - file_a->access_count;
 }
 
 void load_file_history(EditorState *state) {
@@ -300,22 +298,21 @@ void load_file_history(EditorState *state) {
     
     char line[MAX_LINE_LEN];
     while (fgets(line, sizeof(line), f)) {
-        char *path = strchr(line, ' ');
-        if (!path) continue;
-        *path = '\0';
-        path++;
-        path[strcspn(path, "\n")] = 0;
-        
-        time_t access_time = atol(line); 
-        
-        FileInfo *new_file = malloc(sizeof(FileInfo));
-        if (!new_file) continue;
-        new_file->path = strdup(path);
-        new_file->last_access = access_time;
-        
-        state->num_recent_files++;
-        state->recent_files = realloc(state->recent_files, sizeof(FileInfo*) * state->num_recent_files);
-        state->recent_files[state->num_recent_files - 1] = new_file;
+        int count;
+        char path[4096];
+        if (sscanf(line, "%d %4095[^]", &count, path) == 2) {
+            FileInfo *new_file = malloc(sizeof(FileInfo));
+            if (!new_file) continue;
+            
+            new_file->path = strdup(path);
+            if (!new_file->path) { free(new_file); continue; }
+            
+            new_file->access_count = count;
+
+            state->num_recent_files++;
+            state->recent_files = realloc(state->recent_files, sizeof(FileInfo*) * state->num_recent_files);
+            state->recent_files[state->num_recent_files - 1] = new_file;
+        }
     }
     fclose(f);
     
@@ -331,7 +328,7 @@ void save_file_history(EditorState *state) {
     
     int limit = state->num_recent_files < 100 ? state->num_recent_files : 100;
     for (int i = 0; i < limit; i++) {
-        fprintf(f, "%ld %s\n", (long)state->recent_files[i]->last_access, state->recent_files[i]->path);
+        fprintf(f, "%d %s\n", state->recent_files[i]->access_count, state->recent_files[i]->path);
     }
     fclose(f);
 }
@@ -345,17 +342,17 @@ void add_to_file_history(EditorState *state, const char *path) {
         canonical_path[sizeof(canonical_path)-1] = '\0';
     }
 
-    // Verifica se o arquivo já existe e atualiza o tempo de acesso
+    // Verifica se o arquivo já existe e incrementa a contagem de acesso
     for (int i = 0; i < state->num_recent_files; i++) {
         if (strcmp(state->recent_files[i]->path, canonical_path) == 0) {
-            state->recent_files[i]->last_access = time(NULL);
+            state->recent_files[i]->access_count++;
             qsort(state->recent_files, state->num_recent_files, sizeof(FileInfo*), compare_files);
             save_file_history(state);
             return;
         }
     }
 
-    // Se não for encontrado, adiciona um novo
+    // Se não for encontrado, adiciona um novo com contagem 1
     state->num_recent_files++;
     state->recent_files = realloc(state->recent_files, sizeof(FileInfo*) * state->num_recent_files);
 
@@ -367,7 +364,7 @@ void add_to_file_history(EditorState *state, const char *path) {
     }
     
     new_file->path = strdup(canonical_path);
-    new_file->last_access = time(NULL);
+    new_file->access_count = 1;
 
     state->recent_files[state->num_recent_files - 1] = new_file;
 

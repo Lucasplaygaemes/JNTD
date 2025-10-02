@@ -26,6 +26,7 @@
 #define KEY_CTRL_D 4
 #define KEY_CTRL_A 1
 #define KEY_CTRL_G 7
+#define KEY_CTRL_W 23
 #define KEY_CTRL_RIGHT_BRACKET 29
 #define KEY_CTRL_LEFT_BRACKET 27
 
@@ -202,7 +203,7 @@ typedef struct {
 #define FILEINFO_DEFINED
 typedef struct {
     char *path;
-    time_t last_access;
+    int access_count;
 } FileInfo;
 #endif
 
@@ -285,6 +286,17 @@ typedef struct {
 } GerenciadorJanelas;
 #endif
 
+#ifndef GERENCIADOR_WORKSPACES_DEFINED
+#define GERENCIADOR_WORKSPACES_DEFINED
+typedef struct {
+    GerenciadorJanelas **workspaces;
+    int num_workspaces;
+    int workspace_ativo_idx;
+} GerenciadorWorkspaces;
+#endif
+
+#define ACTIVE_WS (gerenciador_workspaces.workspaces[gerenciador_workspaces.workspace_ativo_idx])
+
 #ifndef COMMANDINFO_DEFINED
 #define COMMANDINFO_DEFINED
 typedef struct {
@@ -301,7 +313,7 @@ typedef struct {
 } FileViewer;
 #endif
 
-extern GerenciadorJanelas gerenciador;
+extern GerenciadorWorkspaces gerenciador_workspaces;
 
 extern char executable_dir[PATH_MAX];
 extern char* global_yank_register;

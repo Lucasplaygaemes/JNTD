@@ -16,6 +16,7 @@
 
 void inicializar_ncurses() {
     initscr(); cbreak(); noecho(); keypad(stdscr, TRUE);
+    set_escdelay(25);
     start_color();
     init_pair(1, COLOR_BLACK, COLOR_BLUE); init_pair(2, COLOR_YELLOW, COLOR_BLACK);
     init_pair(3, COLOR_YELLOW, COLOR_BLACK); init_pair(4, COLOR_GREEN, COLOR_BLACK);
@@ -40,22 +41,19 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    EditorState state;
-    memset(&state, 0, sizeof(EditorState));
     start_work_timer();
     setlocale(LC_ALL, "");
     inicializar_ncurses();
     
-    inicializar_gerenciador_janelas();
+    inicializar_workspaces();
 
     if (argc > 1) {
-        criar_nova_janela(argv[1]);
-        EditorState *state = gerenciador.janelas[0]->estado;
-    
+        // Load the first file into the initial window of the first workspace
+        load_file(ACTIVE_WS->janelas[0]->estado, argv[1]);
+        EditorState *state = ACTIVE_WS->janelas[0]->estado;
+
         napms(100);
-        
         lsp_initialize(state);
-        // Esperar um pouco pela inicialização antes de didOpen
         napms(500);
 
         if (argc > 2) {
@@ -76,19 +74,18 @@ int main(int argc, char *argv[]) {
                 state->current_line = 0;
             }
         }
-    } else {
-        criar_nova_janela(NULL);
     }
 
     bool should_exit = false;
     while (!should_exit) {
-        if (gerenciador.num_janelas == 0) {
+        if (gerenciador_workspaces.num_workspaces == 0) {
             should_exit = true;
             continue;
         }
 
-        EditorState *state = gerenciador.janelas[gerenciador.janela_ativa_idx]->estado;
-        WINDOW *active_win = gerenciador.janelas[gerenciador.janela_ativa_idx]->win;
+        GerenciadorJanelas *ws = ACTIVE_WS;
+        EditorState *state = ws->janelas[ws->janela_ativa_idx]->estado;
+        WINDOW *active_win = ws->janelas[ws->janela_ativa_idx]->win;
 
         ensure_cursor_in_bounds(state);
         check_external_modification(state);
@@ -99,7 +96,6 @@ int main(int argc, char *argv[]) {
             state->last_auto_save_time = now;
         }
         
-
         if (state->lsp_enabled) {
             lsp_process_messages(state);
         }
@@ -110,7 +106,7 @@ int main(int argc, char *argv[]) {
         static int check_counter = 0;
         if (check_counter++ % 10 == 0) {
             if (state->lsp_enabled && !lsp_process_alive(state)) {
-                snprintf(state->status_msg, STATUS_MSG_LEN, "LSP terminou inesperadamente");
+                snprintf(state->status_msg, STATUS_MSG_LEN, "LSP terminated unexpectedly");
                 state->lsp_enabled = false;
             }
         }
@@ -162,7 +158,7 @@ int main(int argc, char *argv[]) {
             continue; 
         }
             
-        if (ch == 27) {
+        if (ch == 27) { // ESC
             nodelay(active_win, TRUE);
             int next_ch = wgetch(active_win);
             nodelay(active_win, FALSE);
@@ -178,16 +174,16 @@ int main(int argc, char *argv[]) {
                      snprintf(state->status_msg, sizeof(state->status_msg), "Move cancelled.");
                  }
             } else { // Alt key sequence
-                if (next_ch == '[') { // This is Alt+[ for previous window
-                    janela_anterior();
-                } else if (next_ch == ']') { // This is Alt+] for next window
-                    proxima_janela();
-                } else if (next_ch == 'x' || next_ch == 'X') { // Alt+X to close window
+                if (next_ch == 'n') { // Alt+n to cycle workspaces
+                    ciclar_workspaces(-1);
+                } else if (next_ch == 'm') { // Alt+m to cycle workspaces
+                    ciclar_workspaces(1);
+                } else if (next_ch == '\n' || next_ch == KEY_ENTER) { // Alt+Enter for new split
+                    criar_nova_janela(NULL);
+                } else if (next_ch == 'x' || next_ch == 'X') { // Alt+X to close window/split
                      fechar_janela_ativa(&should_exit);
                 } else if (next_ch == 'b' || next_ch == 'B') {
                     display_recent_files();
-                } else if (next_ch == '\n' || next_ch == KEY_ENTER) { // Alt+Enter to create new window
-                    criar_nova_janela(NULL);
                 } else if (next_ch == 'z' || next_ch == 'Z') {
                     do_undo(state);
                 } else if (next_ch == 'y' || next_ch == 'Y') {
@@ -201,8 +197,7 @@ int main(int argc, char *argv[]) {
                 } else if (next_ch == '.' || next_ch == '>') {
                     ciclar_layout();
                 } else if (next_ch >= '1' && next_ch <= '9') {
-                    int target_pos = next_ch - '1';
-                    mover_janela_para_posicao(target_pos);
+                    mover_janela_para_workspace(next_ch - '1');
                 } else if (next_ch == 'r' || next_ch == 'R') {
                     rotacionar_janelas();
                 } else if (next_ch == 'o' || next_ch == 'O') {
@@ -218,6 +213,11 @@ int main(int argc, char *argv[]) {
                     }
                 }
             }
+            continue;
+        }
+
+        if (ch == KEY_CTRL_W) { // Ctrl+W for new workspace
+            criar_novo_workspace();
             continue;
         }
 
@@ -266,9 +266,8 @@ int main(int argc, char *argv[]) {
                         }
                         break;
                     default: // Fallback to normal mode keys
-                        // (The original NORMAL mode switch case is now here)
                         switch (ch) {
-                            case 'v': state->visual_selection_mode = VISUAL_MODE_NONE; state->mode = NORMAL; break;
+                            case 'v': state->mode = NORMAL; break;
                             case 'i': state->mode = INSERT; break;
                             case ':': state->mode = COMMAND; state->history_pos = state->history_count; state->command_buffer[0] = '\0'; state->command_pos = 0; break;
                             case KEY_CTRL_RIGHT_BRACKET: proxima_janela(); break;
@@ -422,14 +421,11 @@ int main(int argc, char *argv[]) {
         }
     }    
         
-    for (int i = 0; i < gerenciador.num_janelas; i++) {
-        EditorState *estado_janela = gerenciador.janelas[i]->estado;
-        if (estado_janela->lsp_enabled) {
-            lsp_shutdown(estado_janela);
-        }
-        free_janela_editor(gerenciador.janelas[i]);
+    // Final cleanup
+    for (int i = 0; i < gerenciador_workspaces.num_workspaces; i++) {
+        free_workspace(gerenciador_workspaces.workspaces[i]);
     }
-    free(gerenciador.janelas);
+    free(gerenciador_workspaces.workspaces);
        
     stop_and_log_work();
     endwin(); 
