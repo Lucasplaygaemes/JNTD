@@ -40,11 +40,11 @@ void load_directory_history(EditorState *state) {
     if (!f) return;
 
     char line[MAX_LINE_LEN];
-    const char* sscanf_format = "%d %1023[^\n]"; // Declared format string
+    const char* sscanf_format = "%d %1023[^]";
     while (fgets(line, sizeof(line), f)) {
         int count;
         char path[1024];
-        if (sscanf(line, sscanf_format, &count, path) == 2) { // Used variable here
+        if (sscanf(line, sscanf_format, &count, path) == 2) {
             DirectoryInfo *new_dir = malloc(sizeof(DirectoryInfo));
             if (!new_dir) continue;
             
@@ -65,7 +65,7 @@ void load_directory_history(EditorState *state) {
             state->recent_dirs[state->num_recent_dirs - 1] = new_dir;
         }
     }
-    fclose(f); // Moved fclose inside the function
+    fclose(f);
 
     if (state->num_recent_dirs > 0) {
         qsort(state->recent_dirs, state->num_recent_dirs, sizeof(DirectoryInfo*), compare_dirs);
@@ -137,8 +137,8 @@ void display_directory_navigator(EditorState *state) {
     int rows, cols;
     getmaxyx(stdscr, rows, cols);
 
-    int win_h = max(state->num_recent_dirs + 4, 10); // Use max from defs.h
-    win_h = min(win_h, rows - 4); // Use min from defs.h
+    int win_h = max(state->num_recent_dirs + 4, 10); 
+    win_h = min(win_h, rows - 4); 
     int win_w = cols - 10;
     if (win_w < 50) win_w = 50;
     int win_y = (rows - win_h) / 2;
@@ -264,4 +264,113 @@ void prompt_for_directory_change(EditorState *state) {
     }
     
     redesenhar_todas_as_janelas();
+}
+
+void get_file_history_filename(char *buffer, size_t size) {
+    const char *home_dir = getenv("HOME");
+    if (home_dir) {
+        snprintf(buffer, size, "%s/.jntd_file_history", home_dir);
+    } else {
+        snprintf(buffer, size, ".jntd_file_history");
+    }
+}
+
+
+int compare_files(const void *a, const void *b) {
+    FileInfo *file_a = *(FileInfo**)a;
+    FileInfo *file_b = *(FileInfo**)b;
+    if (file_b->last_access > file_a->last_access) return 1;
+    if (file_b->last_access < file_a->last_access) return -1;
+    return 0;
+}
+
+void load_file_history(EditorState *state) {
+    for (int i = 0; i < state->num_recent_files; i++) {
+        free(state->recent_files[i]->path);
+        free(state->recent_files[i]);
+    }
+    free(state->recent_files);
+    state->recent_files = NULL;
+    state->num_recent_files = 0;
+    
+    char history_file[1024];
+    get_file_history_filename(history_file, sizeof(history_file));
+    FILE *f = fopen(history_file, "r");
+    if (!f) return;
+    
+    char line[MAX_LINE_LEN];
+    while (fgets(line, sizeof(line), f)) {
+        char *path = strchr(line, ' ');
+        if (!path) continue;
+        *path = '\0';
+        path++;
+        path[strcspn(path, "\n")] = 0;
+        
+        time_t access_time = atol(line); 
+        
+        FileInfo *new_file = malloc(sizeof(FileInfo));
+        if (!new_file) continue;
+        new_file->path = strdup(path);
+        new_file->last_access = access_time;
+        
+        state->num_recent_files++;
+        state->recent_files = realloc(state->recent_files, sizeof(FileInfo*) * state->num_recent_files);
+        state->recent_files[state->num_recent_files - 1] = new_file;
+    }
+    fclose(f);
+    
+    qsort(state->recent_files, state->num_recent_files, sizeof(FileInfo*), compare_files);
+}
+
+void save_file_history(EditorState *state) {
+    char history_file[1024];
+    get_file_history_filename(history_file, sizeof(history_file));
+    
+    FILE *f = fopen(history_file, "w");
+    if (!f) return;
+    
+    int limit = state->num_recent_files < 100 ? state->num_recent_files : 100;
+    for (int i = 0; i < limit; i++) {
+        fprintf(f, "%ld %s\n", (long)state->recent_files[i]->last_access, state->recent_files[i]->path);
+    }
+    fclose(f);
+}
+
+void add_to_file_history(EditorState *state, const char *path) {
+    if (strcmp(path, "[No Name]") == 0) return;
+
+    char canonical_path[PATH_MAX];
+    if (realpath(path, canonical_path) == NULL) {
+        strncpy(canonical_path, path, sizeof(canonical_path)-1);
+        canonical_path[sizeof(canonical_path)-1] = '\0';
+    }
+
+    // Verifica se o arquivo já existe e atualiza o tempo de acesso
+    for (int i = 0; i < state->num_recent_files; i++) {
+        if (strcmp(state->recent_files[i]->path, canonical_path) == 0) {
+            state->recent_files[i]->last_access = time(NULL);
+            qsort(state->recent_files, state->num_recent_files, sizeof(FileInfo*), compare_files);
+            save_file_history(state);
+            return;
+        }
+    }
+
+    // Se não for encontrado, adiciona um novo
+    state->num_recent_files++;
+    state->recent_files = realloc(state->recent_files, sizeof(FileInfo*) * state->num_recent_files);
+
+    FileInfo *new_file = malloc(sizeof(FileInfo));
+    if (!new_file || !state->recent_files) {
+        // Lida com falha de alocação
+        state->num_recent_files--;
+        return;
+    }
+    
+    new_file->path = strdup(canonical_path);
+    new_file->last_access = time(NULL);
+
+    state->recent_files[state->num_recent_files - 1] = new_file;
+
+    qsort(state->recent_files, state->num_recent_files, sizeof(FileInfo*), compare_files);
+    save_file_history(state);
 }

@@ -4,6 +4,7 @@
 #include "lsp_client.h" // For lsp_did_save
 #include "others.h" // For trim_whitespace, editor_find_unmatched_brackets
 #include "command_execution.h" // For run_and_display_command
+#include "direct_navigation.h"
 
 #include <limits.h> // For PATH_MAX
 #include <errno.h> // For errno, ENOENT
@@ -114,6 +115,7 @@ void load_file_core(EditorState *state, const char *filename) {
 }
    
 void load_file(EditorState *state, const char *filename) {
+    add_to_file_history(state, filename);
 	if (strstr(filename, AUTO_SAVE_EXTENSION) == NULL) {
 		char sv_filename[256];
 		snprintf(sv_filename, sizeof(sv_filename), "%s%s", filename, AUTO_SAVE_EXTENSION);

@@ -184,6 +184,8 @@ int main(int argc, char *argv[]) {
                     proxima_janela();
                 } else if (next_ch == 'x' || next_ch == 'X') { // Alt+X to close window
                      fechar_janela_ativa(&should_exit);
+                } else if (next_ch == 'b' || next_ch == 'B') {
+                    display_recent_files();
                 } else if (next_ch == '\n' || next_ch == KEY_ENTER) { // Alt+Enter to create new window
                     criar_nova_janela(NULL);
                 } else if (next_ch == 'z' || next_ch == 'Z') {
@@ -277,6 +279,7 @@ int main(int argc, char *argv[]) {
                             case KEY_CTRL_D: editor_find_next(state); break;
                             case KEY_CTRL_A: editor_find_previous(state); break;
                             case KEY_CTRL_G: display_directory_navigator(state); break;
+                            case 'o':
                             case KEY_UP:
                                 if (state->word_wrap_enabled) {
                                     if (state->current_line > 0) {
@@ -290,6 +293,7 @@ int main(int argc, char *argv[]) {
                                     }
                                 }
                                 break;
+                            case 'l':
                             case KEY_DOWN: {
                                 if (state->current_line < state->num_lines - 1) {
                                     state->current_line++;
@@ -297,6 +301,7 @@ int main(int argc, char *argv[]) {
                                 }
                                 break;
                             }
+                            case 'k':
                             case KEY_LEFT:
                                 if (state->current_col > 0) {
                                     state->current_col--;
@@ -306,6 +311,7 @@ int main(int argc, char *argv[]) {
                                 }
                                 state->ideal_col = state->current_col;
                                 break;
+                            case 231: // ç
                             case KEY_RIGHT: {
                                 char* line = state->lines[state->current_line];
                                 if (line && state->current_col < strlen(line)) {
@@ -316,9 +322,13 @@ int main(int argc, char *argv[]) {
                                 }
                                 state->ideal_col = state->current_col;
                                 } break;
+                            case 'O':
                             case KEY_PPAGE: case KEY_SR: for (int i = 0; i < PAGE_JUMP; i++) if (state->current_line > 0) state->current_line--; state->current_col = state->ideal_col; break;
+                            case 'L':
                             case KEY_NPAGE: case KEY_SF: for (int i = 0; i < PAGE_JUMP; i++) if (state->current_line < state->num_lines - 1) state->current_line++; state->current_col = state->ideal_col; break;
+                            case 'K':
                             case KEY_HOME: state->current_col = 0; state->ideal_col = 0; break;
+                            case 199: // Ç
                             case KEY_END: { char* line = state->lines[state->current_line]; if(line) state->current_col = strlen(line); state->ideal_col = state->current_col; } break;
                             case KEY_SDC: editor_delete_line(state); break;
                         }
@@ -349,6 +359,7 @@ int main(int argc, char *argv[]) {
                     case KEY_CTRL_D: editor_find_next(state); break;
                     case KEY_CTRL_A: editor_find_previous(state); break;
                     case KEY_CTRL_G: display_directory_navigator(state); break;
+                    case 'o':
                     case KEY_UP:
                         if (state->word_wrap_enabled) {
                             if (state->current_line > 0) {
@@ -362,6 +373,7 @@ int main(int argc, char *argv[]) {
                             }
                         }
                         break;
+                    case 'l':
                     case KEY_DOWN: {
                         if (state->current_line < state->num_lines - 1) {
                             state->current_line++;
@@ -369,6 +381,7 @@ int main(int argc, char *argv[]) {
                         }
                         break;                        
                     }
+                    case 'k':
                     case KEY_LEFT:
                         if (state->current_col > 0) {
                             state->current_col--;
@@ -378,6 +391,7 @@ int main(int argc, char *argv[]) {
                         }
                         state->ideal_col = state->current_col;
                         break;
+                    case 231: // ç
                     case KEY_RIGHT: {
                         char* line = state->lines[state->current_line];
                         if (line && state->current_col < strlen(line)) {
@@ -388,9 +402,13 @@ int main(int argc, char *argv[]) {
                         }
                         state->ideal_col = state->current_col;
                         } break;
+                    case 'O':
                     case KEY_PPAGE: case KEY_SR: for (int i = 0; i < PAGE_JUMP; i++) if (state->current_line > 0) state->current_line--; state->current_col = state->ideal_col; break;
+                    case 'L':
                     case KEY_NPAGE: case KEY_SF: for (int i = 0; i < PAGE_JUMP; i++) if (state->current_line < state->num_lines - 1) state->current_line++; state->current_col = state->ideal_col; break;
+                    case 'K':
                     case KEY_HOME: state->current_col = 0; state->ideal_col = 0; break;
+                    case 199: // Ç
                     case KEY_END: { char* line = state->lines[state->current_line]; if(line) state->current_col = strlen(line); state->ideal_col = state->current_col; } break;
                     case KEY_SDC: editor_delete_line(state); break;
                 }

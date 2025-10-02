@@ -198,6 +198,14 @@ typedef struct {
 } LspDocumentState;
 #endif
 
+#ifndef FILEINFO_DEFINED
+#define FILEINFO_DEFINED
+typedef struct {
+    char *path;
+    time_t last_access;
+} FileInfo;
+#endif
+
 #ifndef EDITORSTATE_DEFINED
 #define EDITORSTATE_DEFINED
 typedef struct EditorState {
@@ -243,6 +251,8 @@ typedef struct EditorState {
     time_t last_change_time;
     time_t lsp_init_time;
     int lsp_init_retries;
+    FileInfo **recent_files;
+    int num_recent_files;
 } EditorState;
 #endif
 

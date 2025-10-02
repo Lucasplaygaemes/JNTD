@@ -17,5 +17,6 @@ void janela_anterior();
 void ciclar_layout();
 void rotacionar_janelas();
 void mover_janela_para_posicao(int target_idx);
+void display_recent_files();
 
 #endif // WINDOW_MANAGMENT_H

@@ -12,5 +12,8 @@ void update_directory_access(EditorState *state, const char *path);
 void change_directory(EditorState *state, const char *new_path);
 void display_directory_navigator(EditorState *state);
 void prompt_for_directory_change(EditorState *state);
+void load_file_history(EditorState *state);
+void save_file_history(EditorState *state);
+void add_to_file_history(EditorState *state, const char *path);
 
 #endif // DIRECT_NAVIGATION_H
