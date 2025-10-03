@@ -61,6 +61,8 @@ void process_command(EditorState *state, bool *should_exit) {
             }
     } else if (strcmp(command, "help") == 0) {
         display_help_screen();
+    } else if (strcmp(command, "ksc") == 0) {
+        display_shortcuts_screen();
     } else if (strcmp(command, "gcc") == 0) {
         compile_file(state, args);
     } else if (strcmp(command, "rc") == 0) {

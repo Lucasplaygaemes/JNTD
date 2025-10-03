@@ -198,6 +198,13 @@ int main(int argc, char *argv[]) {
                     ciclar_layout();
                 } else if (next_ch >= '1' && next_ch <= '9') {
                     mover_janela_para_workspace(next_ch - '1');
+                } else if (strchr("!@#$%^&*(", next_ch)) {
+                    const char* symbols = "!@#$%^&*(";
+                    char* p = strchr(symbols, next_ch);
+                    if (p) {
+                        int index = p - symbols;
+                        mover_janela_para_posicao(index);
+                    }
                 } else if (next_ch == 'r' || next_ch == 'R') {
                     rotacionar_janelas();
                 } else if (next_ch == 'o' || next_ch == 'O') {

@@ -671,7 +671,7 @@ void get_visual_pos(WINDOW *win, EditorState *state, int *visual_y, int *visual_
                 line_offset += break_pos;
             } else { 
                 break; 
-            }
+            } 
         }
         x = get_visual_col(current_line_str + line_offset, state->current_col - line_offset);
 
@@ -924,4 +924,82 @@ void display_diagnostics_list(EditorState *state) {
     fclose(temp_file);
 
     display_output_screen("--- LSP Diagnostics List ---", temp_filename);
+}
+
+void display_shortcuts_screen() {
+    char temp_filename[] = "/tmp/shortcuts.XXXXXX";
+    int fd = mkstemp(temp_filename);
+    if (fd == -1) return;
+
+    FILE *temp_file = fdopen(fd, "w");
+    if (!temp_file) {
+        close(fd);
+        return;
+    }
+
+    fprintf(temp_file, "--- Atalhos de Teclado ---\n\n");
+
+    fprintf(temp_file, "General:\n");
+    fprintf(temp_file, "    %-20s %s\n", "Ctrl+F", "search");
+    fprintf(temp_file, "    %-20s %s\n", "Ctrl+D", "search for the next occurency");
+    fprintf(temp_file, "    %-20s %s\n", "Ctrl+A", "search for the last occurency");
+    fprintf(temp_file, "    %-20s %s\n", "Ctrl+G", "Navigate in the directorys");
+    fprintf(temp_file, "    %-20s %s\n", "Alt+Z", "Undo");
+    fprintf(temp_file, "    %-20s %s\n", "Alt+Y", "Redo");
+    fprintf(temp_file, "    %-20s %s\n", "Alt+B", "Open recent files");
+    fprintf(temp_file, "\n");
+
+    fprintf(temp_file, "Window managment:\n");
+    fprintf(temp_file, "    %-20s %s\n", "Ctrl+W", "New workspace");
+    fprintf(temp_file, "    %-20s %s\n", "Alt+N / Alt+M", "alternate for the last/next workspace");
+    fprintf(temp_file, "    %-20s %s\n", "Alt+Enter", "split the scrre");
+    fprintf(temp_file, "    %-20s %s\n", "Alt+X", "close the window/split");
+    fprintf(temp_file, "    %-20s %s\n", "Ctrl+]", "next window");
+    fprintf(temp_file, "    %-20s %s\n", "Ctrl+[", "last window");
+    fprintf(temp_file, "    %-20s %s\n", "Alt+.", "Mudar layout");
+    fprintf(temp_file, "    %-20s %s\n", "Alt+R", "Rotate the splits/windows");
+    fprintf(temp_file, "    %-20s %s\n", "Alt+[1-9]", "Move the window for a other workspace [1-9]");
+    fprintf(temp_file, "\n");
+
+    fprintf(temp_file, "Normal Mode (Navigation):\n");
+    fprintf(temp_file, "    %-20s %s\n", "o / Seta Cima", "Mover para cima");
+    fprintf(temp_file, "    %-20s %s\n", "l / Seta Baixo", "Mover para baixo");
+    fprintf(temp_file, "    %-20s %s\n", "k / Seta Esquerda", "Mover para a esquerda");
+    fprintf(temp_file, "    %-20s %s\n", "ç / Seta Direita", "Mover para a direita");
+    fprintf(temp_file, "    %-20s %s\n", "Alt+f / Alt+w", "Avançar uma palavra");
+    fprintf(temp_file, "    %-20s %s\n", "Alt+b / Alt+q", "Voltar uma palavra");
+    fprintf(temp_file, "    %-20s %s\n", "O / Page Up", "Página para cima");
+    fprintf(temp_file, "    %-20s %s\n", "L / Page Down", "Página para baixo");
+    fprintf(temp_file, "    %-20s %s\n", "K / Home", "Início da linha");
+    fprintf(temp_file, "    %-20s %s\n", "Ç / End", "Fim da linha");
+    fprintf(temp_file, "\n");
+
+    fprintf(temp_file, "Modo Normal (Ações):\n");
+    fprintf(temp_file, "    %-20s %s\n", "i", "Entrar no modo de inserção");
+    fprintf(temp_file, "    %-20s %s\n", "v", "Entrar no modo visual");
+    fprintf(temp_file, "    %-20s %s\n", ":", "Entrar no modo de comando");
+    fprintf(temp_file, "    %-20s %s\n", "Ctrl+P", "Colar do registro global");
+    fprintf(temp_file, "    %-20s %s\n", "m", "Colar do registro de movimento");
+    fprintf(temp_file, "    %-20s %s\n", "Ctrl+Del / Ctrl+K", "Apagar linha");
+    fprintf(temp_file, "\n");
+
+    fprintf(temp_file, "Modo de Inserção:\n");
+    fprintf(temp_file, "    %-20s %s\n", "Esc", "Voltar para o modo normal");
+    fprintf(temp_file, "    %-20s %s\n", "Ctrl+P / Tab", "Autocompletar");
+    fprintf(temp_file, "\n");
+
+    fprintf(temp_file, "Modo Visual:\n");
+    fprintf(temp_file, "    %-20s %s\n", "Esc", "Return to the normal Mode");
+    fprintf(temp_file, "    %-20s %s\n", "s", "start/end selection");
+    fprintf(temp_file, "    %-20s %s\n", "y", "Copy (yank) selection");
+    fprintf(temp_file, "    %-20s %s\n", "m", "Cut (mover) selection");
+    fprintf(temp_file, "    %-20s %s\n", "p", "Paste the copied/moved text");
+    fprintf(temp_file, "    %-20s %s\n", "Ctrl+Y", "Copy to the global register");
+    fprintf(temp_file, "    %-20s %s\n", "Alt+O", "Copy the selection in the clipboard of the system");
+    fprintf(temp_file, "    %-20s %s\n", "Alt+P", "Paste from the clipboard");
+    fprintf(temp_file, "    %-20s %s\n", "Shift+Alt+Number", "Move the current window to the designed position, it's used based in the numbers with carachteres.");
+    
+    fclose(temp_file);
+
+    display_output_screen("--- Atalhos de Teclado ---", temp_filename);
 }

@@ -18,5 +18,6 @@ WINDOW* draw_pop_up(const char *message, int y, int x);
 bool is_selected(EditorState *state, int line_idx, int col_idx);
 bool confirm_action(const char *prompt);
 void display_shortcuts_screen();
+void display_shortcuts_screen();
 
 #endif // SCREEN_UI_H

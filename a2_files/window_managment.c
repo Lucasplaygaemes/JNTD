@@ -105,6 +105,7 @@ void ciclar_workspaces(int direcao) {
         gerenciador_workspaces.workspace_ativo_idx = gerenciador_workspaces.num_workspaces - 1;
     }
 
+    recalcular_layout_janelas();
     redesenhar_todas_as_janelas();
 }
 
