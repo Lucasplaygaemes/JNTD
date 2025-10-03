@@ -8,6 +8,23 @@
 #include <errno.h> // For errno
 #include <ctype.h> // For tolower
 #include <stdio.h> // For sscanf, fgets, fopen, fclose
+#include <string.h> // For strcmp, strstr, etc.
+#include <stdarg.h> // For va_list, etc.
+
+// ===================================================================
+// Debug Logging
+// ===================================================================
+
+void debug_log(const char *format, ...) {
+    FILE *log_file = fopen("/tmp/jntd_debug.log", "a");
+    if (log_file) {
+        va_list args;
+        va_start(args, format);
+        vfprintf(log_file, format, args);
+        va_end(args);
+        fclose(log_file);
+    }
+}
 
 // ===================================================================
 // 4. Directory Navigation
@@ -30,21 +47,29 @@ int compare_dirs(const void *a, const void *b) {
 }
 
 void load_directory_history(EditorState *state) {
+    debug_log("--- Loading directory history ---\n");
     state->recent_dirs = NULL;
     state->num_recent_dirs = 0;
 
     char history_file[1024];
     get_history_filename(history_file, sizeof(history_file));
+    debug_log("Directory history file path: %s\n", history_file);
 
     FILE *f = fopen(history_file, "r");
-    if (!f) return;
+    if (!f) {
+        debug_log("Failed to open directory history file: %s\n", strerror(errno));
+        return;
+    }
+    debug_log("Directory history file opened successfully.\n");
 
     char line[MAX_LINE_LEN];
-    const char* sscanf_format = "%d %1023[^]";
     while (fgets(line, sizeof(line), f)) {
+        debug_log("Read line from dir history: %s", line);
         int count;
         char path[1024];
-        if (sscanf(line, sscanf_format, &count, path) == 2) {
+        int result = sscanf(line, "%d %1023[^\n]", &count, path);
+        if (result == 2) {
+            debug_log("sscanf successful for dir: count=%d, path=%s\n", count, path);
             DirectoryInfo *new_dir = malloc(sizeof(DirectoryInfo));
             if (!new_dir) continue;
             
@@ -63,9 +88,12 @@ void load_directory_history(EditorState *state) {
             }
             
             state->recent_dirs[state->num_recent_dirs - 1] = new_dir;
+        } else {
+            debug_log("sscanf failed for dir, result=%d\n", result);
         }
     }
     fclose(f);
+    debug_log("--- Finished loading directory history. Found %d entries. ---\n", state->num_recent_dirs);
 
     if (state->num_recent_dirs > 0) {
         qsort(state->recent_dirs, state->num_recent_dirs, sizeof(DirectoryInfo*), compare_dirs);
@@ -77,7 +105,10 @@ void save_directory_history(EditorState *state) {
     get_history_filename(history_file, sizeof(history_file));
 
     FILE *f = fopen(history_file, "w");
-    if (!f) return;
+    if (!f) {
+        snprintf(state->status_msg, sizeof(state->status_msg), "Error saving dir history: %s", strerror(errno));
+        return;
+    }
 
     for (int i = 0; i < state->num_recent_dirs; i++) {
         fprintf(f, "%d %s\n", state->recent_dirs[i]->access_count, state->recent_dirs[i]->path);
@@ -146,47 +177,86 @@ void display_directory_navigator(EditorState *state) {
 
     nav_win = newwin(win_h, win_w, win_y, win_x);
     if (!nav_win) return;
-    
+
     keypad(nav_win, TRUE);
     wbkgd(nav_win, COLOR_PAIR(9));
-    box(nav_win, 0, 0);
 
-    mvwprintw(nav_win, 1, (win_w - 25) / 2, "Navegador de Diretórios");
-    
     int current_selection = 0;
     int top_of_list = 0;
     int max_visible = win_h - 4;
 
+    char search_term[100] = {0};
+    int search_pos = 0;
+    bool search_mode = false;
+
+    DirectoryInfo **filtered_dirs = NULL;
+    int num_filtered = 0;
+
     while (1) {
+        if (search_term[0] != '\0') {
+            if (filtered_dirs && filtered_dirs != state->recent_dirs) free(filtered_dirs);
+            num_filtered = 0;
+            filtered_dirs = malloc(sizeof(DirectoryInfo*) * state->num_recent_dirs);
+            for (int i = 0; i < state->num_recent_dirs; i++) {
+                if (strstr(state->recent_dirs[i]->path, search_term)) {
+                    filtered_dirs[num_filtered++] = state->recent_dirs[i];
+                }
+            }
+        } else {
+            if (filtered_dirs && filtered_dirs != state->recent_dirs) free(filtered_dirs);
+            filtered_dirs = state->recent_dirs;
+            num_filtered = state->num_recent_dirs;
+        }
+
+        if (current_selection >= num_filtered) {
+            current_selection = num_filtered > 0 ? num_filtered - 1 : 0;
+        }
+        if (top_of_list > current_selection) top_of_list = current_selection;
+        if (max_visible > 0 && top_of_list < current_selection - max_visible + 1) {
+            top_of_list = current_selection - max_visible + 1;
+        }
+
+
         werase(nav_win);
         box(nav_win, 0, 0);
         mvwprintw(nav_win, 1, (win_w - 25) / 2, "Navegador de Diretórios");
 
         for (int i = 0; i < max_visible; i++) {
             int dir_idx = top_of_list + i;
-            if (dir_idx < state->num_recent_dirs) {
+            if (dir_idx < num_filtered) {
                 if (dir_idx == current_selection) wattron(nav_win, A_REVERSE);
-                
+
                 char display_path[win_w - 4];
-                strncpy(display_path, state->recent_dirs[dir_idx]->path, sizeof(display_path) - 1);
+                strncpy(display_path, filtered_dirs[dir_idx]->path, sizeof(display_path) - 1);
                 display_path[sizeof(display_path) - 1] = '\0';
                 
-                if (strlen(state->recent_dirs[dir_idx]->path) > sizeof(display_path) - 1) {
+                if (strlen(filtered_dirs[dir_idx]->path) > sizeof(display_path) - 1) {
                     strcpy(display_path + sizeof(display_path) - 4, "...");
                 }
                 
                 mvwprintw(nav_win, i + 2, 2, "%s (%d acessos)", 
-                         display_path, state->recent_dirs[dir_idx]->access_count);
+                         display_path, filtered_dirs[dir_idx]->access_count);
                 
                 if (dir_idx == current_selection) wattroff(nav_win, A_REVERSE);
             }
         }
 
-        mvwprintw(nav_win, win_h - 2, 2, "Use as setas para navegar, ENTER para selecionar, ESC para sair.");
+        mvwprintw(nav_win, win_h - 2, 2, "ESC: Sair | /: Buscar | ENTER: Selecionar");
+        mvwprintw(nav_win, win_h - 1, 2, "/%s", search_term);
+        if (search_mode) {
+            wmove(nav_win, win_h - 1, 3 + search_pos);
+            curs_set(1);
+        } else {
+            curs_set(0);
+        }
+
         wrefresh(nav_win);
 
         int ch = wgetch(nav_win);
         switch(ch) {
+            case '/':
+                search_mode = true;
+                break;
             case KEY_UP:
                 if (current_selection > 0) {
                     current_selection--;
@@ -194,30 +264,60 @@ void display_directory_navigator(EditorState *state) {
                 }
                 break;
             case KEY_DOWN:
-                if (current_selection < state->num_recent_dirs - 1) {
+                if (current_selection < num_filtered - 1) {
                     current_selection++;
                     if(current_selection >= top_of_list + max_visible) top_of_list = current_selection - max_visible + 1;
                 }
                 break;
             case KEY_ENTER: case '\n': case '\r':
-                if (current_selection < state->num_recent_dirs) {
-                    change_directory(state, state->recent_dirs[current_selection]->path);
+                if (search_mode) {
+                    search_mode = false;
+                } else if (num_filtered > 0) {
+                    change_directory(state, filtered_dirs[current_selection]->path);
                     goto end_nav;
                 }
                 break;
-            case 27: case 'q': case 'Q': goto end_nav;
+            case 27: // ESC
+                if (search_mode) {
+                    search_mode = false;
+                    search_term[0] = '\0';
+                    search_pos = 0;
+                    current_selection = 0;
+                    top_of_list = 0;
+                } else {
+                    goto end_nav;
+                }
+                break;
+            case KEY_BACKSPACE: case 127:
+                if (search_mode && search_pos > 0) {
+                    search_term[--search_pos] = '\0';
+                    current_selection = 0;
+                    top_of_list = 0;
+                }
+                break;
             case KEY_NPAGE:
-                current_selection = min(current_selection + max_visible, state->num_recent_dirs - 1);
-                top_of_list = min(top_of_list + max_visible, state->num_recent_dirs - max_visible);
+                current_selection = min(current_selection + max_visible, num_filtered - 1);
+                top_of_list = min(top_of_list + max_visible, num_filtered - max_visible);
+                if (top_of_list < 0) top_of_list = 0;
                 break;
             case KEY_PPAGE:
                 current_selection = max(current_selection - max_visible, 0);
                 top_of_list = max(top_of_list - max_visible, 0);
                 break;
+            default:
+                if (search_mode && isprint(ch) && search_pos < (int)sizeof(search_term) - 1) {
+                    search_term[search_pos++] = ch;
+                    search_term[search_pos] = '\0';
+                    current_selection = 0;
+                    top_of_list = 0;
+                }
         }
     }
 
 end_nav:
+    if (search_term[0] != '\0') {
+        free(filtered_dirs);
+    }
     delwin(nav_win);
     touchwin(stdscr);
     redesenhar_todas_as_janelas();
@@ -283,6 +383,7 @@ int compare_files(const void *a, const void *b) {
 }
 
 void load_file_history(EditorState *state) {
+    debug_log("--- Loading file history ---\n");
     for (int i = 0; i < state->num_recent_files; i++) {
         free(state->recent_files[i]->path);
         free(state->recent_files[i]);
@@ -293,14 +394,23 @@ void load_file_history(EditorState *state) {
     
     char history_file[1024];
     get_file_history_filename(history_file, sizeof(history_file));
+    debug_log("File history path: %s\n", history_file);
+
     FILE *f = fopen(history_file, "r");
-    if (!f) return;
+    if (!f) {
+        debug_log("Failed to open file history: %s\n", strerror(errno));
+        return;
+    }
+    debug_log("File history opened successfully.\n");
     
     char line[MAX_LINE_LEN];
     while (fgets(line, sizeof(line), f)) {
+        debug_log("Read line from file history: %s", line);
         int count;
         char path[4096];
-        if (sscanf(line, "%d %4095[^]", &count, path) == 2) {
+        int result = sscanf(line, "%d %4095[^\n]", &count, path);
+        if (result == 2) {
+            debug_log("sscanf successful for file: count=%d, path=%s\n", count, path);
             FileInfo *new_file = malloc(sizeof(FileInfo));
             if (!new_file) continue;
             
@@ -312,9 +422,12 @@ void load_file_history(EditorState *state) {
             state->num_recent_files++;
             state->recent_files = realloc(state->recent_files, sizeof(FileInfo*) * state->num_recent_files);
             state->recent_files[state->num_recent_files - 1] = new_file;
+        } else {
+            debug_log("sscanf failed for file, result=%d\n", result);
         }
     }
     fclose(f);
+    debug_log("--- Finished loading file history. Found %d entries. ---\n", state->num_recent_files);
     
     qsort(state->recent_files, state->num_recent_files, sizeof(FileInfo*), compare_files);
 }
@@ -324,7 +437,10 @@ void save_file_history(EditorState *state) {
     get_file_history_filename(history_file, sizeof(history_file));
     
     FILE *f = fopen(history_file, "w");
-    if (!f) return;
+    if (!f) {
+        snprintf(state->status_msg, sizeof(state->status_msg), "Error saving file history: %s", strerror(errno));
+        return;
+    }
     
     int limit = state->num_recent_files < 100 ? state->num_recent_files : 100;
     for (int i = 0; i < limit; i++) {
@@ -357,7 +473,7 @@ void add_to_file_history(EditorState *state, const char *path) {
     state->recent_files = realloc(state->recent_files, sizeof(FileInfo*) * state->num_recent_files);
 
     FileInfo *new_file = malloc(sizeof(FileInfo));
-    if (!new_file || !state->recent_files) {
+    if (!new_file || !state->recent_files) { // This condition seems to be checking against state->recent_files, which might be incorrect if realloc succeeded but new_file failed.
         // Lida com falha de alocação
         state->num_recent_files--;
         return;

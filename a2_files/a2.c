@@ -10,6 +10,7 @@
 #include <locale.h>
 #include <libgen.h> // For dirname()
 #include <limits.h> // For PATH_MAX
+#include <unistd.h> // For getcwd()
 
 // Global variable definition
 // GerenciadorJanelas gerenciador; // Definido em defs.c
@@ -46,6 +47,13 @@ int main(int argc, char *argv[]) {
     inicializar_ncurses();
     
     inicializar_workspaces();
+
+    // Add current directory to history on startup
+    EditorState *initial_state = ACTIVE_WS->janelas[0]->estado;
+    char cwd[PATH_MAX];
+    if (getcwd(cwd, sizeof(cwd)) != NULL) {
+        update_directory_access(initial_state, cwd);
+    }
 
     if (argc > 1) {
         // Load the first file into the initial window of the first workspace

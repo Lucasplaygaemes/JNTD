@@ -13,6 +13,8 @@
 #include <stdio.h> // For sscanf, fgets, fopen, fclose
 #include <string.h> // For strncpy, strlen, strchr, strrchr, strcmp, strcspn
 #include <stdlib.h> // For realpath, calloc, free, realloc
+#include <libgen.h> // For dirname()
+#include <unistd.h> // For getcwd()
 
 // ===================================================================
 // 3. File I/O & Handling
@@ -116,6 +118,24 @@ void load_file_core(EditorState *state, const char *filename) {
    
 void load_file(EditorState *state, const char *filename) {
     add_to_file_history(state, filename);
+
+    // Add the file's directory to the directory history
+    char *path_copy = strdup(filename);
+    if (path_copy) {
+        char *dir = dirname(path_copy);
+        if (dir) {
+            if (strcmp(dir, ".") == 0) {
+                char cwd[PATH_MAX];
+                if (getcwd(cwd, sizeof(cwd)) != NULL) {
+                    update_directory_access(state, cwd);
+                }
+            } else {
+                update_directory_access(state, dir);
+            }
+        }
+        free(path_copy);
+    }
+
 	if (strstr(filename, AUTO_SAVE_EXTENSION) == NULL) {
 		char sv_filename[256];
 		snprintf(sv_filename, sizeof(sv_filename), "%s%s", filename, AUTO_SAVE_EXTENSION);
@@ -126,8 +146,8 @@ void load_file(EditorState *state, const char *filename) {
 		}
 	}
 	load_file_core(state, filename);
-        const char * syntax_file = get_syntax_file_from_extension(filename);
-        load_syntax_file(state, syntax_file);
+    const char * syntax_file = get_syntax_file_from_extension(filename);
+    load_syntax_file(state, syntax_file);
 }
 
 void save_file(EditorState *state) {
