@@ -1,9 +1,10 @@
 #include "timer.h"
+#include "screen_ui.h"
 #include <stdio.h>
 #include <time.h>
 #include <stdlib.h>
 #include <string.h>
-
+#include <unistd.h>
 #define LOG_FILE "work_timer.log"
 
 // Static global variable to hold the session start time.
@@ -33,7 +34,9 @@ void stop_and_log_work() {
         return;
     }
 
-    FILE* file = fopen(LOG_FILE, "a");
+    char log_path[PATH_MAX];
+    snprintf(log_path, sizeof(log_path), "%s/%s", executable_dir, LOG_FILE);
+    FILE* file = fopen(log_path, "a");
     if (!file) {
         perror("Could not open the timer log file");
         return;
@@ -48,11 +51,11 @@ void stop_and_log_work() {
 }
 
 void display_work_summary() {
-    FILE* file = fopen(LOG_FILE, "r");
+    char log_path[PATH_MAX];
+    snprintf(log_path, sizeof(log_path), "%s/%s", executable_dir, LOG_FILE);
+    FILE* file = fopen(log_path, "r");
     if (!file) {
-        printf("No work time records found.\n");
-        printf("\nPress Enter to continue...");
-        getchar();
+        display_output_screen("Work Time Report", "/tme/no_log.tmp");
         return;
     }
     long timer_total = 0;
@@ -119,19 +122,26 @@ void display_work_summary() {
     format_duration(year_total, year_buf, sizeof(year_buf));
     format_duration(timer_total, total_buf, sizeof(total_buf));
     
-    system("clear");
-    printf("--- Work Time Report ---\n");
-    printf("Date: %s\n\n", date_str);
-    printf("      Today: %s\n", today_buf);
-    printf("       Week: %s\n", week_buf);
-    printf("      Month: %s\n", month_buf);
-    printf("   Semester: %s\n", sem_buf);
-    printf("       Year: %s\n", year_buf);
-    printf("Total Timer: %s\n", total_buf);
-    printf("\n--------------------------\n");
-    printf("\nPress Enter to return to the editor...");
-
-    // Clear input buffer and wait for Enter
-    int c;
-    while ((c = getchar()) != '\n' && c != EOF) { }
+    char temp_filename[] = "/tmp/time_report.XXXXXX";
+    int fd = mkstemp(temp_filename);
+    if (fd == -1) return;
+    
+    FILE *temp_file = fdopen(fd, "w");
+    if (!temp_file) { 
+         close(fd); return;
+    }
+    
+    
+    fprintf(temp_file, "--- Work Time Report ---\n");
+    fprintf(temp_file, "Date: %s\n\n", date_str);
+    fprintf(temp_file, "      Today: %s\n", today_buf);
+    fprintf(temp_file, "       Week: %s\n", week_buf);
+    fprintf(temp_file, "      Month: %s\n", month_buf);
+    fprintf(temp_file, "   Semester: %s\n", sem_buf);
+    fprintf(temp_file, "       Year: %s\n", year_buf);
+    fprintf(temp_file, "Total Timer: %s\n", total_buf);
+    fprintf(temp_file, "\n--------------------------\n");
+    fprintf(temp_file, "\nPress Enter to return to the editor...");
+    fclose(temp_file);
+    display_output_screen("", temp_filename);
 }

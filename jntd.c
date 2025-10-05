@@ -1332,8 +1332,8 @@ int main(void) {
 
     printf("Iniciando o JNTD...\n");
     printf("Bem vindo/a\n");
-    printf("Checado TODOs\n");
-    check_todos();
+    //printf("Checado TODOs\n");
+    //check_todos();
     enable_raw_mode();
 
     load_plugins();

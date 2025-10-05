@@ -1,12 +1,78 @@
+#include "fileio.h" // Include its own header
+#include "defs.h" // For EditorState, etc.
+#include "screen_ui.h" // For editor_redraw, display_output_screen
+#include "lsp_client.h" // For lsp_did_save
+#include "others.h" // For trim_whitespace, editor_find_unmatched_brackets
+#include "command_execution.h" // For run_and_display_command
+#include "direct_navigation.h"
+
+#include <limits.h> // For PATH_MAX
+#include <errno.h> // For errno, ENOENT
+#include <sys/stat.h> // For struct stat, stat
+#include <ctype.h> // For tolower
+#include <stdio.h> // For sscanf, fgets, fopen, fclose
+#include <string.h> // For strncpy, strlen, strchr, strrchr, strcmp, strcspn
+#include <stdlib.h> // For realpath, calloc, free, realloc
+#include <libgen.h> // For dirname()
+#include <unistd.h> // For getcwd()
+
 // ===================================================================
 // 3. File I/O & Handling
 // ===================================================================
+
+// Helper function to determine syntax file based on extension
+const char * get_syntax_file_from_extension(const char* filename) {
+    const char* ext = strrchr(filename, '.');
+    if (!ext) return NULL; // Default to no syntax highlighting
+    
+    if (strcmp(ext, ".c") == 0 || strcmp(ext, ".h") == 0)
+        return "c.syntax";
+    else if (strcmp(ext, ".cpp") == 0 || strcmp(ext, ".hpp") == 0)
+        return "cpp.syntax";
+    else if (strcmp(ext, ".py") == 0)
+        return "python.syntax";
+    else if (strcmp(ext, ".php") == 0)
+        return "php.syntax";
+    else if (strcmp(ext, ".js") == 0)
+        return "javascript.syntax";
+    else if (strcmp(ext, ".java") == 0)
+        return "java.syntax";
+    else if (strcmp(ext, ".ts") == 0)
+        return "typescript.syntax";
+    else if (strcmp(ext, ".html") == 0 || strcmp(ext, ".htm") == 0)
+        return "html.syntax";
+    else if (strcmp(ext, ".css") == 0)
+        return "css.syntax";
+    else if (strcmp(ext, ".rb") == 0)
+        return "ruby.syntax";
+    else if (strcmp(ext, ".rs") == 0)
+        return "rust.syntax";
+    else if (strcmp(ext, ".go") == 0)
+        return "go.syntax";
+    
+    return NULL; // Default to no syntax highlighting for unknown extensions
+}
 
 void load_file_core(EditorState *state, const char *filename) {
     for (int i = 0; i < state->num_lines; i++) { if(state->lines[i]) free(state->lines[i]); state->lines[i] = NULL; }
     state->num_lines = 0;
     strncpy(state->filename, filename, sizeof(state->filename) - 1);
     state->filename[sizeof(state->filename) - 1] = '\0';
+
+
+    char absolute_path[PATH_MAX];
+    if (realpath(filename, absolute_path) == NULL) {
+        // Se realpath falhar, use o filename original
+        strncpy(absolute_path, filename, PATH_MAX - 1);
+        absolute_path[PATH_MAX - 1] = '\0';
+    }
+
+    for (int i = 0; i < state->num_lines; i++) { if(state->lines[i]) free(state->lines[i]); state->lines[i] = NULL; } // This line was duplicated and caused issues
+    state->num_lines = 0;
+    strncpy(state->filename, absolute_path, sizeof(state->filename) - 1);
+    state->filename[sizeof(state->filename) - 1] = '\0';
+
+
 
     FILE *file = fopen(filename, "r");
     if (file) {
@@ -51,6 +117,25 @@ void load_file_core(EditorState *state, const char *filename) {
 }
    
 void load_file(EditorState *state, const char *filename) {
+    add_to_file_history(state, filename);
+
+    // Add the file's directory to the directory history
+    char *path_copy = strdup(filename);
+    if (path_copy) {
+        char *dir = dirname(path_copy);
+        if (dir) {
+            if (strcmp(dir, ".") == 0) {
+                char cwd[PATH_MAX];
+                if (getcwd(cwd, sizeof(cwd)) != NULL) {
+                    update_directory_access(state, cwd);
+                }
+            } else {
+                update_directory_access(state, dir);
+            }
+        }
+        free(path_copy);
+    }
+
 	if (strstr(filename, AUTO_SAVE_EXTENSION) == NULL) {
 		char sv_filename[256];
 		snprintf(sv_filename, sizeof(sv_filename), "%s%s", filename, AUTO_SAVE_EXTENSION);
@@ -61,8 +146,8 @@ void load_file(EditorState *state, const char *filename) {
 		}
 	}
 	load_file_core(state, filename);
-        const char * syntax_file = get_syntax_file_from_extension(filename);
-        load_syntax_file(state, syntax_file);
+    const char * syntax_file = get_syntax_file_from_extension(filename);
+    load_syntax_file(state, syntax_file);
 }
 
 void save_file(EditorState *state) {
@@ -85,11 +170,14 @@ void save_file(EditorState *state) {
         remove(auto_save_filename);
         
         char display_filename[40]; 
-        strncpy(display_filename, state->filename, sizeof(display_filename) - 1); 
+        strncpy(display_filename, state->filename, sizeof(display_filename) - 1);
         display_filename[sizeof(display_filename) - 1] = '\0';
         snprintf(state->status_msg, sizeof(state->status_msg), "%s written", display_filename);
         state->buffer_modified = false;
         state->last_file_mod_time = get_file_mod_time(state->filename);
+        if (state->lsp_enabled) {
+          lsp_did_save(state);
+            }
     } else { 
         snprintf(state->status_msg, sizeof(state->status_msg), "Error saving: %s", strerror(errno)); 
     } 
@@ -129,35 +217,24 @@ void check_external_modification(EditorState *state) {
     time_t on_disk_mod_time = get_file_mod_time(state->filename);
 
     if (on_disk_mod_time != 0 && on_disk_mod_time != state->last_file_mod_time) {
-        WINDOW *win = gerenciador.janelas[gerenciador.janela_ativa_idx]->win;
+        bool decision = false;
         if (state->buffer_modified) {
-            snprintf(state->status_msg, sizeof(state->status_msg), "Warning: File on disk has changed! (S)ave, (L)oad, or (C)ancel?");
+            decision = confirm_action("File on disk changed! Discard your changes and reload?");
         } else {
-            snprintf(state->status_msg, sizeof(state->status_msg), "File on disk has changed. Reload? (Y/N)");
+            decision = confirm_action("File on disk changed. Reload?");
         }
-        editor_redraw(win, state);
-        wint_t ch;
-        wget_wch(win, &ch);
-        if (state->buffer_modified) {
-             switch (tolower(ch)) {
-                case 's':
-                    save_file(state);
-                    break;
-                case 'l':
-                    load_file(state, state->filename);
-                    break;
-                default:
-                    state->last_file_mod_time = on_disk_mod_time;
-                    snprintf(state->status_msg, sizeof(state->status_msg), "Action cancelled. In-memory version kept.");
-                    break;
-            }
+
+        if (decision) {
+            // Força o recarregamento do arquivo do disco
+            load_file_core(state, state->filename);
+            const char* syntax_file = get_syntax_file_from_extension(state->filename);
+            load_syntax_file(state, syntax_file);
+            snprintf(state->status_msg, sizeof(state->status_msg), "File reloaded from disk.");
         } else {
-            if (tolower(ch) == 'y') {
-                load_file(state, state->filename);
-            } else {
-                state->last_file_mod_time = on_disk_mod_time;
-                 snprintf(state->status_msg, sizeof(state->status_msg), "Reload cancelled.");
-            }
+            // Se o usuário escolher "não", apenas atualizamos o tempo de modificação
+            // para não perguntar novamente, mantendo a versão em memória.
+            state->last_file_mod_time = on_disk_mod_time;
+            snprintf(state->status_msg, sizeof(state->status_msg), "Reload cancelled. In-memory version kept.");
         }
     }
 }
@@ -183,8 +260,38 @@ void editor_reload_file(EditorState *state) {
 }
 
 void load_syntax_file(EditorState *state, const char *filename) {
-    FILE *file = fopen(filename, "r");
-    if (!file) return;
+    // Limpa as regras de sintaxe existentes antes de carregar novas
+    if (state->syntax_rules) {
+        for (int i = 0; i < state->num_syntax_rules; i++) {
+            free(state->syntax_rules[i].word);
+        }
+        free(state->syntax_rules);
+        state->syntax_rules = NULL;
+        state->num_syntax_rules = 0;
+    }
+
+    if (!filename) {
+        return; // No syntax file to load, just clear old rules.
+    }
+
+    char path[PATH_MAX];
+    // If the executable path is known, construct an absolute path to syntaxes
+    if (executable_dir[0] != '\0') {
+        snprintf(path, sizeof(path), "%s/syntaxes/%s", executable_dir, filename);
+    } else {
+        // Fallback to the old relative path method
+        snprintf(path, sizeof(path), "syntaxes/%s", filename);
+    }
+
+    FILE *file = fopen(path, "r");
+    if (!file) {
+        // Fallback to current directory if not found in syntaxes/
+        file = fopen(filename, "r");
+        if (!file) {
+            snprintf(state->status_msg, sizeof(state->status_msg), "Erro: sintaxe '%s' nao encontrada.", filename);
+            return;
+        }
+    }
 
     char line_buffer[256];
     while (fgets(line_buffer, sizeof(line_buffer), file)) {
@@ -240,7 +347,6 @@ int load_last_line(const char *filename) {
         int line = 0;
         fscanf(f, "%d", &line);
         fclose(f);
-        return line;
     }
     return 0;
 }
@@ -296,7 +402,7 @@ FileRecoveryChoice display_recovery_prompt(WINDOW *parent_win, EditorState *stat
 }
 
 void handle_file_recovery(EditorState *state, const char *original_filename, const char *sv_filename) {
-    WINDOW *win = gerenciador.janelas[gerenciador.janela_ativa_idx]->win;
+    WINDOW *win = ACTIVE_WS->janelas[ACTIVE_WS->janela_ativa_idx]->win;
     
     while (1) {
         FileRecoveryChoice choice = display_recovery_prompt(win, state);

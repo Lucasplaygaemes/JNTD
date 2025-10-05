@@ -4,9 +4,8 @@
 typedef void (*plugin_func)(const char*);
 
 typedef struct {
-    const char *name;
-    plugin_func execute;
+	const char *name;
+	plugin_func execute;
 } Plugin;
-
 
 #endif

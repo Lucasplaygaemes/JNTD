@@ -2,20 +2,20 @@
 
 # --- Configuração do Compilador ---
 CC = gcc
-# Flags combinadas: -I. para o projeto a2, -I../include para outros possíveis includes
-CFLAGS = -g -Wall -Wextra -I. -I../include
-# Bibliotecas combinadas para todos os alvos
+# Adicionado -I./a2_files para encontrar os headers do a2
+CFLAGS = -g -Wall -Wextra -I. -I./a2_files -I../include
 LDFLAGS = -lncursesw -ljansson -lm -lcurl -lpthread -ldl -lssl -lcrypto
 
 # --- Alvos Principais ---
+TARGETS = a2 jntd
 
-# Executáveis principais
-TARGETS = a2 2bt
+# --- Diretórios ---
+A2_DIR = a2_files
 
 # --- Plugins ---
 PLUGIN_CFLAGS = -fPIC -shared
-# Encontra os fontes dos plugins usando caminho relativo
-PLUGIN_SRCS = $(wildcard ../plugins/*.c)
+# Corrigido o caminho para a pasta de plugins
+PLUGIN_SRCS = $(wildcard plugins/*.c)
 PLUGIN_TARGETS = $(PLUGIN_SRCS:.c=.so)
 
 # O alvo padrão 'all' compila os executáveis e os plugins
@@ -24,28 +24,29 @@ all: $(TARGETS) $(PLUGIN_TARGETS)
 
 # --- Regras de Compilação para o Editor 'a2' ---
 
-# Arquivos fonte para o a2
-A2_SRCS = a2.c command_execution.c direct_navigation.c fileio.c lsp_client.c others.c screen_ui.c window_managment.c timer.c
+# Arquivos fonte para o a2 (adicionando defs.c que estava faltando)
+A2_SOURCES = a2.c command_execution.c defs.c direct_navigation.c fileio.c lsp_client.c others.c screen_ui.c window_managment.c timer.c
+# Adiciona o prefixo do diretório para os fontes e objetos
+A2_SRCS = $(addprefix $(A2_DIR)/, $(A2_SOURCES))
 A2_OBJS = $(A2_SRCS:.c=.o)
 
-# Regra para linkar o executável a2
+# Regra para linkar o executável a2 (na raiz do projeto)
 a2: $(A2_OBJS)
 	$(CC) $(CFLAGS) -o $@ $(A2_OBJS) $(LDFLAGS)
 
-# Regra de padrão para compilar os arquivos .c do a2 em .o
-# Esta regra é usada implicitamente pelo make para os alvos em A2_OBJS
-%.o: %.c
+# Regra de padrão para compilar os arquivos .c do a2 em .o no diretório de objetos
+$(A2_DIR)/%.o: $(A2_DIR)/%.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 
 # --- Regras de Compilação para '2bt' e Plugins ---
 
-# Regra para compilar o 2bt (usa caminho relativo)
-2bt: ../2bt.c
+# Regra para compilar o 2bt
+jntd: jntd.c
 	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
 
-# Regra de padrão para compilar os plugins (usa caminho relativo)
-../plugins/%.so: ../plugins/%.c
+# Regra de padrão para compilar os plugins
+plugins/%.so: plugins/%.c
 	$(CC) $(CFLAGS) $(PLUGIN_CFLAGS) -o $@ $<
 
 

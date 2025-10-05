@@ -1,3 +1,32 @@
+#include "others.h" // Include its own header
+#include "defs.h" // For EditorState, etc.
+#include "lsp_client.h" // For lsp_did_change
+#include "screen_ui.h" // For editor_redraw, redesenhar_todas_as_janelas, get_visual_pos, get_visual_col
+#include "fileio.h" // For load_last_line, save_last_line
+#include "window_managment.h" // For gerenciador
+#include "command_execution.h"
+#include <ctype.h>
+#include <dirent.h>
+
+// Dummy definitions for autocompletion symbols to allow compilation
+const char *editor_commands[] = {
+    "q", "q!", "w", "wq", "help", "gcc", "rc", "rc!", "open", "new", "timer", "diff", "set",
+    "lsp-restart", "lsp-diag", "lsp-definition", "lsp-references", "lsp-rename",
+    "lsp-status", "lsp-hover", "lsp-symbols", "lsp-refresh", "lsp-check", "lsp-debug",
+    "lsp-list", "toggle_auto_indent"
+};
+const int num_editor_commands = sizeof(editor_commands) / sizeof(char*);
+
+typedef struct {
+    const char *header_name;
+    const char **symbols;
+    int count;
+} KnownHeader;
+
+const KnownHeader known_headers[] = {};
+const int num_known_headers = 0;
+
+
 // ===================================================================
 //  2. Bracket Matching
 // ===================================================================
@@ -7,6 +36,11 @@ void editor_find_unmatched_brackets(EditorState *state) {
     state->unmatched_brackets = NULL;
     state->num_unmatched_brackets = 0;
 
+    typedef struct {
+        int line;
+        int col;
+        char type;
+    } BracketStackItem;
     BracketStackItem *stack = NULL;
     int stack_top = 0;
     int stack_capacity = 0;
@@ -96,6 +130,268 @@ bool is_unmatched_bracket(EditorState *state, int line, int col) {
 //  Text Editing & Manipulation
 // ===================================================================
 
+void editor_yank_selection(EditorState *state) {
+    if (state->yank_register) {
+        free(state->yank_register);
+        state->yank_register = NULL;
+    }
+
+    int start_line, start_col, end_line, end_col;
+
+    if (state->selection_start_line < state->current_line ||
+        (state->selection_start_line == state->current_line && state->selection_start_col <= state->current_col)) {
+        start_line = state->selection_start_line;
+        start_col = state->selection_start_col;
+        end_line = state->current_line;
+        end_col = state->current_col;
+    } else {
+        start_line = state->current_line;
+        start_col = state->current_col;
+        end_line = state->selection_start_line;
+        end_col = state->selection_start_col;
+    }
+
+    size_t total_len = 0;
+    for (int i = start_line; i <= end_line; i++) {
+        total_len += strlen(state->lines[i]) + 1; // +1 for newline
+    }
+
+    state->yank_register = malloc(total_len);
+    if (!state->yank_register) return;
+    state->yank_register[0] = '\0';
+
+    if (start_line == end_line) {
+        int len = end_col - start_col;
+        if (len > 0) {
+            strncat(state->yank_register, state->lines[start_line] + start_col, len);
+        }
+    } else {
+        // First line
+        strcat(state->yank_register, state->lines[start_line] + start_col);
+        strcat(state->yank_register, "\n");
+
+        // Middle lines
+        for (int i = start_line + 1; i < end_line; i++) {
+            strcat(state->yank_register, state->lines[i]);
+            strcat(state->yank_register, "\n");
+        }
+
+        // Last line
+        strncat(state->yank_register, state->lines[end_line], end_col);
+    }
+
+    snprintf(state->status_msg, sizeof(state->status_msg), "%d lines yanked", end_line - start_line + 1);
+}
+
+void editor_global_yank(EditorState *state) {
+    if (global_yank_register) {
+        free(global_yank_register);
+        global_yank_register = NULL;
+    }
+
+    int start_line, start_col, end_line, end_col;
+
+    if (state->selection_start_line < state->current_line ||
+        (state->selection_start_line == state->current_line && state->selection_start_col <= state->current_col)) {
+        start_line = state->selection_start_line;
+        start_col = state->selection_start_col;
+        end_line = state->current_line;
+        end_col = state->current_col;
+    } else {
+        start_line = state->current_line;
+        start_col = state->current_col;
+        end_line = state->selection_start_line;
+        end_col = state->selection_start_col;
+    }
+
+    size_t total_len = 0;
+    for (int i = start_line; i <= end_line; i++) {
+        total_len += strlen(state->lines[i]) + 1; // +1 for newline
+    }
+
+    global_yank_register = malloc(total_len);
+    if (!global_yank_register) return;
+    global_yank_register[0] = '\0';
+
+    if (start_line == end_line) {
+        int len = end_col - start_col;
+        if (len > 0) {
+            strncat(global_yank_register, state->lines[start_line] + start_col, len);
+        }
+    } else {
+        strcat(global_yank_register, state->lines[start_line] + start_col);
+        strcat(global_yank_register, "\n");
+
+        for (int i = start_line + 1; i < end_line; i++) {
+            strcat(global_yank_register, state->lines[i]);
+            strcat(global_yank_register, "\n");
+        }
+
+        strncat(global_yank_register, state->lines[end_line], end_col);
+    }
+
+    snprintf(state->status_msg, sizeof(state->status_msg), "%d lines yanked to global register", end_line - start_line + 1);
+}
+
+void editor_global_paste(EditorState *state) {
+    if (!global_yank_register || global_yank_register[0] == '\0') {
+        snprintf(state->status_msg, sizeof(state->status_msg), "Global yank register is empty");
+        return;
+    }
+
+    push_undo(state);
+    clear_redo_stack(state);
+
+    char *yank_copy = strdup(global_yank_register);
+    if (!yank_copy) return;
+
+    char *line = strtok(yank_copy, "\n");
+
+    if (strchr(global_yank_register, '\n') == NULL) {
+        char *current_line_content = state->lines[state->current_line];
+        int paste_len = strlen(line);
+        int old_len = strlen(current_line_content);
+        char *new_line_content = realloc(current_line_content, old_len + paste_len + 1);
+        if (!new_line_content) { free(yank_copy); return; }
+
+        memmove(new_line_content + state->current_col + paste_len, 
+                new_line_content + state->current_col, 
+                old_len - state->current_col + 1);
+        memcpy(new_line_content + state->current_col, line, paste_len);
+
+        state->lines[state->current_line] = new_line_content;
+        state->current_col += paste_len;
+    } else {
+        int paste_line_count = 0;
+        char *temp_yank_copy = strdup(global_yank_register);
+        for (const char *p = temp_yank_copy; *p; p++) {
+            if (*p == '\n') paste_line_count++;
+        }
+        if (temp_yank_copy[strlen(temp_yank_copy)-1] != '\n') paste_line_count++;
+        free(temp_yank_copy);
+
+        for (int i = 0; i < paste_line_count; i++) {
+            if (state->num_lines >= MAX_LINES) break;
+            for (int j = state->num_lines; j > state->current_line + 1 + i; j--) {
+                state->lines[j] = state->lines[j-1];
+            }
+            state->num_lines++;
+            state->lines[state->current_line + 1 + i] = NULL;
+        }
+
+        int insert_at_line = state->current_line + 1;
+        while (line != NULL && paste_line_count > 0) {
+            state->lines[insert_at_line] = strdup(line);
+            line = strtok(NULL, "\n");
+            insert_at_line++;
+            paste_line_count--;
+        }
+        state->current_line++;
+        state->current_col = 0;
+    }
+
+    free(yank_copy);
+    state->buffer_modified = true;
+    if (state->lsp_enabled) {
+        lsp_did_change(state);
+    }
+}
+
+
+void editor_paste(EditorState *state) {
+    if (!state->yank_register || state->yank_register[0] == '\0') {
+        snprintf(state->status_msg, sizeof(state->status_msg), "Yank register is empty");
+        return;
+    }
+
+    push_undo(state);
+    clear_redo_stack(state);
+
+    char *yank_copy = strdup(state->yank_register);
+    if (!yank_copy) return;
+
+    // Normalize line endings (remove \r)
+    char *p = yank_copy;
+    while ((p = strstr(p, "\r\n"))) {
+        memmove(p, p + 1, strlen(p));
+    }
+    p = yank_copy;
+    while ((p = strchr(p, '\r'))) {
+        *p = '\n';
+    }
+
+    char *rest_of_line = strdup(state->lines[state->current_line] + state->current_col);
+    state->lines[state->current_line][state->current_col] = '\0';
+
+    char *line = strtok(yank_copy, "\n");
+
+    // 1. First line of paste
+    if (line) {
+        char *current_line = state->lines[state->current_line];
+        char *new_line = realloc(current_line, strlen(current_line) + strlen(line) + 1);
+        if (!new_line) { free(yank_copy); free(rest_of_line); return; }
+        strcat(new_line, line);
+        state->lines[state->current_line] = new_line;
+    }
+
+    // 2. Middle lines
+    int num_new_lines = 0;
+    char *lines_to_insert[MAX_LINES];
+    while((line = strtok(NULL, "\n")) != NULL) {
+        if (state->num_lines + num_new_lines >= MAX_LINES) break;
+        lines_to_insert[num_new_lines++] = strdup(line);
+    }
+
+    bool ends_with_newline = state->yank_register[strlen(state->yank_register)-1] == '\n';
+    if (ends_with_newline && (strchr(state->yank_register, '\n') == (state->yank_register + strlen(state->yank_register) - 1))) {
+        if (state->num_lines + num_new_lines < MAX_LINES) {
+             lines_to_insert[num_new_lines++] = strdup("");
+        }
+    }
+
+    if (num_new_lines > 0) {
+        if (state->num_lines + num_new_lines > MAX_LINES) {
+            for(int i=0; i<num_new_lines; i++) free(lines_to_insert[i]);
+            free(yank_copy); free(rest_of_line); return;
+        }
+        
+        if (state->num_lines > state->current_line + 1) {
+            memmove(&state->lines[state->current_line + 1 + num_new_lines],
+                    &state->lines[state->current_line + 1],
+                    (state->num_lines - (state->current_line + 1)) * sizeof(char*));
+        }
+
+        for(int i=0; i<num_new_lines; i++) {
+            state->lines[state->current_line + 1 + i] = lines_to_insert[i];
+        }
+        state->num_lines += num_new_lines;
+    }
+
+    // 3. Last line
+    int last_line_idx = state->current_line + num_new_lines;
+    char *last_line_content = state->lines[last_line_idx];
+    int old_len = strlen(last_line_content);
+    char *new_last_line = realloc(last_line_content, old_len + strlen(rest_of_line) + 1);
+    if (!new_last_line) { free(yank_copy); free(rest_of_line); return; }
+    strcat(new_last_line, rest_of_line);
+    state->lines[last_line_idx] = new_last_line;
+
+    state->current_line = last_line_idx;
+    state->current_col = old_len;
+    state->ideal_col = state->current_col;
+
+    free(rest_of_line);
+    free(yank_copy);
+    state->buffer_modified = true;
+    if (state->lsp_enabled) {
+        lsp_did_change(state);
+    }
+}
+
+
+
+
+
 void editor_handle_enter(EditorState *state) {
     push_undo(state);
     clear_redo_stack(state);
@@ -147,6 +443,9 @@ void editor_handle_enter(EditorState *state) {
     state->current_col = new_indent_len;
     state->ideal_col = new_indent_len;
     state->buffer_modified = true;
+    if (state->lsp_enabled) {
+        lsp_did_change(state);
+    }
 }
 
 void editor_handle_backspace(EditorState *state) {
@@ -197,6 +496,9 @@ void editor_handle_backspace(EditorState *state) {
         state->ideal_col = state->current_col;
     }
     state->buffer_modified = true;
+    if (state->lsp_enabled) {
+        lsp_did_change(state);
+    }
 }
 
 void editor_insert_char(EditorState *state, wint_t ch) {
@@ -223,6 +525,9 @@ void editor_insert_char(EditorState *state, wint_t ch) {
     state->ideal_col = state->current_col;
     new_line[line_len + char_len] = '\0';
     state->buffer_modified = true;
+    if (state->lsp_enabled) {
+        lsp_did_change(state);
+    }
 }
 
 void editor_delete_line(EditorState *state) {
@@ -245,6 +550,9 @@ void editor_delete_line(EditorState *state) {
     }
     state->current_col = 0; state->ideal_col = 0;
     state->buffer_modified = true;
+    if (state->lsp_enabled) {
+        lsp_did_change(state);
+    }
 }
 
 char* trim_whitespace(char *str) {
@@ -294,7 +602,7 @@ void editor_move_to_previous_word(EditorState *state) {
 
 
 void editor_find(EditorState *state) {
-    JanelaEditor *active_jw = gerenciador.janelas[gerenciador.janela_ativa_idx];
+    JanelaEditor *active_jw = ACTIVE_WS->janelas[ACTIVE_WS->janela_ativa_idx];
     WINDOW *win = active_jw->win;
     int rows, cols;
     getmaxyx(win, rows, cols);
@@ -485,6 +793,9 @@ void do_undo(EditorState *state) {
     EditorSnapshot *undo_snap = state->undo_stack[--state->undo_count];
     restore_from_snapshot(state, undo_snap);
     state->buffer_modified = true;
+    if (state->lsp_enabled) {
+        lsp_did_change(state);
+    }
 }
 
 void do_redo(EditorState *state) {
@@ -493,6 +804,9 @@ void do_redo(EditorState *state) {
     push_undo(state);
     restore_from_snapshot(state, redo_snap);
     state->buffer_modified = true;
+    if (state->lsp_enabled) {
+        lsp_did_change(state);
+    }
 }
 
 // ===================================================================
@@ -523,7 +837,7 @@ void editor_start_completion(EditorState *state) {
     state->num_suggestions = 0;
     state->completion_suggestions = NULL;
 
-    const char *delimiters = " \t\n\r`~!@#$%^&*()-=+[]{}|\\;:'\".,<>/?";
+    const char *delimiters = " \t\n\r`~!@#$%^&*()-=+[]{}|\\;:'\",.<>/?";
     for (int i = 0; i < state->num_lines; i++) {
         char *line_copy = strdup(state->lines[i]);
         if (!line_copy) continue;
@@ -706,7 +1020,7 @@ void editor_draw_completion_win(WINDOW *win, EditorState *state) {
         return;
     }
 
-    if(state->completion_win) delwin(state->completion_win);
+    if(state->completion_win) delwin(state->completion_win); 
     state->completion_win = newwin(win_h, win_w, win_y, win_x);
     wbkgd(state->completion_win, COLOR_PAIR(9));
 
@@ -728,7 +1042,7 @@ void editor_draw_completion_win(WINDOW *win, EditorState *state) {
 // ===================================================================
 
 void handle_insert_mode_key(EditorState *state, wint_t ch) {
-    WINDOW *win = gerenciador.janelas[gerenciador.janela_ativa_idx]->win;
+    WINDOW *win = ACTIVE_WS->janelas[ACTIVE_WS->janela_ativa_idx]->win;
     switch (ch) {
         case KEY_CTRL_P: editor_start_completion(state); break;
         case KEY_CTRL_DEL: case KEY_CTRL_K: editor_delete_line(state); break;
@@ -836,4 +1150,119 @@ void handle_command_mode_key(EditorState *state, wint_t ch, bool *should_exit) {
             }
             break;
     }
+}
+void editor_delete_selection(EditorState *state) {
+    push_undo(state);
+    clear_redo_stack(state);
+
+    int start_line, start_col, end_line, end_col;
+    if (state->selection_start_line < state->current_line ||
+        (state->selection_start_line == state->current_line && state->selection_start_col <= state->current_col)) {
+        start_line = state->selection_start_line;
+        start_col = state->selection_start_col;
+        end_line = state->current_line;
+        end_col = state->current_col;
+    } else {
+        start_line = state->current_line;
+        start_col = state->current_col;
+        end_line = state->selection_start_line;
+        end_col = state->selection_start_col;
+    }
+
+    if (start_line == end_line) {
+        char *line = state->lines[start_line];
+        int len = end_col - start_col;
+        if (len > 0) {
+            memmove(&line[start_col], &line[end_col], strlen(line) - end_col + 1);
+            char *resized_line = realloc(line, strlen(line) + 1);
+            if(resized_line) state->lines[start_line] = resized_line;
+        }
+    } else {
+        char *first_line = state->lines[start_line];
+        char *last_line = state->lines[end_line];
+
+        char *last_line_suffix = strdup(&last_line[end_col]);
+
+        char *new_line = realloc(first_line, start_col + strlen(last_line_suffix) + 1);
+        if (!new_line) { free(last_line_suffix); return; }
+        new_line[start_col] = '\0';
+        strcat(new_line, last_line_suffix);
+        state->lines[start_line] = new_line;
+        free(last_line_suffix);
+
+        for (int i = start_line + 1; i <= end_line; i++) {
+            free(state->lines[i]);
+        }
+
+        int num_deleted = end_line - start_line;
+        if (state->num_lines > end_line + 1) {
+            memmove(&state->lines[start_line + 1], &state->lines[end_line + 1], (state->num_lines - end_line - 1) * sizeof(char*));
+        }
+        state->num_lines -= num_deleted;
+    }
+    state->buffer_modified = true;
+    state->current_line = start_line;
+    state->current_col = start_col;
+    state->visual_selection_mode = VISUAL_MODE_NONE;
+    state->mode = NORMAL;
+}
+
+void editor_yank_to_move_register(EditorState *state) {
+    if (state->move_register) {
+        free(state->move_register);
+        state->move_register = NULL;
+    }
+
+    int start_line, start_col, end_line, end_col;
+    if (state->selection_start_line < state->current_line ||
+        (state->selection_start_line == state->current_line && state->selection_start_col <= state->current_col)) {
+        start_line = state->selection_start_line;
+        start_col = state->selection_start_col;
+        end_line = state->current_line;
+        end_col = state->current_col;
+    } else {
+        start_line = state->current_line;
+        start_col = state->current_col;
+        end_line = state->selection_start_line;
+        end_col = state->selection_start_col;
+    }
+
+    size_t total_len = 0;
+    for (int i = start_line; i <= end_line; i++) {
+        total_len += strlen(state->lines[i]) + 1;
+    }
+
+    state->move_register = malloc(total_len);
+    if (!state->move_register) return;
+    state->move_register[0] = '\0';
+
+    if (start_line == end_line) {
+        int len = end_col - start_col;
+        if (len > 0) {
+            strncat(state->move_register, state->lines[start_line] + start_col, len);
+        }
+    } else {
+        strcat(state->move_register, state->lines[start_line] + start_col);
+        strcat(state->move_register, "\n");
+
+        for (int i = start_line + 1; i < end_line; i++) {
+            strcat(state->move_register, state->lines[i]);
+            strcat(state->move_register, "\n");
+        }
+
+        strncat(state->move_register, state->lines[end_line], end_col);
+    }
+}
+
+void editor_paste_from_move_register(EditorState *state) {
+    if (!state->move_register || state->move_register[0] == '\0') {
+        return;
+    }
+    
+    if (state->yank_register) {
+        free(state->yank_register);
+    }
+    state->yank_register = strdup(state->move_register);
+    
+    editor_paste(state);
 }
