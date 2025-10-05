@@ -23,5 +23,6 @@ void criar_novo_workspace();
 void ciclar_workspaces(int direcao);
 void mover_janela_para_workspace(int target_idx);
 void fechar_workspace_ativo(bool *should_exit);
+void prompt_and_create_debug_workspace();
 
 #endif // WINDOW_MANAGMENT_H

@@ -12,9 +12,6 @@
 #include <limits.h> // For PATH_MAX
 #include <unistd.h> // For getcwd()
 
-// Global variable definition
-// GerenciadorJanelas gerenciador; // Definido em defs.c
-
 void inicializar_ncurses() {
     initscr(); cbreak(); noecho(); keypad(stdscr, TRUE);
     set_escdelay(25);
@@ -32,7 +29,6 @@ void inicializar_ncurses() {
 }
 
 int main(int argc, char *argv[]) {
-    // Find and store the executable's directory path
     char exe_path_buf[PATH_MAX];
     if (realpath(argv[0], exe_path_buf)) {
         char* dir = dirname(exe_path_buf);
@@ -48,7 +44,6 @@ int main(int argc, char *argv[]) {
     
     inicializar_workspaces();
 
-    // Add current directory to history on startup
     EditorState *initial_state = ACTIVE_WS->janelas[0]->estado;
     char cwd[PATH_MAX];
     if (getcwd(cwd, sizeof(cwd)) != NULL) {
@@ -56,7 +51,6 @@ int main(int argc, char *argv[]) {
     }
 
     if (argc > 1) {
-        // Load the first file into the initial window of the first workspace
         load_file(ACTIVE_WS->janelas[0]->estado, argv[1]);
         EditorState *state = ACTIVE_WS->janelas[0]->estado;
 
@@ -192,6 +186,8 @@ int main(int argc, char *argv[]) {
                      fechar_janela_ativa(&should_exit);
                 } else if (next_ch == 'b' || next_ch == 'B') {
                     display_recent_files();
+                } else if (next_ch == 'd' || next_ch == 'D') {
+                    prompt_and_create_debug_workspace();
                 } else if (next_ch == 'z' || next_ch == 'Z') {
                     do_undo(state);
                 } else if (next_ch == 'y' || next_ch == 'Y') {
@@ -328,7 +324,7 @@ int main(int argc, char *argv[]) {
                             case 231: // ç
                             case KEY_RIGHT: {
                                 char* line = state->lines[state->current_line];
-                                if (line && state->current_col < strlen(line)) {
+                                if (line && state->current_col < (int)strlen(line)) {
                                     state->current_col++;
                                     while (line[state->current_col] != '\0' && (line[state->current_col] & 0xC0) == 0x80) {
                                         state->current_col++;
@@ -408,7 +404,7 @@ int main(int argc, char *argv[]) {
                     case 231: // ç
                     case KEY_RIGHT: {
                         char* line = state->lines[state->current_line];
-                        if (line && state->current_col < strlen(line)) {
+                        if (line && state->current_col < (int)strlen(line)) {
                             state->current_col++;
                             while (line[state->current_col] != '\0' && (line[state->current_col] & 0xC0) == 0x80) {
                                 state->current_col++;

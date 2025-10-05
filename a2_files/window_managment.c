@@ -9,15 +9,20 @@
 #include <sys/stat.h>
 #include <dirent.h>
 #include <ctype.h>
+#include <pty.h>
+#include <libgen.h>
+#include <signal.h>
+#include <sys/wait.h>
+#include <fcntl.h>
+#include <errno.h>
+#include <termios.h>
+#include <sys/ioctl.h>
 
-// Macro to easily access the active workspace's window manager
+#include <sys/select.h> // Para select() e fd_set
+
 #define ACTIVE_WS (gerenciador_workspaces.workspaces[gerenciador_workspaces.workspace_ativo_idx])
 
-// ===================================================================
-//  1. Workspace and Window Management
-// ===================================================================
-
-// --- Memory Management ---
+void handle_gdb_session(int pty_fd, pid_t child_pid);
 
 void free_editor_state(EditorState* state) {
     if (!state) return;
@@ -65,16 +70,12 @@ void free_workspace(GerenciadorJanelas *ws) {
     free(ws);
 }
 
-// --- Initialization ---
-
 void inicializar_workspaces() {
     gerenciador_workspaces.workspaces = NULL;
     gerenciador_workspaces.num_workspaces = 0;
     gerenciador_workspaces.workspace_ativo_idx = -1;
-    criar_novo_workspace(); // Create the first initial workspace
+    criar_novo_workspace();
 }
-
-// --- Workspace Operations ---
 
 void criar_novo_workspace() {
     gerenciador_workspaces.num_workspaces++;
@@ -89,7 +90,6 @@ void criar_novo_workspace() {
     gerenciador_workspaces.workspaces[gerenciador_workspaces.num_workspaces - 1] = novo_ws;
     gerenciador_workspaces.workspace_ativo_idx = gerenciador_workspaces.num_workspaces - 1;
 
-    // Create an initial window inside the new workspace
     criar_nova_janela(NULL);
 }
 
@@ -123,12 +123,10 @@ void mover_janela_para_workspace(int target_idx) {
     int active_win_idx = source_ws->janela_ativa_idx;
     JanelaEditor *win_to_move = source_ws->janelas[active_win_idx];
 
-    // Add window to destination workspace
     dest_ws->num_janelas++;
     dest_ws->janelas = realloc(dest_ws->janelas, sizeof(JanelaEditor*) * dest_ws->num_janelas);
     dest_ws->janelas[dest_ws->num_janelas - 1] = win_to_move;
 
-    // Remove window from source workspace
     for (int i = active_win_idx; i < source_ws->num_janelas - 1; i++) {
         source_ws->janelas[i] = source_ws->janelas[i+1];
     }
@@ -147,8 +145,6 @@ void mover_janela_para_workspace(int target_idx) {
     recalcular_layout_janelas();
     redesenhar_todas_as_janelas();
 }
-
-// --- Window (Split) Operations within a Workspace ---
 
 void criar_nova_janela(const char *filename) {
     GerenciadorJanelas *ws = ACTIVE_WS;
@@ -190,7 +186,7 @@ void fechar_janela_ativa(bool *should_exit) {
 
     int idx = ws->janela_ativa_idx;
     EditorState *state = ws->janelas[idx]->estado;
-    if (state->buffer_modified) {
+    if (state && state->buffer_modified) {
         snprintf(state->status_msg, sizeof(state->status_msg), "Warning: Unsaved changes! Use :q! to force quit.");
         return;
     }
@@ -216,9 +212,8 @@ void fechar_janela_ativa(bool *should_exit) {
 
 void fechar_workspace_ativo(bool *should_exit) {
     if (gerenciador_workspaces.num_workspaces == 1) {
-        // If it's the last workspace, check the last window for unsaved changes and then exit
         EditorState *last_state = ACTIVE_WS->janelas[0]->estado;
-        if (last_state->buffer_modified) {
+        if (last_state && last_state->buffer_modified) {
             snprintf(last_state->status_msg, sizeof(last_state->status_msg), "Warning: Unsaved changes! Use :q! to force quit.");
             return;
         }
@@ -232,7 +227,12 @@ void fechar_workspace_ativo(bool *should_exit) {
         gerenciador_workspaces.workspaces[i] = gerenciador_workspaces.workspaces[i+1];
     }
     gerenciador_workspaces.num_workspaces--;
-    gerenciador_workspaces.workspaces = realloc(gerenciador_workspaces.workspaces, sizeof(GerenciadorJanelas*) * gerenciador_workspaces.num_workspaces);
+    if (gerenciador_workspaces.num_workspaces > 0) {
+        gerenciador_workspaces.workspaces = realloc(gerenciador_workspaces.workspaces, sizeof(GerenciadorJanelas*) * gerenciador_workspaces.num_workspaces);
+    } else {
+        free(gerenciador_workspaces.workspaces);
+        gerenciador_workspaces.workspaces = NULL;
+    }
 
     if (gerenciador_workspaces.workspace_ativo_idx >= gerenciador_workspaces.num_workspaces) {
         gerenciador_workspaces.workspace_ativo_idx = gerenciador_workspaces.num_workspaces - 1;
@@ -243,8 +243,6 @@ void fechar_workspace_ativo(bool *should_exit) {
         redesenhar_todas_as_janelas();
     }
 }
-
-// --- Layout and Drawing ---
 
 void recalcular_layout_janelas() {
     GerenciadorJanelas *ws = ACTIVE_WS;
@@ -337,19 +335,18 @@ void redesenhar_todas_as_janelas() {
     GerenciadorJanelas *ws = ACTIVE_WS;
     for (int i = 0; i < ws->num_janelas; i++) {
         JanelaEditor *jw = ws->janelas[i];
-        editor_redraw(jw->win, jw->estado);
+        if (jw && jw->estado) editor_redraw(jw->win, jw->estado);
     }
     
     if (ws->num_janelas > 0) {
         JanelaEditor* active_jw = ws->janelas[ws->janela_ativa_idx];
         EditorState* state = active_jw->estado;
-        if (state->lsp_enabled) {
+        if (state && state->lsp_enabled) {
             LspDiagnostic *diag = get_diagnostic_under_cursor(state);
             if (diag) {
                 draw_diagnostic_popup(active_jw->win, state, diag->message);
             }
         }
-        // state->status_msg[0] = '\0'; // Keep status message until next action
     }
     posicionar_cursor_ativo();
     doupdate();
@@ -387,8 +384,6 @@ void posicionar_cursor_ativo() {
         }
     }
 }
-
-// --- Navigation ---
 
 void proxima_janela() {
     GerenciadorJanelas *ws = ACTIVE_WS;
@@ -464,7 +459,6 @@ void mover_janela_para_posicao(int target_idx) {
     redesenhar_todas_as_janelas();
 }
 
-// display_recent_files remains largely the same, but needs to use ACTIVE_WS
 typedef struct {
     char* path;
     bool is_recent;
@@ -686,4 +680,114 @@ end_switcher:
     delwin(switcher_win);
     touchwin(stdscr);
     redesenhar_todas_as_janelas();
+}
+
+void prompt_and_create_debug_workspace() {
+    int master_fd;
+    int screen_rows, screen_cols;
+    getmaxyx(stdscr, screen_rows, screen_cols);
+
+    // Create a formatted box for the prompt
+    int win_h = 5;
+    int win_w = screen_cols - 20;
+    if (win_w < 50) win_w = 50;
+    int win_y = (screen_rows - win_h) / 2;
+    int win_x = (screen_cols - win_w) / 2;
+    WINDOW *input_win = newwin(win_h, win_w, win_y, win_x);
+    keypad(input_win, TRUE);
+    wbkgd(input_win, COLOR_PAIR(9));
+    box(input_win, 0, 0);
+    mvwprintw(input_win, 1, 2, "Path to executable to debug:");
+    wrefresh(input_win);
+
+    char path_buffer[1024] = {0};
+    curs_set(1);
+    echo();
+    wmove(input_win, 2, 2);
+    wgetnstr(input_win, path_buffer, sizeof(path_buffer) - 1);
+    noecho();
+    curs_set(0);
+    delwin(input_win);
+    touchwin(stdscr);
+    redesenhar_todas_as_janelas();
+
+    if (strlen(path_buffer) == 0) {
+        return;
+    }
+
+    // --- GDB Session Logic ---
+    pid_t pid = forkpty(&master_fd, NULL, NULL, NULL);
+
+    if (pid < 0) {
+        endwin();
+        perror("forkpty failed");
+        exit(1);
+    } else if (pid == 0) { // Child
+        execlp("gdb", "gdb", "-tui", path_buffer, (char *)NULL);
+        perror("execlp gdb failed");
+        exit(1);
+    }
+
+    // Parent
+    // Set the window size of the pseudo-terminal to match our screen
+    struct winsize ws_size;
+    ws_size.ws_row = screen_rows;
+    ws_size.ws_col = screen_cols;
+    ws_size.ws_xpixel = 0;
+    ws_size.ws_ypixel = 0;
+    ioctl(master_fd, TIOCSWINSZ, &ws_size);
+
+    endwin();
+    handle_gdb_session(master_fd, pid);
+    
+    // After GDB exits, restore ncurses screen
+    refresh();
+    redesenhar_todas_as_janelas();
+}
+
+void handle_gdb_session(int pty_fd, pid_t child_pid) {
+    // Set terminal to raw mode
+    struct termios orig_termios;
+    tcgetattr(STDIN_FILENO, &orig_termios);
+    struct termios raw = orig_termios;
+    raw.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
+    raw.c_oflag &= ~(OPOST);
+    raw.c_cflag |= (CS8);
+    raw.c_lflag &= ~(ECHO | ICANON | IEXTEN | ISIG);
+    tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
+
+    // I/O loop
+    while (1) {
+        fd_set fds;
+        FD_ZERO(&fds);
+        FD_SET(STDIN_FILENO, &fds);
+        FD_SET(pty_fd, &fds);
+
+        select(pty_fd + 1, &fds, NULL, NULL, NULL);
+
+        if (FD_ISSET(STDIN_FILENO, &fds)) {
+            char c;
+            if (read(STDIN_FILENO, &c, 1) > 0) {
+                write(pty_fd, &c, 1);
+            }
+        }
+
+        if (FD_ISSET(pty_fd, &fds)) {
+            char buf[1024];
+            ssize_t n = read(pty_fd, buf, sizeof(buf));
+            if (n > 0) {
+                write(STDOUT_FILENO, buf, n);
+            } else {
+                break; // GDB exited or error
+            }
+        }
+
+        int status;
+        if (waitpid(child_pid, &status, WNOHANG) > 0) {
+            break; // Child has exited
+        }
+    }
+
+    // Restore terminal settings
+    tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
 }
