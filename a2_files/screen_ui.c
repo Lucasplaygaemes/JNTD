@@ -998,6 +998,8 @@ void display_shortcuts_screen() {
     fprintf(temp_file, "    %-20s %s\n", "Alt+O", "Copy the selection in the clipboard of the system");
     fprintf(temp_file, "    %-20s %s\n", "Alt+P", "Paste from the clipboard");
     fprintf(temp_file, "    %-20s %s\n", "Shift+Alt+Number", "Move the current window to the designed position, it's used based in the numbers with carachteres.");
+    fprintf(temp_file, "    %-20s %s\n", "Alt+D", "With this command you can execute gdb in the a2! but one overtaken the other, you can only use a2 again if you quit gdb.");
+    
     
     fclose(temp_file);
 
