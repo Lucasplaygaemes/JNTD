@@ -55,14 +55,8 @@ I'm going to add a new file, soon, called documentation. Why's that? Simple, the
 I would be really gratefull if you want to improve the code, it's always open to commits. and if you want you can contact me via my email. My email is lucasmoura27271@gmail.com, and if you need to say something with me, we can chat by email.
 
 # Plugins!
-You can make you own plugins to JNTD, there is a example of plugins in the plugin folder. The same file is well documented about how you can make your own.
+You can make you own plugins to JNTD, there is a example of plugins in the plugin folder. The same file is documented about how you can make your own.
 
 # Readme?
 As you may notice, the README file is getting big, and i can't list every new thing neither any changes that i will make in this code.
 So i will add a new file, Features, and the name again is selfexplanatory. When a big update or change be made, it will be showed in README for 5~10 days in maximum. In the features file will have all that already is on the readme, and what's not.
-
-# Calculator!
-There is a calculator, it's not a scientific calculator but neither a common one, it's between the line, a friend of mine will help me improve it futurely.
-
-# Languages?
-The code is being constantly updated, and for me translate every little change every times isn't good or convinent, so i will probably delete the languages folder, and make a file to explain and documented all changes between relases.
