@@ -7,7 +7,7 @@ CFLAGS = -g -Wall -Wextra -I. -I./a2_files -I../include
 LDFLAGS = -lncursesw -ljansson -lm -lcurl -lpthread -ldl -lssl -lcrypto
 
 # --- Alvos Principais ---
-TARGETS = a2 2bt
+TARGETS = a2 jntd
 
 # --- Diretórios ---
 A2_DIR = a2_files
@@ -42,7 +42,7 @@ $(A2_DIR)/%.o: $(A2_DIR)/%.c
 # --- Regras de Compilação para '2bt' e Plugins ---
 
 # Regra para compilar o 2bt
-2bt: 2bt.c
+jntd: jntd.c
 	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
 
 # Regra de padrão para compilar os plugins
