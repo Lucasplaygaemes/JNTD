@@ -1050,6 +1050,8 @@ void handle_insert_mode_key(EditorState *state, wint_t ch) {
         case KEY_CTRL_A: editor_find_previous(state); break;
         case KEY_CTRL_F: editor_find(state); break;
         case KEY_UNDO: do_undo(state); break;
+        case KEY_CTRL_RIGHT_BRACKET: proxima_janela(); break;
+        case KEY_CTRL_LEFT_BRACKET: janela_anterior(); break;
         case KEY_REDO: do_redo(state); break;
         case KEY_ENTER: case '\n': editor_handle_enter(state); break;
         case KEY_BACKSPACE: case 127: case 8: editor_handle_backspace(state); break;
