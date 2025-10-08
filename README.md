@@ -30,7 +30,7 @@ Both a2 and jntd are not windows compatible, but it can run in most unix or linu
 JNTD as a plugin functionality, there is a plugin example in the plugins folder.
 
 # Makefile!
-The make file compile and make every thing necessary to JNTD, a2 will be added in it.
+The make file compile and make every thing necessary to JNTD and a2 to compile.
 
 # Documentation!
 I'm going to add a new file, soon, called documentation. Why's that? Simple, the code is written by me, and i really want other people to contribuite on it, so i will make a documentation. So whoever want to add something, make it own plugin, Or anything like will be able because he can read the docs. I will need AI help to implement in the whole code, but i will revise it all by myself. Just forgot to say, the documentation will be in english too.
