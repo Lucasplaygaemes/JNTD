@@ -15,21 +15,12 @@ A lot of things were added! So, any doubt's of keyboard shortcuts? :ksc show all
 Now there is the gdb "mode", if you start gdb, it process take over the a2, and a2 is "killed" until he closes, after that you can use a2 again.
 Most of the bugs were corrected, and if any bug is not, should be reported!
 
-
-# Now it's getting good!
-Adding a lot of new functions! Now with ctrl "." or ">" you can change the multi-windows layout, but have few for now.
-With ctrl r you rotate then, with alt number you change the current window for the one with the number.
-Will add a visual mod so you can copy and cut files just like in vim.
-
 # Visual Mode
 I'm adding a visual mode, where you can copy and move or manipulate text.
 
 # LSP
 LSP is on! it's being on a while now, i forgot to update the README.
 I have currently the C and Python lsp, but will add for other languages in the future.
-
-# Refactoring!
-The code was "refactored" and now is divided in main parts.
 
 # A2!
 What's A2 you might ask? It's my own file editor. The VIM is my main file editor, but with the develop of the A2 and it's improvments i'm slowing changing it to be my main editor.
