@@ -20,14 +20,14 @@ I'm already doing it, and from now on i will add issues always i have a bug or s
 I will try to fix then in at max 2 weeks after created, or at least try and add updates about it.
 
 # Projects?
-JNTD is my main project for a while now, but i have other projects in mind, my favorite programming language is C, and that's clear, but, i would love somethings that are not native in C, i'm not a c developer,
-but i will make changes haha. I have other projects in mind, some of then i can add in JNTD, but other i can't, i will make then public once i feel they're good enough.
+A2 is being my main project for almost 4 months straight, and will probably be for a lot more.
+Because how the things are going, A2 will be my main project, i will seperate them one from the another, but not for now i guess. Still deciding.
 
 # Multiplatform?
 Both a2 and jntd are not windows compatible, but it can run in most unix or linux based distros.
 
 # Plugins?
-And the plugins parts are back, but this time isn't with good news, but i'm making a clean and revision, and unfortunetly with AI help, to debug the code. And i'm not having sucess yet haha.
+JNTD as a plugin functionality, there is a plugin example in the plugins folder.
 
 # Makefile!
 The make file compile and make every thing necessary to JNTD, a2 will be added in it.
