@@ -40,9 +40,6 @@ Every cool feature and more important, useful that comes to my mind, i will try 
 Even tought this repo and the main code is JNTD, i'm having a lot of fun adding useful functions in a2, so i'm giving it a lot more attention the JNTD, but i will not do it forever, after i added 
 the functions in my TODO list, i will return my focus to JNTD, but i have a lot of cool features to add at JNTD, but even more add a2.c.
 
-# Releases!
-I will make releases every few days with minor changes, or when big changes are made, i will also make one. Can't say which plataforms it will be deployed. 
-
 # Issues!
 I'm already doing it, and from now on i will add issues always i have a bug or something i need to fix, to improve terminal workflow, i'm using gh and git, because yet gh don't replace git for me.
 I will try to fix then in at max 2 weeks after created, or at least try and add updates about it.
@@ -65,9 +62,6 @@ I'm going to add a new file, soon, called documentation. Why's that? Simple, the
 
 # Tip's?
 I would be really gratefull if you want to improve the code, it's always open to commits. and if you want you can contact me via my email. My email is lucasmoura27271@gmail.com, and if you need to say something with me, we can chat by email.
-
-# Plugins!
-You can make you own plugins to JNTD, there is a example of plugins in the plugin folder. The same file is documented about how you can make your own.
 
 # Readme?
 As you may notice, the README file is getting big, and i can't list every new thing neither any changes that i will make in this code.
