@@ -15,22 +15,6 @@ A lot of things were added! So, any doubt's of keyboard shortcuts? :ksc show all
 Now there is the gdb "mode", if you start gdb, it process take over the a2, and a2 is "killed" until he closes, after that you can use a2 again.
 Most of the bugs were corrected, and if any bug is not, should be reported!
 
-# Visual Mode
-I'm adding a visual mode, where you can copy and move or manipulate text.
-
-# LSP
-LSP is on! it's being on a while now, i forgot to update the README.
-I have currently the C and Python lsp, but will add for other languages in the future.
-
-# A2!
-What's A2 you might ask? It's my own file editor. The VIM is my main file editor, but with the develop of the A2 and it's improvments i'm slowing changing it to be my main editor.
-I have added functions that are not present in VIM or any text editor i have used in the past, functions like GCC, or diff, are functions that help my everyday development so i added them.
-Every cool feature and more important, useful that comes to my mind, i will try to add it.
-
-# A2 or JNTD?
-Even tought this repo and the main code is JNTD, i'm having a lot of fun adding useful functions in a2, so i'm giving it a lot more attention the JNTD, but i will not do it forever, after i added 
-the functions in my TODO list, i will return my focus to JNTD, but i have a lot of cool features to add at JNTD, but even more add a2.c.
-
 # Issues!
 I'm already doing it, and from now on i will add issues always i have a bug or something i need to fix, to improve terminal workflow, i'm using gh and git, because yet gh don't replace git for me.
 I will try to fix then in at max 2 weeks after created, or at least try and add updates about it.
@@ -40,7 +24,7 @@ JNTD is my main project for a while now, but i have other projects in mind, my f
 but i will make changes haha. I have other projects in mind, some of then i can add in JNTD, but other i can't, i will make then public once i feel they're good enough.
 
 # Multiplatform?
-And it's a miracle! The code is "multiplataform", not really, but the code was able to run on my pc. But it's not perfect, nothing is, i need to make some modifications so it can run nice on every platform.
+Both a2 and jntd are not windows compatible, but it can run in most unix or linux based distros.
 
 # Plugins?
 And the plugins parts are back, but this time isn't with good news, but i'm making a clean and revision, and unfortunetly with AI help, to debug the code. And i'm not having sucess yet haha.
