@@ -17,10 +17,75 @@
 #include <errno.h>
 #include <termios.h>
 #include <sys/ioctl.h>
+#include <vterm.h>
+
 
 #include <sys/select.h> // Para select() e fd_set
 
 #define ACTIVE_WS (gerenciador_workspaces.workspaces[gerenciador_workspaces.workspace_ativo_idx])
+
+void desenhar_janela_terminal(JanelaEditor *jw);
+void criar_novo_workspace_vazio();
+
+void atualizar_tamanho_pty(JanelaEditor *jw) {
+    if (jw->tipo != TIPOJANELA_TERMINAL || jw->pty_fd == -1) return;
+
+    int border_offset = ACTIVE_WS->num_janelas > 1 ? 1 : 0;
+    struct winsize ws;
+    ws.ws_row = jw->altura - (2 * border_offset);
+    ws.ws_col = jw->largura - (2 * border_offset);
+    ws.ws_xpixel = 0;
+    ws.ws_ypixel = 0;
+    
+    ioctl(jw->pty_fd, TIOCSWINSZ, &ws);
+}
+
+
+
+void criar_janela_terminal_generica(char *const argv[]) {
+    if (!argv || !argv[0]) return;
+
+    GerenciadorJanelas *ws = ACTIVE_WS;
+    ws->num_janelas++;
+    ws->janelas = realloc(ws->janelas, sizeof(JanelaEditor*) * ws->num_janelas);
+    if (!ws->janelas) { perror("realloc falhou"); ws->num_janelas--; exit(1); }
+
+    JanelaEditor *jw = calloc(1, sizeof(JanelaEditor));
+    if (!jw) { perror("calloc falhou"); ws->num_janelas--; exit(1); }
+    ws->janelas[ws->num_janelas - 1] = jw;
+    ws->janela_ativa_idx = ws->num_janelas - 1;
+
+    // A lógica de forkpty continua igual...
+    int master_fd;
+    pid_t pid = forkpty(&master_fd, NULL, NULL, NULL);
+
+    if (pid < 0) {
+        perror("forkpty falhou");
+        ws->num_janelas--; free(jw); return;
+    }
+    if (pid == 0) {
+        execvp(argv[0], argv);
+        exit(127);
+    }
+    
+    // Recalcular o layout ANTES de criar o vterm para ter o tamanho certo
+    recalcular_layout_janelas();
+    
+    jw->tipo = TIPOJANELA_TERMINAL;
+    jw->pid = pid;
+    jw->pty_fd = master_fd;
+    fcntl(master_fd, F_SETFL, O_NONBLOCK);
+
+    // MUDANÇA: Lógica de criação da vterm adaptada para a nova API
+    int rows, cols;
+    getmaxyx(jw->win, rows, cols);
+    int border_offset = ws->num_janelas > 1 ? 1 : 0;
+
+    jw->vterm = vterm_create(cols - 2 * border_offset, rows - 2 * border_offset, VTERM_FLAG_XTERM_256);
+    vterm_wnd_set(jw->vterm, jw->win); // Associa a WINDOW da ncurses
+    vterm_set_userptr(jw->vterm, jw);  // Associa nossos dados à instância
+}
+
 
 void handle_gdb_session(int pty_fd, pid_t child_pid);
 
@@ -56,19 +121,19 @@ void free_editor_state(EditorState* state) {
 
 void free_janela_editor(JanelaEditor* jw) {
     if (!jw) return;
-    if (jw->estado) free_editor_state(jw->estado);
+
+    if (jw->tipo == TIPOJANELA_EDITOR && jw->estado) {
+        free_editor_state(jw->estado);
+    } else if (jw->tipo == TIPOJANELA_TERMINAL) {
+        if (jw->pid > 0) { kill(jw->pid, SIGKILL); waitpid(jw->pid, NULL, 0); }
+        if (jw->pty_fd != -1) close(jw->pty_fd);
+        if (jw->vterm) vterm_destroy(jw->vterm); // Usa vterm_destroy
+    }
+
     if (jw->win) delwin(jw->win);
     free(jw);
 }
 
-void free_workspace(GerenciadorJanelas *ws) {
-    if (!ws) return;
-    for (int i = 0; i < ws->num_janelas; i++) {
-        free_janela_editor(ws->janelas[i]);
-    }
-    free(ws->janelas);
-    free(ws);
-}
 
 void inicializar_workspaces() {
     gerenciador_workspaces.workspaces = NULL;
@@ -315,6 +380,7 @@ void recalcular_layout_janelas() {
         }
     }
 
+
     for (int i = 0; i < ws->num_janelas; i++) {
         JanelaEditor *jw = ws->janelas[i];
         if (jw->win) {
@@ -323,10 +389,72 @@ void recalcular_layout_janelas() {
         jw->win = newwin(jw->altura, jw->largura, jw->y, jw->x);
         keypad(jw->win, TRUE);
         scrollok(jw->win, FALSE);
+        
+        // Se for um terminal, precisamos redimensioná-lo
+        if (jw->tipo == TIPOJANELA_TERMINAL && jw->vterm) {
+            int border_offset = ws->num_janelas > 1 ? 1 : 0;
+            int content_h = jw->altura - (2 * border_offset);
+            int content_w = jw->largura - (2 * border_offset);
+            
+            // CORREÇÃO: Usa vterm_resize, que é a função correta desta biblioteca
+            vterm_resize(jw->vterm, content_w > 0 ? content_w : 1, content_h > 0 ? content_h : 1);
+            atualizar_tamanho_pty(jw); // Esta função continua importante
+        }
     }
 }
 
+
+void executar_comando_no_terminal(const char *comando_str) {
+    // Se nenhum comando for especificado, abre um shell padrão
+    if (strlen(comando_str) == 0) {
+        char *const cmd[] = {"/bin/bash", NULL};
+        criar_janela_terminal_generica(cmd);
+        return;
+    }
+
+    // Cria uma cópia da string, pois strtok a modifica
+    char *str_copia = strdup(comando_str);
+    if (!str_copia) return;
+
+    // Array para guardar os argumentos (ex: "btop", "--utf-force")
+    char **argv = NULL;
+    int argc = 0;
+    
+    // Usa strtok para dividir a string em palavras (tokens) separadas por espaço
+    char *token = strtok(str_copia, " ");
+    while (token != NULL) {
+        argc++;
+        argv = realloc(argv, sizeof(char*) * argc);
+        argv[argc - 1] = token;
+        token = strtok(NULL, " ");
+    }
+
+    // Adiciona o NULL no final, que é obrigatório para a função execvp
+    argc++;
+    argv = realloc(argv, sizeof(char*) * argc);
+    argv[argc - 1] = NULL;
+
+    // Chama a nossa função mágica que já está pronta!
+    if (argv) {
+        criar_janela_terminal_generica(argv);
+    }
+
+    // Libera a memória que alocamos
+    free(str_copia);
+    free(argv);
+}
+
+void free_workspace(GerenciadorJanelas *ws) {
+    if (!ws) return;
+    for (int i = 0; i < ws->num_janelas; i++) {
+        free_janela_editor(ws->janelas[i]);
+    }
+    free(ws->janelas);
+    free(ws);
+}
+
 void redesenhar_todas_as_janelas() {
+    // Apaga a tela virtual principal
     erase();
     wnoutrefresh(stdscr);
 
@@ -335,55 +463,80 @@ void redesenhar_todas_as_janelas() {
     GerenciadorJanelas *ws = ACTIVE_WS;
     for (int i = 0; i < ws->num_janelas; i++) {
         JanelaEditor *jw = ws->janelas[i];
-        if (jw && jw->estado) editor_redraw(jw->win, jw->estado);
-    }
-    
-    if (ws->num_janelas > 0) {
-        JanelaEditor* active_jw = ws->janelas[ws->janela_ativa_idx];
-        EditorState* state = active_jw->estado;
-        if (state && state->lsp_enabled) {
-            LspDiagnostic *diag = get_diagnostic_under_cursor(state);
-            if (diag) {
-                draw_diagnostic_popup(active_jw->win, state, diag->message);
+        if (jw) {
+            // Desenha a borda da janela
+            if (ws->num_janelas > 1) {
+                wattron(jw->win, (i == ws->janela_ativa_idx) ? (COLOR_PAIR(3)|A_BOLD) : 0);
+                box(jw->win, 0, 0);
+                wattroff(jw->win, (i == ws->janela_ativa_idx) ? (COLOR_PAIR(3)|A_BOLD) : 0);
             }
+            
+            // Prepara o conteúdo da janela para ser desenhado
+            if (jw->tipo == TIPOJANELA_EDITOR && jw->estado) {
+                editor_redraw(jw->win, jw->estado);
+            } else if (jw->tipo == TIPOJANELA_TERMINAL && jw->vterm) {
+                // Manda a libvterm redesenhar seu conteúdo na WINDOW associada.
+                vterm_wnd_update(jw->vterm, -1, 0, VTERM_WND_RENDER_ALL);
+            }
+            // Adiciona a janela à "fila" de redesenho
+            wnoutrefresh(jw->win);
         }
     }
-    posicionar_cursor_ativo();
-    doupdate();
+    
 }
 
 void posicionar_cursor_ativo() {
-    if (gerenciador_workspaces.num_workspaces == 0) return;
+    if (gerenciador_workspaces.num_workspaces == 0 || ACTIVE_WS->num_janelas == 0) {
+        curs_set(0);
+        return;
+    }
+
+
     GerenciadorJanelas *ws = ACTIVE_WS;
     if (ws->num_janelas == 0) { curs_set(0); return; };
 
-    JanelaEditor* active_jw = ws->janelas[ws->janela_ativa_idx];
-    EditorState* state = active_jw->estado;
-    WINDOW* win = active_jw->win;
-    if (state->completion_mode != COMPLETION_NONE) {
-        editor_draw_completion_win(win, state);
-    } else {
-        curs_set(1);
-        if (state->mode == COMMAND) {
-            int rows, cols;
-            getmaxyx(win, rows, cols);
-            wmove(win, rows - 1, state->command_pos + 2);
+    JanelaEditor* active_jw = ws->janelas[ACTIVE_WS->janela_ativa_idx];
+    
+    // Se a janela for um terminal, a libvterm cuida do cursor. Não fazemos nada.
+    if (active_jw->tipo == TIPOJANELA_TERMINAL) {
+        // A libvterm já posicionou o cursor durante o vterm_render ou vterm_wnd_update.
+        // Apenas garantimos que ele esteja visível se o processo estiver ativo.
+        curs_set(active_jw->pid != -1 ? 1 : 0);
+    } 
+    // Se a janela for um editor, nós cuidamos do cursor manualmente.
+    else if (active_jw->tipo == TIPOJANELA_EDITOR) {
+        EditorState* state = active_jw->estado;
+        if (!state) { curs_set(0); return; }
+        
+        WINDOW* win = active_jw->win;
+        if (state->completion_mode != COMPLETION_NONE) {
+            editor_draw_completion_win(win, state); // Esconde o cursor principal
         } else {
-            int visual_y, visual_x;
-            get_visual_pos(win, state, &visual_y, &visual_x);
-            int border_offset = ws->num_janelas > 1 ? 1 : 0;
-            int screen_y = visual_y - state->top_line + border_offset;
-            int screen_x = visual_x - state->left_col + border_offset;
-            int max_y, max_x;
-            getmaxyx(win, max_y, max_x);
-            if (screen_y >= max_y) screen_y = max_y - 1;
-            if (screen_x >= max_x) screen_x = max_x - 1;
-            if (screen_y < border_offset) screen_y = border_offset;
-            if (screen_x < border_offset) screen_x = border_offset;
-            wmove(win, screen_y, screen_x);
+            curs_set(1); // Liga o cursor
+            if (state->mode == COMMAND) {
+                int rows, cols;
+                getmaxyx(win, rows, cols);
+                (void)cols;
+                wmove(win, rows - 1, state->command_pos + 2);
+            } else {
+                int visual_y, visual_x;
+                get_visual_pos(win, state, &visual_y, &visual_x);
+                int border_offset = ws->num_janelas > 1 ? 1 : 0;
+                int screen_y = visual_y - state->top_line + border_offset;
+                int screen_x = visual_x - state->left_col + border_offset;
+                int max_y, max_x;
+                getmaxyx(win, max_y, max_x);
+                if (screen_y >= max_y) screen_y = max_y - 1;
+                if (screen_x >= max_x) screen_x = max_x - 1;
+                if (screen_y < border_offset) screen_y = border_offset;
+                if (screen_x < border_offset) screen_x = border_offset;
+                wmove(win, screen_y, screen_x);
+            }
         }
     }
+    wrefresh(active_jw->win);
 }
+
 
 void proxima_janela() {
     GerenciadorJanelas *ws = ACTIVE_WS;
@@ -682,12 +835,25 @@ end_switcher:
     redesenhar_todas_as_janelas();
 }
 
-void prompt_and_create_debug_workspace() {
-    int master_fd;
+void criar_novo_workspace_vazio() {
+    gerenciador_workspaces.num_workspaces++;
+    gerenciador_workspaces.workspaces = realloc(gerenciador_workspaces.workspaces, sizeof(GerenciadorJanelas*) * gerenciador_workspaces.num_workspaces);
+
+    GerenciadorJanelas *novo_ws = calloc(1, sizeof(GerenciadorJanelas));
+    novo_ws->janelas = NULL;
+    novo_ws->num_janelas = 0;
+    novo_ws->janela_ativa_idx = -1;
+    novo_ws->current_layout = LAYOUT_VERTICAL_SPLIT;
+
+    gerenciador_workspaces.workspaces[gerenciador_workspaces.num_workspaces - 1] = novo_ws;
+    gerenciador_workspaces.workspace_ativo_idx = gerenciador_workspaces.num_workspaces - 1;
+}
+
+void prompt_and_create_gdb_workspace() {
     int screen_rows, screen_cols;
     getmaxyx(stdscr, screen_rows, screen_cols);
 
-    // Create a formatted box for the prompt
+    // (O código para criar a janela de prompt e pegar o path_buffer continua o mesmo)
     int win_h = 5;
     int win_w = screen_cols - 20;
     if (win_w < 50) win_w = 50;
@@ -697,7 +863,7 @@ void prompt_and_create_debug_workspace() {
     keypad(input_win, TRUE);
     wbkgd(input_win, COLOR_PAIR(9));
     box(input_win, 0, 0);
-    mvwprintw(input_win, 1, 2, "Path to executable to debug:");
+    mvwprintw(input_win, 1, 2, "Path to executable to debug with GDB:");
     wrefresh(input_win);
 
     char path_buffer[1024] = {0};
@@ -711,38 +877,14 @@ void prompt_and_create_debug_workspace() {
     touchwin(stdscr);
     redesenhar_todas_as_janelas();
 
-    if (strlen(path_buffer) == 0) {
-        return;
+    if (strlen(path_buffer) > 0) {
+        // 1. Cria um workspace novo e vazio
+        criar_novo_workspace_vazio();
+        
+        // 2. Adiciona uma única janela de terminal a este novo workspace
+        char *const cmd[] = {"gdb", "-tui", path_buffer, NULL};
+        criar_janela_terminal_generica(cmd);
     }
-
-    // --- GDB Session Logic ---
-    pid_t pid = forkpty(&master_fd, NULL, NULL, NULL);
-
-    if (pid < 0) {
-        endwin();
-        perror("forkpty failed");
-        exit(1);
-    } else if (pid == 0) { // Child
-        execlp("gdb", "gdb", "-tui", path_buffer, (char *)NULL);
-        perror("execlp gdb failed");
-        exit(1);
-    }
-
-    // Parent
-    // Set the window size of the pseudo-terminal to match our screen
-    struct winsize ws_size;
-    ws_size.ws_row = screen_rows;
-    ws_size.ws_col = screen_cols;
-    ws_size.ws_xpixel = 0;
-    ws_size.ws_ypixel = 0;
-    ioctl(master_fd, TIOCSWINSZ, &ws_size);
-
-    endwin();
-    handle_gdb_session(master_fd, pid);
-    
-    // After GDB exits, restore ncurses screen
-    refresh();
-    redesenhar_todas_as_janelas();
 }
 
 void handle_gdb_session(int pty_fd, pid_t child_pid) {
@@ -791,3 +933,14 @@ void handle_gdb_session(int pty_fd, pid_t child_pid) {
     // Restore terminal settings
     tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
 }
+
+void gf2_starter() {
+    // Esta função agora abre o 'gf2' em uma nova janela de terminal,
+    // em vez de congelar o editor.
+    // Você pode adicionar um prompt para o usuário digitar o nome do arquivo,
+    // ou passar um argumento fixo.
+    char *const cmd[] = {"gf2", NULL};
+    criar_janela_terminal_generica(cmd);
+}
+
+
