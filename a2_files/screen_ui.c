@@ -6,6 +6,8 @@
 #include <ctype.h>
 #include <unistd.h>
 
+extern const int ansi_to_ncurses_map[16];
+
 bool confirm_action(const char *prompt) {
     int rows, cols;
     getmaxyx(stdscr, rows, cols);
@@ -171,7 +173,7 @@ void draw_diagnostic_popup(WINDOW *main_win, EditorState *state, const char *mes
         win_x = term_cols - win_width - 1;
     }
     if (win_x < 0) win_x = 0;
-    if (win_y < 0) win_y = 0;
+    if (win_y < 0) win_y = 0; // CORREÇÃO: era 'y = 0', agora é 'win_y = 0'
 
     state->diagnostic_popup = newwin(win_height, win_width, win_y, win_x);
     wbkgd(state->diagnostic_popup, COLOR_PAIR(8));
@@ -579,6 +581,7 @@ void adjust_viewport(WINDOW *win, EditorState *state) {
 void get_visual_pos(WINDOW *win, EditorState *state, int *visual_y, int *visual_x) {
     int rows, cols;
     getmaxyx(win, rows, cols);
+    (void)rows;
 
     int border_offset = ACTIVE_WS->num_janelas > 1 ? 1 : 0;
     int content_width = cols - (2 * border_offset);
@@ -786,7 +789,7 @@ void display_help_screen() {
     for (int i = 0; i < num_commands; i++) {
         wmove(help_win, 4 + i, 4);
         wattron(help_win, COLOR_PAIR(3) | A_BOLD);
-        wprintw(help_win, "% -15s", commands[i].command);
+        wprintw(help_win, "%-15s", commands[i].command);
         wattroff(help_win, COLOR_PAIR(3) | A_BOLD);
         wprintw(help_win, ": %s", commands[i].description);
     }
@@ -797,7 +800,7 @@ void display_help_screen() {
     for (int i = 0; i < num_visual_commands; i++) {
         wmove(help_win, visual_start_y + 2 + i, 4);
         wattron(help_win, COLOR_PAIR(3) | A_BOLD);
-        wprintw(help_win, "% -15s", visual_commands[i].command);
+        wprintw(help_win, "%-15s", visual_commands[i].command);
         wattroff(help_win, COLOR_PAIR(3) | A_BOLD);
         wprintw(help_win, ": %s", visual_commands[i].description);
     }

@@ -11,227 +11,157 @@
 #include <libgen.h> // For dirname()
 #include <limits.h> // For PATH_MAX
 #include <unistd.h> // For getcwd()
+#include <errno.h>      // Para a variável errno
+#include <locale.h>
+#include <sys/select.h>
+#include <sys/wait.h> 
+
+const int ansi_to_ncurses_map[16] = {
+    COLOR_BLACK, COLOR_RED, COLOR_GREEN, COLOR_YELLOW,
+    COLOR_BLUE, COLOR_MAGENTA, COLOR_CYAN, COLOR_WHITE,
+    COLOR_BLACK,   // Bright Black (geralmente cinza)
+    COLOR_RED,     // Bright Red
+    COLOR_GREEN,   // Bright Green
+    COLOR_YELLOW,  // Bright Yellow
+    COLOR_BLUE,    // Bright Blue
+    COLOR_MAGENTA, // Bright Magenta
+    COLOR_CYAN,    // Bright Cyan
+    COLOR_WHITE    // Bright White
+};
+
 
 void inicializar_ncurses() {
     initscr(); cbreak(); noecho(); keypad(stdscr, TRUE);
     set_escdelay(25);
     start_color();
-    init_pair(1, COLOR_BLACK, COLOR_BLUE); init_pair(2, COLOR_YELLOW, COLOR_BLACK);
-    init_pair(3, COLOR_YELLOW, COLOR_BLACK); init_pair(4, COLOR_GREEN, COLOR_BLACK);
-    init_pair(5, COLOR_BLUE, COLOR_BLACK); init_pair(6, COLOR_CYAN, COLOR_BLACK);
+    
+    // CORREÇÃO: Substitui use_default_colors() pela solução robusta
+    // Diz à ncurses para mapear as cores padrão do terminal para COLOR_WHITE e COLOR_BLACK
+    assume_default_colors(COLOR_WHITE, COLOR_BLACK);
+
+    // Pares de cores do editor (agora usarão COLOR_BLACK como fundo "transparente")
+    init_pair(1, COLOR_BLACK, COLOR_BLUE);
+    init_pair(2, COLOR_YELLOW, COLOR_BLACK);
+    init_pair(3, COLOR_YELLOW, COLOR_BLACK);
+    init_pair(4, COLOR_GREEN, COLOR_BLACK);
+    init_pair(5, COLOR_BLUE, COLOR_BLACK);
+    init_pair(6, COLOR_CYAN, COLOR_BLACK);
     init_pair(7, COLOR_MAGENTA, COLOR_BLACK);
-    init_pair(8, COLOR_WHITE, COLOR_BLACK);
+    init_pair(8, COLOR_WHITE, COLOR_BLACK); // Par padrão: texto branco, fundo transparente
     init_pair(9, COLOR_BLACK, COLOR_MAGENTA);
     init_pair(10, COLOR_GREEN, COLOR_BLACK);
     init_pair(11, COLOR_RED, COLOR_BLACK);
     init_pair(12, COLOR_BLACK, COLOR_YELLOW);
+
+    // Pares de cores para o terminal (também usarão o fundo "transparente")
+    for (int i = 0; i < 16; i++) {
+        init_pair(16 + i, ansi_to_ncurses_map[i], COLOR_BLACK);
+    }
+    
     bkgd(COLOR_PAIR(8));
 }
 
-int main(int argc, char *argv[]) {
-    char exe_path_buf[PATH_MAX];
-    if (realpath(argv[0], exe_path_buf)) {
-        char* dir = dirname(exe_path_buf);
-        if (dir) {
-            strncpy(executable_dir, dir, PATH_MAX - 1);
-            executable_dir[PATH_MAX - 1] = '\0';
-        }
-    }
 
-    start_work_timer();
-    setlocale(LC_ALL, "");
-    inicializar_ncurses();
-    
-    inicializar_workspaces();
+void process_editor_input(EditorState *state, wint_t ch, bool *should_exit) {
+    JanelaEditor* active_jw = ACTIVE_WS->janelas[ACTIVE_WS->janela_ativa_idx];
+    WINDOW *active_win = active_jw->win;
 
-    EditorState *initial_state = ACTIVE_WS->janelas[0]->estado;
-    char cwd[PATH_MAX];
-    if (getcwd(cwd, sizeof(cwd)) != NULL) {
-        update_directory_access(initial_state, cwd);
-    }
+    if (state->completion_mode != COMPLETION_NONE) {
+        int win_h = 0;
+        if (state->completion_win) win_h = getmaxy(state->completion_win);
 
-    if (argc > 1) {
-        load_file(ACTIVE_WS->janelas[0]->estado, argv[1]);
-        EditorState *state = ACTIVE_WS->janelas[0]->estado;
-
-        napms(100);
-        lsp_initialize(state);
-        napms(500);
-
-        if (argc > 2) {
-            state->current_line = atoi(argv[2]) - 1;
-            if (state->current_line >= state->num_lines) {
-                state->current_line = state->num_lines - 1;
-            }
-            if (state->current_line < 0) {
-                state->current_line = 0;
-            }
-            state->ideal_col = 0;
-        } else {
-            state->current_line = load_last_line(state->filename);
-             if (state->current_line >= state->num_lines) {
-                state->current_line = state->num_lines > 0 ? state->num_lines - 1 : 0;
-            }
-            if (state->current_line < 0) {
-                state->current_line = 0;
-            }
-        }
-    }
-
-    bool should_exit = false;
-    while (!should_exit) {
-        if (gerenciador_workspaces.num_workspaces == 0) {
-            should_exit = true;
-            continue;
-        }
-
-        GerenciadorJanelas *ws = ACTIVE_WS;
-        EditorState *state = ws->janelas[ws->janela_ativa_idx]->estado;
-        WINDOW *active_win = ws->janelas[ws->janela_ativa_idx]->win;
-
-        ensure_cursor_in_bounds(state);
-        check_external_modification(state);
-
-        time_t now = time(NULL);
-        if (now - state->last_auto_save_time >= AUTO_SAVE_INTERVAL) {
-            auto_save(state);
-            state->last_auto_save_time = now;
-        }
-        
-        if (state->lsp_enabled) {
-            lsp_process_messages(state);
-        }
-        redesenhar_todas_as_janelas();
-        wint_t ch;
-        wget_wch(active_win, &ch);
-        
-        static int check_counter = 0;
-        if (check_counter++ % 10 == 0) {
-            if (state->lsp_enabled && !lsp_process_alive(state)) {
-                snprintf(state->status_msg, STATUS_MSG_LEN, "LSP terminated unexpectedly");
-                state->lsp_enabled = false;
-            }
-        }
-
-        if (state->completion_mode != COMPLETION_NONE) {
-            int win_h = 0;
-            if (state->completion_win) win_h = getmaxy(state->completion_win);
-
-            switch(ch) {
-                case KEY_UP:
-                    state->selected_suggestion--;
-                    if (state->selected_suggestion < 0) {
-                        state->selected_suggestion = state->num_suggestions - 1;
-                        if(win_h > 0) {
-                           int new_top = state->num_suggestions - win_h;
-                           state->completion_scroll_top = new_top > 0 ? new_top : 0;
-                        }
-                    }
-                    if (state->selected_suggestion < state->completion_scroll_top) {
-                        state->completion_scroll_top = state->selected_suggestion;
-                    }
-                    break;
-                case ' ':
-                case KEY_DOWN:
-                    state->selected_suggestion++;
-                    if (state->selected_suggestion >= state->num_suggestions) {
-                        state->selected_suggestion = 0;
-                        state->completion_scroll_top = 0;
-                    }
-                    if (win_h > 0 && state->selected_suggestion >= state->completion_scroll_top + win_h) {
-                        state->completion_scroll_top = state->selected_suggestion - win_h + 1;
-                    }
-                    break;
-                case KEY_ENTER: case '\n':
-                    editor_apply_completion(state);
-                    break;
-                case 27: // ESC
-                    editor_end_completion(state);
-                    break;
-                default: 
-                    editor_end_completion(state);
-                    if (state->mode == INSERT) {
-                        handle_insert_mode_key(state, ch);
-                    } else if (state->mode == COMMAND) {
-                        handle_command_mode_key(state, ch, &should_exit);
-                    }
-                    break;
-            }
-            continue; 
-        }
-            
-        if (ch == 27) { // ESC
-            nodelay(active_win, TRUE);
-            int next_ch = wgetch(active_win);
-            nodelay(active_win, FALSE);
-
-            if (next_ch == ERR) { // Just a single ESC press
-                 if (state->mode == INSERT || state->mode == VISUAL) {
-                    state->mode = NORMAL;
-                }
-                 if (state->is_moving) {
-                     state->is_moving = false;
-                     free(state->move_register);
-                     state->move_register = NULL;
-                     snprintf(state->status_msg, sizeof(state->status_msg), "Move cancelled.");
-                 }
-            } else { // Alt key sequence
-                if (next_ch == 'n') { // Alt+n to cycle workspaces
-                    ciclar_workspaces(-1);
-                } else if (next_ch == 'm') { // Alt+m to cycle workspaces
-                    ciclar_workspaces(1);
-                } else if (next_ch == '\n' || next_ch == KEY_ENTER) { // Alt+Enter for new split
-                    criar_nova_janela(NULL);
-                } else if (next_ch == 'x' || next_ch == 'X') { // Alt+X to close window/split
-                     fechar_janela_ativa(&should_exit);
-                } else if (next_ch == 'b' || next_ch == 'B') {
-                    display_recent_files();
-                } else if (next_ch == 'd' || next_ch == 'D') {
-                    prompt_and_create_debug_workspace();
-                } else if (next_ch == 'z' || next_ch == 'Z') {
-                    do_undo(state);
-                } else if (next_ch == 'y' || next_ch == 'Y') {
-                    do_redo(state);
-                } else if (next_ch == 'f' || next_ch == 'w') {
-                    editor_move_to_next_word(state);
-                } else if (next_ch == 'b' || next_ch == 'q') {
-                    editor_move_to_previous_word(state);
-                } else if (next_ch == 'g' || next_ch == 'G') {
-                    prompt_for_directory_change(state);
-                } else if (next_ch == '.' || next_ch == '>') {
-                    ciclar_layout();
-                } else if (next_ch >= '1' && next_ch <= '9') {
-                    mover_janela_para_workspace(next_ch - '1');
-                } else if (strchr("!@#$%^&*(", next_ch)) {
-                    const char* symbols = "!@#$%^&*(";
-                    char* p = strchr(symbols, next_ch);
-                    if (p) {
-                        int index = p - symbols;
-                        mover_janela_para_posicao(index);
-                    }
-                } else if (next_ch == 'r' || next_ch == 'R') {
-                    rotacionar_janelas();
-                } else if (next_ch == 'o' || next_ch == 'O') {
-                    if (state->mode == VISUAL && state->visual_selection_mode != VISUAL_MODE_NONE) {
-                        copy_selection_to_clipboard(state);
-                    }
-                } else if (next_ch == 'p' || next_ch == 'P') {
-                    if (state->mode == NORMAL || state->mode == INSERT) {
-                        paste_from_clipboard(state);
-                    } else if (state->mode == VISUAL && state->visual_selection_mode != VISUAL_MODE_NONE) {
-                        editor_delete_selection(state);
-                        paste_from_clipboard(state);
+        switch(ch) {
+            case KEY_UP:
+                state->selected_suggestion--;
+                if (state->selected_suggestion < 0) {
+                    state->selected_suggestion = state->num_suggestions - 1;
+                    if(win_h > 0) {
+                       int new_top = state->num_suggestions - win_h;
+                       state->completion_scroll_top = new_top > 0 ? new_top : 0;
                     }
                 }
+                if (state->selected_suggestion < state->completion_scroll_top) {
+                    state->completion_scroll_top = state->selected_suggestion;
+                }
+                return; // Usa return para não processar mais nada
+            case ' ':
+            case KEY_DOWN:
+                state->selected_suggestion++;
+                if (state->selected_suggestion >= state->num_suggestions) {
+                    state->selected_suggestion = 0;
+                    state->completion_scroll_top = 0;
+                }
+                if (win_h > 0 && state->selected_suggestion >= state->completion_scroll_top + win_h) {
+                    state->completion_scroll_top = state->selected_suggestion - win_h + 1;
+                }
+                return;
+            case KEY_ENTER: case '\n':
+                editor_apply_completion(state);
+                return;
+            case 27: // ESC
+                editor_end_completion(state);
+                return;
+            default: 
+                editor_end_completion(state);
+                // Deixa o resto da função processar a tecla
+                break;
+        }
+    }
+        
+    if (ch == 27) { // ESC
+        nodelay(active_win, TRUE);
+        int next_ch = wgetch(active_win);
+        nodelay(active_win, FALSE);
+
+        if (next_ch == ERR) { // Apenas ESC
+             if (state->mode == INSERT || state->mode == VISUAL) {
+                state->mode = NORMAL;
             }
-            continue;
+             if (state->is_moving) {
+                 state->is_moving = false;
+                 free(state->move_register);
+                 state->move_register = NULL;
+                 snprintf(state->status_msg, sizeof(state->status_msg), "Move cancelled.");
+             }
+        } else { // Sequência com Alt
+            if (next_ch == 'n') ciclar_workspaces(-1);
+            else if (next_ch == 'm') ciclar_workspaces(1);
+            else if (next_ch == '\n' || next_ch == KEY_ENTER) criar_nova_janela(NULL);
+            else if (next_ch == 'x' || next_ch == 'X') fechar_janela_ativa(should_exit);
+            else if (next_ch == 'b' || next_ch == 'B') display_recent_files();
+            else if (next_ch == 'd' || next_ch == 'D') prompt_and_create_gdb_workspace();
+            else if (next_ch == 'z' || next_ch == 'Z') do_undo(state);
+            else if (next_ch == 'y' || next_ch == 'Y') do_redo(state);
+            else if (next_ch == 'h' || next_ch == 'H') gf2_starter();
+            else if (next_ch == 'f' || next_ch == 'w') editor_move_to_next_word(state);
+            else if (next_ch == 'b' || next_ch == 'q') editor_move_to_previous_word(state);
+            else if (next_ch == 'g' || next_ch == 'G') prompt_for_directory_change(state);
+            else if (next_ch == '.' || next_ch == '>') ciclar_layout();
+            else if (next_ch >= '1' && next_ch <= '9') mover_janela_para_workspace(next_ch - '1');
+            else if (strchr("!@#$%^&*(", next_ch)) {
+                const char* symbols = "!@#$%^&*(";
+                char* p = strchr(symbols, next_ch);
+                if (p) mover_janela_para_posicao(p - symbols);
+            }
+            else if (next_ch == 'r' || next_ch == 'R') rotacionar_janelas();
+            else if (next_ch == 'o' || next_ch == 'O') {
+                if (state->mode == VISUAL && state->visual_selection_mode != VISUAL_MODE_NONE) copy_selection_to_clipboard(state);
+            }
+            else if (next_ch == 'p' || next_ch == 'P') {
+                if (state->mode == NORMAL || state->mode == INSERT) paste_from_clipboard(state);
+                else if (state->mode == VISUAL && state->visual_selection_mode != VISUAL_MODE_NONE) {
+                    editor_delete_selection(state);
+                    paste_from_clipboard(state);
+                }
+            }
         }
+        return; // Termina o processamento aqui
+    }
 
-        if (ch == KEY_CTRL_W) { // Ctrl+W for new workspace
-            criar_novo_workspace();
-            continue;
-        }
-
+    if (ch == KEY_CTRL_W) {
+        criar_novo_workspace();
+        return;
+    }
         switch (state->mode) {
             case VISUAL:
                 switch (ch) {
@@ -427,17 +357,226 @@ int main(int argc, char *argv[]) {
                 handle_insert_mode_key(state, ch);
                 break;
             case COMMAND:
-                handle_command_mode_key(state, ch, &should_exit);
+                handle_command_mode_key(state, ch, should_exit);
                 break;
         }
     }    
+
+
+bool handle_global_shortcut(int ch, bool *should_exit) {
+    switch (ch) {
+        // --- Atalhos de Workspace ---
+        case 'n':
+        case 'm':
+            ciclar_workspaces(ch == 'm' ? 1 : -1);
+            return true; // Atalho consumido
+
+        // --- Atalhos de Janela ---
+        case 'x':
+        case 'X':
+            fechar_janela_ativa(should_exit);
+            return true; // Atalho consumido
+            
+        case '\n':
+        case KEY_ENTER:
+            criar_nova_janela(NULL);
+            return true; // Atalho consumido
         
-    // Final cleanup
+        // Adicione outros atalhos com Alt que devem funcionar em qualquer lugar AQUI
+
+        default:
+            return false; // Não era um atalho global, então a janela ativa deve tratar
+    }
+}
+int main(int argc, char *argv[]) {
+    char exe_path_buf[PATH_MAX];
+    if (realpath(argv[0], exe_path_buf)) {
+        char* dir = dirname(exe_path_buf);
+        if (dir) {
+            strncpy(executable_dir, dir, PATH_MAX - 1);
+            executable_dir[PATH_MAX - 1] = '\0';
+        }
+    }
+
+    start_work_timer();
+    setlocale(LC_ALL, "");
+    inicializar_ncurses();
+    
+    inicializar_workspaces();
+
+    EditorState *initial_state = ACTIVE_WS->janelas[0]->estado;
+    char cwd[PATH_MAX];
+    if (getcwd(cwd, sizeof(cwd)) != NULL) {
+        update_directory_access(initial_state, cwd);
+    }
+
+    if (argc > 1) {
+        load_file(ACTIVE_WS->janelas[0]->estado, argv[1]);
+        EditorState *state = ACTIVE_WS->janelas[0]->estado;
+
+        napms(100);
+        lsp_initialize(state);
+        napms(500);
+
+        if (argc > 2) {
+            state->current_line = atoi(argv[2]) - 1;
+            if (state->current_line >= state->num_lines) {
+                state->current_line = state->num_lines - 1;
+            }
+            if (state->current_line < 0) {
+                state->current_line = 0;
+            }
+            state->ideal_col = 0;
+        } else {
+            state->current_line = load_last_line(state->filename);
+             if (state->current_line >= state->num_lines) {
+                state->current_line = state->num_lines > 0 ? state->num_lines - 1 : 0;
+            }
+            if (state->current_line < 0) {
+                state->current_line = 0;
+            }
+        }
+    }
+
+    bool should_exit = false;
+    int check_counter = 0;
+    while (!should_exit) {
+        if (gerenciador_workspaces.num_workspaces == 0) {
+            should_exit = true;
+            continue;
+        }
+        
+        if (check_counter++ % 10 == 0) {
+            JanelaEditor* active_jw = ACTIVE_WS->janelas[ACTIVE_WS->janela_ativa_idx];
+            if (active_jw->tipo == TIPOJANELA_EDITOR) {
+                EditorState *state = active_jw->estado;
+                if (state && state->lsp_enabled && !lsp_process_alive(state)) {
+                    snprintf(state->status_msg, STATUS_MSG_LEN, "LSP terminated unexpectedly");
+                    state->lsp_enabled = false;
+                }
+            }
+        }
+        redesenhar_todas_as_janelas();
+        posicionar_cursor_ativo();
+        doupdate();
+
+        fd_set readfds;
+        FD_ZERO(&readfds);
+        FD_SET(STDIN_FILENO, &readfds);
+        int max_fd = STDIN_FILENO;
+
+        for (int i = 0; i < gerenciador_workspaces.num_workspaces; i++) {
+            GerenciadorJanelas *ws = gerenciador_workspaces.workspaces[i];
+            for (int j = 0; j < ws->num_janelas; j++) {
+                JanelaEditor *jw = ws->janelas[j];
+                if (jw->tipo == TIPOJANELA_TERMINAL && jw->pty_fd != -1) {
+                    FD_SET(jw->pty_fd, &readfds);
+                    if (jw->pty_fd > max_fd) max_fd = jw->pty_fd;
+                }
+            }
+        }
+
+        int activity = select(max_fd + 1, &readfds, NULL, NULL, NULL);
+        if (activity < 0 && errno != EINTR) {
+            perror("select error");
+            continue;
+        }
+
+        if (FD_ISSET(STDIN_FILENO, &readfds)) {
+            JanelaEditor *active_jw = ACTIVE_WS->janelas[ACTIVE_WS->janela_ativa_idx];
+
+            // ===================================================================
+            // LÓGICA DE ENTRADA PARA JANELA DE EDITOR
+            // ===================================================================
+            if (active_jw->tipo == TIPOJANELA_EDITOR) {
+                wint_t ch;
+                if (wget_wch(stdscr, &ch) != ERR) {
+                    // Se for uma tecla Alt...
+                    if (ch == 27) {
+                        nodelay(stdscr, TRUE);
+                        int next_ch = wgetch(stdscr);
+                        nodelay(stdscr, FALSE);
+
+                        // Se for uma sequência Alt (ex: Alt+n)...
+                        if (next_ch != ERR) {
+                            // ...perguntamos à função global se ela quer tratar disso.
+                            if (!handle_global_shortcut(next_ch, &should_exit)) {
+                                // Se não for um atalho global, devolvemos para o editor.
+                                ungetch(next_ch);
+                                process_editor_input(active_jw->estado, ch, &should_exit);
+                            }
+                        } else {
+                            // Se for apenas a tecla ESC, passa para o editor.
+                            process_editor_input(active_jw->estado, ch, &should_exit);
+                        }
+                    } else {
+                        // Se for qualquer outra tecla, passa para o editor.
+                        process_editor_input(active_jw->estado, ch, &should_exit);
+                    }
+                }
+            }
+            // ===================================================================
+            // LÓGICA DE ENTRADA PARA JANELA DE TERMINAL
+            // ===================================================================
+            else if (active_jw->tipo == TIPOJANELA_TERMINAL && active_jw->pty_fd != -1) {
+                keypad(stdscr, FALSE);
+                
+                char input_buf[256];
+                ssize_t len = read(STDIN_FILENO, input_buf, sizeof(input_buf));
+                
+                keypad(stdscr, TRUE);
+
+                if (len > 0) {
+                    // (O resto da lógica para checar atalhos globais e enviar para o terminal continua igual)
+                    bool atalho_consumido = false;
+                    if (len == 2 && input_buf[0] == 27) {
+                        if (!handle_global_shortcut(input_buf[1], &should_exit)) {
+                            write(active_jw->pty_fd, input_buf, len);
+                        }
+                    } else {
+                        write(active_jw->pty_fd, input_buf, len);
+                    }
+                }
+            }
+        }
+
+        for (int i = 0; i < gerenciador_workspaces.num_workspaces; i++) {
+            GerenciadorJanelas *ws = gerenciador_workspaces.workspaces[i];
+            for (int j = 0; j < ws->num_janelas; j++) {
+                JanelaEditor *jw = ws->janelas[j];
+                if (jw->tipo == TIPOJANELA_TERMINAL && jw->pty_fd != -1 && FD_ISSET(jw->pty_fd, &readfds)) {
+                    char buffer[4096];
+                    ssize_t bytes_lidos = read(jw->pty_fd, buffer, sizeof(buffer));
+                    if (bytes_lidos > 0) {
+                        vterm_render(jw->vterm, buffer, bytes_lidos);
+                    } else {
+                        close(jw->pty_fd);
+                        jw->pty_fd = -1;
+                        jw->pid = -1;
+                        // MUDANÇA: Convertemos a janela para um editor "morto"
+                        // A limpeza do vterm (vterm_free) será feita ao fechar a janela.
+                        jw->tipo = TIPOJANELA_EDITOR; 
+                        
+                        jw->estado = calloc(1, sizeof(EditorState));
+                        if (jw->estado) {
+                            jw->estado->num_lines = 1;
+                            jw->estado->lines[0] = strdup("[Processo finalizado. Pressione Alt+X para fechar]");
+                            strcpy(jw->estado->filename, "[Terminal Output]");
+                        }
+                    }
+                }
+            }
+        }
+
+        int status;
+        while (waitpid(-1, &status, WNOHANG) > 0);
+    }
+    
     for (int i = 0; i < gerenciador_workspaces.num_workspaces; i++) {
         free_workspace(gerenciador_workspaces.workspaces[i]);
     }
     free(gerenciador_workspaces.workspaces);
-       
+        
     stop_and_log_work();
     endwin(); 
     return 0;

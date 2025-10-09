@@ -3,8 +3,8 @@
 # --- Configuração do Compilador ---
 CC = gcc
 # Adicionado -I./a2_files para encontrar os headers do a2
-CFLAGS = -g -Wall -Wextra -I. -I./a2_files -I../include
-LDFLAGS = -lncursesw -ljansson -lm -lcurl -lpthread -ldl -lssl -lcrypto
+CFLAGS = -g -Wall -Wextra -I. -I./a2_files -I../include -I/usr/local/include
+LDFLAGS = -lncursesw -ljansson -lcurl -lpthread -ldl -lssl -lcrypto -lvterm -lm 
 
 # --- Alvos Principais ---
 TARGETS = a2 jntd
