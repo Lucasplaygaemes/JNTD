@@ -27,4 +27,6 @@ void process_lsp_symbols(EditorState *state);
 // Utility function
 void get_word_at_cursor(EditorState *state, char *buffer, size_t buffer_size);
 
+void executar_comando_no_terminal(const char *comando_str);
+
 #endif // COMMAND_EXECUTION_H

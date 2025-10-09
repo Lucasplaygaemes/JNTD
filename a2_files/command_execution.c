@@ -111,7 +111,10 @@ void process_command(EditorState *state, bool *should_exit) {
         else {
             snprintf(state->status_msg, sizeof(state->status_msg), "Argumento desconhecido para set: %s", args);
         }
-    
+        
+    } else if (strcmp(command, "term") == 0) {
+        executar_comando_no_terminal(args);
+        
       // Comandos LSP
     } else if (strncmp(command, "lsp-restart", 11) == 0) {
           process_lsp_restart(state);
