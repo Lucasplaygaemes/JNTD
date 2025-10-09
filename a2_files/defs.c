@@ -4,3 +4,4 @@
 GerenciadorWorkspaces gerenciador_workspaces;
 char executable_dir[PATH_MAX] = {0};
 char* global_yank_register = NULL;
+

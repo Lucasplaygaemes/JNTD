@@ -11,6 +11,7 @@
 #include <stdbool.h>
 #include <time.h>
 #include <jansson.h>
+#include <vterm.h>
 
 #ifndef max
 #define max(a, b) ((a) > (b) ? (a) : (b))
@@ -58,6 +59,12 @@ typedef struct {
     json_t *error;
 } LspMessage;
 #endif
+
+typedef enum {
+    TIPOJANELA_EDITOR,
+    TIPOJANELA_TERMINAL
+} TipoJanela;
+
 
 #ifndef EDITORMODE_DEFINED
 #define EDITORMODE_DEFINED
@@ -254,20 +261,28 @@ typedef struct EditorState {
     int lsp_init_retries;
     FileInfo **recent_files;
     int num_recent_files;
+
 } EditorState;
 #endif
 
 #ifndef JANELA_EDITOR_DEFINED
 #define JANELA_EDITOR_DEFINED
 typedef struct JanelaEditor {
-    EditorState *estado;
     WINDOW *win;
     int y, x, altura, largura;
+    TipoJanela tipo;
+
+    EditorState *estado; // Usado apenas por TIPOJANELA_EDITOR
+
+    int pty_fd;          // Usado apenas por TIPOJANELA_TERMINAL
+    pid_t pid;           // Usado apenas por TIPOJANELA_TERMINAL
+    vterm_t *vterm;      // O único campo da libvterm que precisamos!
 } JanelaEditor;
 #endif
 
 #ifndef LAYOUT_MODE_DEFINED
 #define LAYOUT_MODE_DEFINED
+
 typedef enum {
     LAYOUT_VERTICAL_SPLIT,
     LAYOUT_HORIZONTAL_SPLIT,
