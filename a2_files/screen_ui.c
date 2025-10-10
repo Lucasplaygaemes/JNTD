@@ -545,6 +545,7 @@ void editor_redraw(WINDOW *win, EditorState *state) {
 
 
 void adjust_viewport(WINDOW *win, EditorState *state) {
+    ensure_cursor_in_bounds(state);
     int rows, cols;
     getmaxyx(win, rows, cols);
     
