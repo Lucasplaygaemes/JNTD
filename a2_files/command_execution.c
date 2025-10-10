@@ -113,7 +113,7 @@ void process_command(EditorState *state, bool *should_exit) {
         }
         
     } else if (strcmp(command, "term") == 0) {
-        executar_comando_no_terminal(args);
+        executar_comando_em_novo_workspace(args);
         
       // Comandos LSP
     } else if (strncmp(command, "lsp-restart", 11) == 0) {

@@ -257,6 +257,21 @@ void display_directory_navigator(EditorState *state) {
             case '/':
                 search_mode = true;
                 break;
+            case KEY_RESIZE:
+                getmaxyx(stdscr, rows, cols);
+                win_h = max(state->num_recent_dirs + 4, 10);
+                win_h = min(win_h, rows - 4);
+                win_w = cols - 10;
+                if (win_w < 50) win_w = 50;
+                win_y = (rows - win_h) / 2;
+                win_x = (cols - win_w) / 2;
+
+                wresize(nav_win, win_h, win_w);
+                mvwin(nav_win, win_y, win_x);
+
+                touchwin(stdscr);
+                redesenhar_todas_as_janelas();
+                break;
             case KEY_UP:
                 if (current_selection > 0) {
                     current_selection--;

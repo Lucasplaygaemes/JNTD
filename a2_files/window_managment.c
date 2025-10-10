@@ -444,6 +444,41 @@ void executar_comando_no_terminal(const char *comando_str) {
     free(argv);
 }
 
+void executar_comando_em_novo_workspace(const char *comando_str) {
+    criar_novo_workspace_vazio();
+
+    if (strlen(comando_str) == 0) {
+        char *const cmd[] = {"/bin/bash", NULL};
+        criar_janela_terminal_generica(cmd);
+        return;
+    }
+
+    char *str_copia = strdup(comando_str);
+    if (!str_copia) return;
+
+    char **argv = NULL;
+    int argc = 0;
+    
+    char *token = strtok(str_copia, " ");
+    while (token != NULL) {
+        argc++;
+        argv = realloc(argv, sizeof(char*) * argc);
+        argv[argc - 1] = token;
+        token = strtok(NULL, " ");
+    }
+
+    argc++;
+    argv = realloc(argv, sizeof(char*) * argc);
+    argv[argc - 1] = NULL;
+
+    if (argv) {
+        criar_janela_terminal_generica(argv);
+    }
+
+    free(str_copia);
+    free(argv);
+}
+
 void free_workspace(GerenciadorJanelas *ws) {
     if (!ws) return;
     for (int i = 0; i < ws->num_janelas; i++) {
@@ -752,6 +787,20 @@ void display_recent_files() {
                     search_mode = true;
                     curs_set(1);
                 }
+                break;
+            case KEY_RESIZE:
+                getmaxyx(stdscr, rows, cols);
+                win_h = min(20, rows - 4);
+                win_w = cols / 2;
+                if (win_w < 60) win_w = 60;
+                win_y = (rows - win_h) / 2;
+                win_x = (cols - win_w) / 2;
+
+                wresize(switcher_win, win_h, win_w);
+                mvwin(switcher_win, win_y, win_x);
+
+                touchwin(stdscr);
+                redesenhar_todas_as_janelas();
                 break;
             case KEY_UP: case 'k':
                 if (current_selection > 0) current_selection--;
