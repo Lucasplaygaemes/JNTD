@@ -49,7 +49,3 @@ I'm going to add a new file, soon, called documentation. Why's that? Simple, the
 
 # Tip's?
 I would be really gratefull if you want to improve the code, it's always open to commits. and if you want you can contact me via my email. My email is lucasmoura27271@gmail.com, and if you need to say something with me, we can chat by email.
-
-# Readme?
-As you may notice, the README file is getting big, and i can't list every new thing neither any changes that i will make in this code.
-So i will add a new file, Features, and the name again is selfexplanatory. When a big update or change be made, it will be showed in README for 5~10 days in maximum. In the features file will have all that already is on the readme, and what's not.
