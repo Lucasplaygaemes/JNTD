@@ -495,7 +495,9 @@ void redesenhar_todas_as_janelas() {
 
     if (gerenciador_workspaces.num_workspaces == 0) return;
 
-    GerenciadorJanelas *ws = ACTIVE_WS;
+    GerenciadorJanelas *ws = ACTIVE_WS;    
+
+    // 1. Desenha todas as janelas principais primeiro
     for (int i = 0; i < ws->num_janelas; i++) {
         JanelaEditor *jw = ws->janelas[i];
         if (jw) {
@@ -517,7 +519,24 @@ void redesenhar_todas_as_janelas() {
             wnoutrefresh(jw->win);
         }
     }
-    
+
+    // 2. Agora, desenha o popup de diagnóstico por cima da janela ativa
+    if (ws->num_janelas > 0) {
+        JanelaEditor *active_jw = ws->janelas[ws->janela_ativa_idx];
+        if (active_jw->tipo == TIPOJANELA_EDITOR && active_jw->estado) {
+            EditorState *state = active_jw->estado;
+            if (state->lsp_enabled) {
+                LspDiagnostic *diag = get_diagnostic_under_cursor(state);
+                if (diag) {
+                    draw_diagnostic_popup(active_jw->win, state, diag->message);
+                }
+            }
+        }
+    }
+
+    // 3. Posiciona o cursor e atualiza a tela física
+    posicionar_cursor_ativo();
+    doupdate();
 }
 
 void posicionar_cursor_ativo() {
@@ -525,7 +544,6 @@ void posicionar_cursor_ativo() {
         curs_set(0);
         return;
     }
-
 
     GerenciadorJanelas *ws = ACTIVE_WS;
     if (ws->num_janelas == 0) { curs_set(0); return; };
@@ -569,9 +587,8 @@ void posicionar_cursor_ativo() {
             }
         }
     }
-    wrefresh(active_jw->win);
+    wnoutrefresh(active_jw->win);
 }
-
 
 void proxima_janela() {
     GerenciadorJanelas *ws = ACTIVE_WS;

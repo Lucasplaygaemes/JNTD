@@ -205,10 +205,7 @@ void draw_diagnostic_popup(WINDOW *main_win, EditorState *state, const char *mes
 
 
 void editor_redraw(WINDOW *win, EditorState *state) {
-    if (state->diagnostic_popup) {
-        delwin(state->diagnostic_popup);
-        state->diagnostic_popup = NULL;
-    }
+    // A limpeza do popup foi movida para redesenhar_todas_as_janelas() para evitar que seja apagado prematuramente.
 
     if (state->buffer_modified) {
         editor_find_unmatched_brackets(state);
@@ -369,7 +366,7 @@ void editor_redraw(WINDOW *win, EditorState *state) {
                                     if (start_x >= 1) mvwaddch(win, y_pos, start_x - 1, '[');
                                     wattroff(win, COLOR_PAIR(color_pair));
 
-                                    mvwchgat(win, y_pos, start_x, (end_x - start_x) + 1, A_UNDERLINE, color_pair, NULL);
+                                    mvwchgat(win, y_pos, start_x, (end_x - start_x), A_UNDERLINE, color_pair, NULL);
 
                                     wattron(win, COLOR_PAIR(color_pair));
                                     if (end_x < cols - 1) mvwaddch(win, y_pos, end_x + 1, ']');
@@ -475,7 +472,7 @@ void editor_redraw(WINDOW *win, EditorState *state) {
                             if (start_x > border_offset) mvwaddch(win, y_pos, start_x - 1, '[');
                             wattroff(win, COLOR_PAIR(color_pair));
 
-                            mvwchgat(win, y_pos, start_x, (end_x - start_x) + 1, A_UNDERLINE, color_pair, NULL);
+                            mvwchgat(win, y_pos, start_x, (end_x - start_x), A_UNDERLINE, color_pair, NULL);
 
                             wattron(win, COLOR_PAIR(color_pair));
                             if (end_x < cols - 1 - border_offset) mvwaddch(win, y_pos, end_x + 1, ']');
@@ -526,10 +523,11 @@ void editor_redraw(WINDOW *win, EditorState *state) {
         display_filename[sizeof(display_filename) - 1] = '\0'; 
         int visual_col = get_visual_col(state->lines[state->current_line], state->current_col);
         
+        int diag_count = (state->lsp_document) ? state->lsp_document->diagnostics_count : -1;
         char final_bar[cols + 1];
-        snprintf(final_bar, sizeof(final_bar), "WS %d | %s | %s%s | %s | Line %d/%d, Col %d", 
+        snprintf(final_bar, sizeof(final_bar), "WS %d | %s | %s%s | Diags: %d | %s | Line %d/%d, Col %d", 
             gerenciador_workspaces.workspace_ativo_idx + 1, mode_str, display_filename, state->buffer_modified ? "*" : "", 
-            state->status_msg, state->current_line + 1, state->num_lines, visual_col + 1);
+            diag_count, state->status_msg, state->current_line + 1, state->num_lines, visual_col + 1);
 
         mvwprintw(win, rows - 1, 1, "%.*s", cols - 2, final_bar);
     }
