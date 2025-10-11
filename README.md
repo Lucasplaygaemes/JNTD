@@ -1,14 +1,23 @@
-# JNTD!
+# 🚀 JNTD
 "Just Need To Do", or JNTD is a code where you do, what you need to do, every other problematic or slow thing, let it to JNTD.
 This is a simple code where you can automate commands and other tasks in your system.
 The objective of this code is let me integrate my own LLM with my system, i haven't finished it yet, but i'm already making the preaparations when i finished her.
 
-# How to use?
+### How to use?
 There's no such thing as "right way to use". Because you can automate things when and how you want, but you should make changes on it according to your needings. There are pre defined commands that you can see on the help part, you can change the code by yourself, have a good idea, want it on the code? make a submission and if it's good, i merge it.
 
-# How it work's?
+### How it work's?
 The code access the Ollama via bash, the 2B it's trained to know how and what to respond when it's questioned within the terminal, it's has been trained in a personalized dataset, that's has previous commands and interactions between she and the user and the terminal. Ex: make an .txt file that has the firts 50 firts numbers from fibonacci sequence, and it's done.
 I want in the next updates make she possible to make complex interactions with the terminal, and codes, she may be possible to execute codes, and test them by herself, so she will have the possibility to know, where, why, and how a bug it's happening, she will also be able to search for directorys that may have a bug, when something is missing.
+
+## 📦 Installation!
+Clone the Repository with
+```bash
+git clone https://github.com/Lucasplaygaemes/JNTD
+```
+Then, install it with
+
+
 
 # a2
 a2 is being my main project for a while, about 4 months straight, and will probably be for a lot more.
