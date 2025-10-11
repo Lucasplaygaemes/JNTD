@@ -1,4 +1,4 @@
-# 🚀 JNTD
+# JNTD
 "Just Need To Do", or JNTD is a code where you do, what you need to do, every other problematic or slow thing, let it to JNTD.
 This is a simple code where you can automate commands and other tasks in your system.
 The objective of this code is let me integrate my own LLM with my system, i haven't finished it yet, but i'm already making the preaparations when i finished her.
@@ -10,17 +10,17 @@ There's no such thing as "right way to use". Because you can automate things whe
 The code access the Ollama via bash, the 2B it's trained to know how and what to respond when it's questioned within the terminal, it's has been trained in a personalized dataset, that's has previous commands and interactions between she and the user and the terminal. Ex: make an .txt file that has the firts 50 firts numbers from fibonacci sequence, and it's done.
 I want in the next updates make she possible to make complex interactions with the terminal, and codes, she may be possible to execute codes, and test them by herself, so she will have the possibility to know, where, why, and how a bug it's happening, she will also be able to search for directorys that may have a bug, when something is missing.
 
-## 📦 Installation!
+## Installation!
 Clone the Repository with
 ```bash
 git clone https://github.com/Lucasplaygaemes/JNTD
 ```
-Then, install it with
-
-
-
-# a2
-a2 is being my main project for a while, about 4 months straight, and will probably be for a lot more.
+Then, install the dependencys and run Make with
+```bash
+./install.sh
+```
+## a2
+A2 is being my main project for a while, about 4 months straight, and will probably be for a lot more.
 Because how the things are going, a2 will be my main project, i will seperate them one from the another, but not for now i guess. Still deciding.
 A image of how the a2 is, but remember that it will probably be different for almost everyone, the color's in specfic are because of the terminal theme, it's tokyo night if i'm not mistaken.
 <img width="1919" height="1001" alt="image" src="https://github.com/user-attachments/assets/95da6f40-4294-4162-ac84-5be7ac8bb000" />
