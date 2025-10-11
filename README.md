@@ -19,7 +19,7 @@ Then, install the dependencys and run Make with
 ```bash
 ./install.sh
 ```
-## a2
+## A2
 A2 is being my main project for a while, about 4 months straight, and will probably be for a lot more.
 Because how the things are going, a2 will be my main project, i will seperate them one from the another, but not for now i guess. Still deciding.
 A image of how the a2 is, but remember that it will probably be different for almost everyone, the color's in specfic are because of the terminal theme, it's tokyo night if i'm not mistaken.
