@@ -31,8 +31,7 @@ A image of how the a2 is, but remember that it will probably be different for al
 Documentation is in - [**Documentation**](./index.md)
 # New Release!
 A lot of things were added! So, any doubt's of keyboard shortcuts? :ksc show all of them.
-Now there is the gdb "mode", if you start gdb, it process take over the a2, and a2 is "killed" until he closes, after that you can use a2 again.
-Most of the bugs were corrected, and if any bug is not, should be reported!
+Now you can run if not any, most of the termial apps and a terminal by it self insede a2!
 
 # Issues!
 I'm already doing it, and from now on i will add issues always i have a bug or something i need to fix, to improve terminal workflow, i'm using gh and git, because yet gh don't replace git for me.
