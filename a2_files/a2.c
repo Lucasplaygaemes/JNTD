@@ -11,7 +11,7 @@
 #include <libgen.h> // For dirname()
 #include <limits.h> // For PATH_MAX
 #include <unistd.h> // For getcwd()
-#include <errno.h>      // Para a variável errno
+#include <errno.h>      // For the errno variable
 #include <locale.h>
 #include <sys/select.h>
 #include <sys/wait.h> 
@@ -19,7 +19,7 @@
 const int ansi_to_ncurses_map[16] = {
     COLOR_BLACK, COLOR_RED, COLOR_GREEN, COLOR_YELLOW,
     COLOR_BLUE, COLOR_MAGENTA, COLOR_CYAN, COLOR_WHITE,
-    COLOR_BLACK,   // Bright Black (geralmente cinza)
+    COLOR_BLACK,   // Bright Black (usually gray)
     COLOR_RED,     // Bright Red
     COLOR_GREEN,   // Bright Green
     COLOR_YELLOW,  // Bright Yellow
@@ -35,11 +35,11 @@ void inicializar_ncurses() {
     set_escdelay(25);
     start_color();
     
-    // CORREÇÃO: Substitui use_default_colors() pela solução robusta
-    // Diz à ncurses para mapear as cores padrão do terminal para COLOR_WHITE e COLOR_BLACK
+    // FIX: Replaces use_default_colors() with a robust solution
+    // Tells ncurses to map the terminal's default colors to COLOR_WHITE and COLOR_BLACK
     assume_default_colors(COLOR_WHITE, COLOR_BLACK);
 
-    // Pares de cores do editor (agora usarão COLOR_BLACK como fundo "transparente")
+    // Editor color pairs (will now use COLOR_BLACK as a "transparent" background)
     init_pair(1, COLOR_BLACK, COLOR_BLUE);
     init_pair(2, COLOR_YELLOW, COLOR_BLACK);
     init_pair(3, COLOR_YELLOW, COLOR_BLACK);
@@ -47,13 +47,13 @@ void inicializar_ncurses() {
     init_pair(5, COLOR_BLUE, COLOR_BLACK);
     init_pair(6, COLOR_CYAN, COLOR_BLACK);
     init_pair(7, COLOR_MAGENTA, COLOR_BLACK);
-    init_pair(8, COLOR_WHITE, COLOR_BLACK); // Par padrão: texto branco, fundo transparente
+    init_pair(8, COLOR_WHITE, COLOR_BLACK); // Default pair: white text, transparent background
     init_pair(9, COLOR_BLACK, COLOR_MAGENTA);
     init_pair(10, COLOR_GREEN, COLOR_BLACK);
     init_pair(11, COLOR_RED, COLOR_BLACK);
     init_pair(12, COLOR_BLACK, COLOR_YELLOW);
 
-    // Pares de cores para o terminal (também usarão o fundo "transparente")
+    // Color pairs for the terminal (will also use the "transparent" background)
     for (int i = 0; i < 16; i++) {
         init_pair(16 + i, ansi_to_ncurses_map[i], COLOR_BLACK);
     }
@@ -82,7 +82,7 @@ void process_editor_input(EditorState *state, wint_t ch, bool *should_exit) {
                 if (state->selected_suggestion < state->completion_scroll_top) {
                     state->completion_scroll_top = state->selected_suggestion;
                 }
-                return; // Usa return para não processar mais nada
+                return; // Use return to prevent further processing
             case ' ':
             case KEY_DOWN:
                 state->selected_suggestion++;
@@ -102,7 +102,7 @@ void process_editor_input(EditorState *state, wint_t ch, bool *should_exit) {
                 return;
             default: 
                 editor_end_completion(state);
-                // Deixa o resto da função processar a tecla
+                // Let the rest of the function process the key
                 break;
         }
     }
@@ -112,7 +112,7 @@ void process_editor_input(EditorState *state, wint_t ch, bool *should_exit) {
         int next_ch = wgetch(active_win);
         nodelay(active_win, FALSE);
 
-        if (next_ch == ERR) { // Apenas ESC
+        if (next_ch == ERR) { // Just ESC
              if (state->mode == INSERT || state->mode == VISUAL) {
                 state->mode = NORMAL;
             }
@@ -122,7 +122,7 @@ void process_editor_input(EditorState *state, wint_t ch, bool *should_exit) {
                  state->move_register = NULL;
                  snprintf(state->status_msg, sizeof(state->status_msg), "Move cancelled.");
              }
-        } else { // Sequência com Alt
+        } else { // Alt sequence
             if (next_ch == 'n') ciclar_workspaces(-1);
             else if (next_ch == 'm') ciclar_workspaces(1);
             else if (next_ch == '\n' || next_ch == KEY_ENTER) criar_nova_janela(NULL);
@@ -154,7 +154,7 @@ void process_editor_input(EditorState *state, wint_t ch, bool *should_exit) {
                 }
             }
         }
-        return; // Termina o processamento aqui
+        return; // End processing here
     }
 
     if (ch == KEY_CTRL_W) {
@@ -364,27 +364,27 @@ void process_editor_input(EditorState *state, wint_t ch, bool *should_exit) {
 
 bool handle_global_shortcut(int ch, bool *should_exit) {
     switch (ch) {
-        // --- Atalhos de Workspace ---
+        // --- Workspace Shortcuts ---
         case 'n':
         case 'm':
             ciclar_workspaces(ch == 'm' ? 1 : -1);
-            return true; // Atalho consumido
+            return true; // Shortcut consumed
 
-        // --- Atalhos de Janela ---
+        // --- Window Shortcuts ---
         case 'x':
         case 'X':
             fechar_janela_ativa(should_exit);
-            return true; // Atalho consumido
+            return true; // Shortcut consumed
             
         case '\n':
         case KEY_ENTER:
             criar_nova_janela(NULL);
-            return true; // Atalho consumido
+            return true; // Shortcut consumed
         
-        // Adicione outros atalhos com Alt que devem funcionar em qualquer lugar AQUI
+        // Add other global Alt shortcuts HERE
 
         default:
-            return false; // Não era um atalho global, então a janela ativa deve tratar
+            return false; // Not a global shortcut, so the active window should handle it
     }
 }
 int main(int argc, char *argv[]) {
@@ -452,7 +452,7 @@ int main(int argc, char *argv[]) {
         FD_SET(STDIN_FILENO, &readfds);
         int max_fd = STDIN_FILENO;
 
-        // Adiciona FDs de terminais e LSP ao conjunto do select
+        // Add terminal and LSP FDs to the select set
         for (int i = 0; i < gerenciador_workspaces.num_workspaces; i++) {
             GerenciadorJanelas *ws = gerenciador_workspaces.workspaces[i];
             for (int j = 0; j < ws->num_janelas; j++) {
@@ -467,7 +467,7 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        // Usa um timeout para tornar o loop não-bloqueante
+        // Use a timeout to make the loop non-blocking
         struct timeval timeout;
         timeout.tv_sec = 0;
         timeout.tv_usec = 50000; // 50ms
@@ -479,7 +479,7 @@ int main(int argc, char *argv[]) {
             continue;
         }
 
-        // Processa a entrada do teclado
+        // Process keyboard input
         if (FD_ISSET(STDIN_FILENO, &readfds)) {
             JanelaEditor *active_jw = ACTIVE_WS->janelas[ACTIVE_WS->janela_ativa_idx];
             if (active_jw->tipo == TIPOJANELA_EDITOR) {
@@ -492,7 +492,7 @@ int main(int argc, char *argv[]) {
                 ssize_t len = read(STDIN_FILENO, input_buf, sizeof(input_buf));
                 if (len > 0) {
                     bool atalho_consumido = false;
-                    if (len == 2 && input_buf[0] == 27) { // Checa por Alt + tecla
+                    if (len == 2 && input_buf[0] == 27) { // Check for Alt + key
                         if (handle_global_shortcut(input_buf[1], &should_exit)) {
                             atalho_consumido = true;
                         }
@@ -504,12 +504,12 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        // Processa a saída dos terminais e do LSP
+        // Process terminal and LSP output
         for (int i = 0; i < gerenciador_workspaces.num_workspaces; i++) {
             GerenciadorJanelas *ws = gerenciador_workspaces.workspaces[i];
             for (int j = 0; j < ws->num_janelas; j++) {
                 JanelaEditor *jw = ws->janelas[j];
-                // Processa saída do terminal
+                // Process terminal output
                 if (jw->tipo == TIPOJANELA_TERMINAL && jw->pty_fd != -1 && FD_ISSET(jw->pty_fd, &readfds)) {
                     char buffer[4096];
                     ssize_t bytes_lidos = read(jw->pty_fd, buffer, sizeof(buffer) - 1);
@@ -517,7 +517,7 @@ int main(int argc, char *argv[]) {
                         buffer[bytes_lidos] = '\0';
                         vterm_render(jw->vterm, buffer, bytes_lidos);
                     } else {
-                        // Processo do terminal terminou, converte para janela de editor "morta"
+                        // Terminal process finished, convert to a "dead" editor window
                         close(jw->pty_fd);
                         jw->pty_fd = -1;
                         waitpid(jw->pid, NULL, 0);
@@ -531,7 +531,7 @@ int main(int argc, char *argv[]) {
                         }
                     }
                 }
-                // Processa saída do LSP
+                // Process LSP output
                 else if (jw->tipo == TIPOJANELA_EDITOR && jw->estado && jw->estado->lsp_client && jw->estado->lsp_client->stdout_fd != -1 && FD_ISSET(jw->estado->lsp_client->stdout_fd, &readfds)) {
                     char buffer[4096];
                     ssize_t bytes_lidos = read(jw->estado->lsp_client->stdout_fd, buffer, sizeof(buffer) - 1);
@@ -543,7 +543,7 @@ int main(int argc, char *argv[]) {
             }
         }
         
-        // Checa periodicamente por processos mortos
+        // Periodically check for dead processes
         if (check_counter++ % 10 == 0) {
              int status;
              while (waitpid(-1, &status, WNOHANG) > 0);
