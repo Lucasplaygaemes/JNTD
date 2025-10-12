@@ -62,7 +62,7 @@ void load_file_core(EditorState *state, const char *filename) {
 
     char absolute_path[PATH_MAX];
     if (realpath(filename, absolute_path) == NULL) {
-        // Se realpath falhar, use o filename original
+        // If realpath fails, use the original filename
         strncpy(absolute_path, filename, PATH_MAX - 1);
         absolute_path[PATH_MAX - 1] = '\0';
     }
@@ -225,14 +225,14 @@ void check_external_modification(EditorState *state) {
         }
 
         if (decision) {
-            // Força o recarregamento do arquivo do disco
+            // Force reloading the file from disk
             load_file_core(state, state->filename);
             const char* syntax_file = get_syntax_file_from_extension(state->filename);
             load_syntax_file(state, syntax_file);
             snprintf(state->status_msg, sizeof(state->status_msg), "File reloaded from disk.");
         } else {
-            // Se o usuário escolher "não", apenas atualizamos o tempo de modificação
-            // para não perguntar novamente, mantendo a versão em memória.
+            // If the user chooses "no", we just update the modification time
+            // to avoid asking again, keeping the in-memory version.
             state->last_file_mod_time = on_disk_mod_time;
             snprintf(state->status_msg, sizeof(state->status_msg), "Reload cancelled. In-memory version kept.");
         }
@@ -248,19 +248,19 @@ void editor_reload_file(EditorState *state) {
     time_t on_disk_mod_time = get_file_mod_time(state->filename);
     
     if (state->buffer_modified && on_disk_mod_time != 0 && on_disk_mod_time != state->last_file_mod_time) {
-        // Usar mensagem de status em vez de diálogo interativo
+        // Use status message instead of interactive dialog
         snprintf(state->status_msg, sizeof(state->status_msg), 
                  "Warning: File changed on disk! Use :rc! to force reload.");
         return;
     }
     
-    // Recarregar o arquivo normalmente
+    // Reload the file normally
     load_file(state, state->filename);
     snprintf(state->status_msg, sizeof(state->status_msg), "File reloaded.");
 }
 
 void load_syntax_file(EditorState *state, const char *filename) {
-    // Limpa as regras de sintaxe existentes antes de carregar novas
+    // Clear existing syntax rules before loading new ones
     if (state->syntax_rules) {
         for (int i = 0; i < state->num_syntax_rules; i++) {
             free(state->syntax_rules[i].word);
@@ -288,7 +288,7 @@ void load_syntax_file(EditorState *state, const char *filename) {
         // Fallback to current directory if not found in syntaxes/
         file = fopen(filename, "r");
         if (!file) {
-            snprintf(state->status_msg, sizeof(state->status_msg), "Erro: sintaxe '%s' nao encontrada.", filename);
+            snprintf(state->status_msg, sizeof(state->status_msg), "Error: syntax '%s' not found.", filename);
             return;
         }
     }
@@ -359,7 +359,7 @@ FileRecoveryChoice display_recovery_prompt(WINDOW *parent_win, EditorState *stat
     int rows, cols;
     getmaxyx(parent_win, rows, cols);
     
-    // Criar uma janela de diálogo
+    // Create a dialog window
     int win_height = 7;
     int win_width = 50;
     int start_y = (rows - win_height) / 2;
@@ -370,9 +370,9 @@ FileRecoveryChoice display_recovery_prompt(WINDOW *parent_win, EditorState *stat
     wbkgd(dialog_win, COLOR_PAIR(9));
     box(dialog_win, 0, 0);
     
-    // Exibir mensagem
-    mvwprintw(dialog_win, 1, 2, "Arquivo de recuperação encontrado!");
-    mvwprintw(dialog_win, 2, 2, "Escolha uma opção:");
+    // Display message
+    mvwprintw(dialog_win, 1, 2, "Recovery file found!");
+    mvwprintw(dialog_win, 2, 2, "Choose an option:");
     mvwprintw(dialog_win, 3, 4, "(R)ecover from .sv");
     mvwprintw(dialog_win, 4, 4, "(O)pen original");
     mvwprintw(dialog_win, 5, 4, "(D)iff files");
@@ -411,7 +411,7 @@ void handle_file_recovery(EditorState *state, const char *original_filename, con
             case RECOVER_DIFF: {
                 char diff_command[1024];
                 snprintf(diff_command, sizeof(diff_command), "git diff --no-index -- %s %s", original_filename, sv_filename);
-                run_and_display_command(diff_command, "--- DIFERENÇAS ---");
+                run_and_display_command(diff_command, "--- DIFFERENCES ---");
                 break; 
             }
             case RECOVER_FROM_SV:
@@ -419,18 +419,18 @@ void handle_file_recovery(EditorState *state, const char *original_filename, con
                 strncpy(state->filename, original_filename, sizeof(state->filename) - 1);
                 state->buffer_modified = true;
                 remove(sv_filename);
-                snprintf(state->status_msg, sizeof(state->status_msg), "Recuperado de %s. Salve para confirmar.", sv_filename);
+                snprintf(state->status_msg, sizeof(state->status_msg), "Recovered from %s. Save to confirm.", sv_filename);
                 return;
 
             case RECOVER_OPEN_ORIGINAL:
                 remove(sv_filename);
                 load_file_core(state, original_filename);
-                snprintf(state->status_msg, sizeof(state->status_msg), "Arquivo de recuperação ignorado e removido.");
+                snprintf(state->status_msg, sizeof(state->status_msg), "Recovery file ignored and removed.");
                 return;
 
             case RECOVER_IGNORE:
                 load_file_core(state, original_filename);
-                snprintf(state->status_msg, sizeof(state->status_msg), "Arquivo de recuperação mantido.");
+                snprintf(state->status_msg, sizeof(state->status_msg), "Recovery file kept.");
                 return;
 
             case RECOVER_ABORT:
