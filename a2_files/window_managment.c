@@ -20,7 +20,7 @@
 #include <vterm.h>
 
 
-#include <sys/select.h> // Para select() e fd_set
+#include <sys/select.h> // For select() and fd_set
 
 #define ACTIVE_WS (gerenciador_workspaces.workspaces[gerenciador_workspaces.workspace_ativo_idx])
 
@@ -48,19 +48,19 @@ void criar_janela_terminal_generica(char *const argv[]) {
     GerenciadorJanelas *ws = ACTIVE_WS;
     ws->num_janelas++;
     ws->janelas = realloc(ws->janelas, sizeof(JanelaEditor*) * ws->num_janelas);
-    if (!ws->janelas) { perror("realloc falhou"); ws->num_janelas--; exit(1); }
+    if (!ws->janelas) { perror("realloc failed"); ws->num_janelas--; exit(1); }
 
     JanelaEditor *jw = calloc(1, sizeof(JanelaEditor));
-    if (!jw) { perror("calloc falhou"); ws->num_janelas--; exit(1); }
+    if (!jw) { perror("calloc failed"); ws->num_janelas--; exit(1); }
     ws->janelas[ws->num_janelas - 1] = jw;
     ws->janela_ativa_idx = ws->num_janelas - 1;
 
-    // A lógica de forkpty continua igual...
+    // The forkpty logic remains the same...
     int master_fd;
     pid_t pid = forkpty(&master_fd, NULL, NULL, NULL);
 
     if (pid < 0) {
-        perror("forkpty falhou");
+        perror("forkpty failed");
         ws->num_janelas--; free(jw); return;
     }
     if (pid == 0) {
@@ -68,7 +68,7 @@ void criar_janela_terminal_generica(char *const argv[]) {
         exit(127);
     }
     
-    // Recalcular o layout ANTES de criar o vterm para ter o tamanho certo
+    // Recalculate the layout BEFORE creating the vterm to get the correct size
     recalcular_layout_janelas();
     
     jw->tipo = TIPOJANELA_TERMINAL;
@@ -76,14 +76,14 @@ void criar_janela_terminal_generica(char *const argv[]) {
     jw->pty_fd = master_fd;
     fcntl(master_fd, F_SETFL, O_NONBLOCK);
 
-    // MUDANÇA: Lógica de criação da vterm adaptada para a nova API
+    // CHANGE: vterm creation logic adapted for the new API
     int rows, cols;
     getmaxyx(jw->win, rows, cols);
     int border_offset = ws->num_janelas > 1 ? 1 : 0;
 
     jw->vterm = vterm_create(cols - 2 * border_offset, rows - 2 * border_offset, VTERM_FLAG_XTERM_256);
-    vterm_wnd_set(jw->vterm, jw->win); // Associa a WINDOW da ncurses
-    vterm_set_userptr(jw->vterm, jw);  // Associa nossos dados à instância
+    vterm_wnd_set(jw->vterm, jw->win); // Associates the ncurses WINDOW
+    vterm_set_userptr(jw->vterm, jw);  // Associates our data with the instance
 }
 
 
@@ -127,7 +127,7 @@ void free_janela_editor(JanelaEditor* jw) {
     } else if (jw->tipo == TIPOJANELA_TERMINAL) {
         if (jw->pid > 0) { kill(jw->pid, SIGKILL); waitpid(jw->pid, NULL, 0); }
         if (jw->pty_fd != -1) close(jw->pty_fd);
-        if (jw->vterm) vterm_destroy(jw->vterm); // Usa vterm_destroy
+        if (jw->vterm) vterm_destroy(jw->vterm); // Use vterm_destroy
     }
 
     if (jw->win) delwin(jw->win);
@@ -390,37 +390,37 @@ void recalcular_layout_janelas() {
         keypad(jw->win, TRUE);
         scrollok(jw->win, FALSE);
         
-        // Se for um terminal, precisamos redimensioná-lo
+        // If it's a terminal, we need to resize it
         if (jw->tipo == TIPOJANELA_TERMINAL && jw->vterm) {
             int border_offset = ws->num_janelas > 1 ? 1 : 0;
             int content_h = jw->altura - (2 * border_offset);
             int content_w = jw->largura - (2 * border_offset);
             
-            // CORREÇÃO: Usa vterm_resize, que é a função correta desta biblioteca
+            // FIX: Use vterm_resize, which is the correct function from this library
             vterm_resize(jw->vterm, content_w > 0 ? content_w : 1, content_h > 0 ? content_h : 1);
-            atualizar_tamanho_pty(jw); // Esta função continua importante
+            atualizar_tamanho_pty(jw); // This function remains important
         }
     }
 }
 
 
 void executar_comando_no_terminal(const char *comando_str) {
-    // Se nenhum comando for especificado, abre um shell padrão
+    // If no command is specified, open a default shell
     if (strlen(comando_str) == 0) {
         char *const cmd[] = {"/bin/bash", NULL};
         criar_janela_terminal_generica(cmd);
         return;
     }
 
-    // Cria uma cópia da string, pois strtok a modifica
+    // Create a copy of the string, as strtok modifies it
     char *str_copia = strdup(comando_str);
     if (!str_copia) return;
 
-    // Array para guardar os argumentos (ex: "btop", "--utf-force")
+    // Array to store the arguments (e.g., "btop", "--utf-force")
     char **argv = NULL;
     int argc = 0;
     
-    // Usa strtok para dividir a string em palavras (tokens) separadas por espaço
+    // Use strtok to split the string into words (tokens) separated by spaces
     char *token = strtok(str_copia, " ");
     while (token != NULL) {
         argc++;
@@ -429,17 +429,17 @@ void executar_comando_no_terminal(const char *comando_str) {
         token = strtok(NULL, " ");
     }
 
-    // Adiciona o NULL no final, que é obrigatório para a função execvp
+    // Add NULL at the end, which is required for the execvp function
     argc++;
     argv = realloc(argv, sizeof(char*) * argc);
     argv[argc - 1] = NULL;
 
-    // Chama a nossa função mágica que já está pronta!
+    // Call our magic function that is already prepared!
     if (argv) {
         criar_janela_terminal_generica(argv);
     }
 
-    // Libera a memória que alocamos
+    // Free the memory we allocated
     free(str_copia);
     free(argv);
 }
@@ -489,7 +489,7 @@ void free_workspace(GerenciadorJanelas *ws) {
 }
 
 void redesenhar_todas_as_janelas() {
-    // Apaga a tela virtual principal
+    // Clear the main virtual screen
     erase();
     wnoutrefresh(stdscr);
 
@@ -497,30 +497,30 @@ void redesenhar_todas_as_janelas() {
 
     GerenciadorJanelas *ws = ACTIVE_WS;    
 
-    // 1. Desenha todas as janelas principais primeiro
+    // 1. Draw all main windows first
     for (int i = 0; i < ws->num_janelas; i++) {
         JanelaEditor *jw = ws->janelas[i];
         if (jw) {
-            // Desenha a borda da janela
+            // Draw the window border
             if (ws->num_janelas > 1) {
                 wattron(jw->win, (i == ws->janela_ativa_idx) ? (COLOR_PAIR(3)|A_BOLD) : 0);
                 box(jw->win, 0, 0);
                 wattroff(jw->win, (i == ws->janela_ativa_idx) ? (COLOR_PAIR(3)|A_BOLD) : 0);
             }
             
-            // Prepara o conteúdo da janela para ser desenhado
+            // Prepare the window content to be drawn
             if (jw->tipo == TIPOJANELA_EDITOR && jw->estado) {
                 editor_redraw(jw->win, jw->estado);
             } else if (jw->tipo == TIPOJANELA_TERMINAL && jw->vterm) {
-                // Manda a libvterm redesenhar seu conteúdo na WINDOW associada.
+                // Tell libvterm to redraw its content in the associated WINDOW.
                 vterm_wnd_update(jw->vterm, -1, 0, VTERM_WND_RENDER_ALL);
             }
-            // Adiciona a janela à "fila" de redesenho
+            // Add the window to the redraw "queue"
             wnoutrefresh(jw->win);
         }
     }
 
-    // 2. Agora, desenha o popup de diagnóstico por cima da janela ativa
+    // 2. Now, draw the diagnostic popup on top of the active window
     if (ws->num_janelas > 0) {
         JanelaEditor *active_jw = ws->janelas[ws->janela_ativa_idx];
         if (active_jw->tipo == TIPOJANELA_EDITOR && active_jw->estado) {
@@ -534,7 +534,7 @@ void redesenhar_todas_as_janelas() {
         }
     }
 
-    // 3. Posiciona o cursor e atualiza a tela física
+    // 3. Position the cursor and update the physical screen
     posicionar_cursor_ativo();
     doupdate();
 }
@@ -550,22 +550,22 @@ void posicionar_cursor_ativo() {
 
     JanelaEditor* active_jw = ws->janelas[ACTIVE_WS->janela_ativa_idx];
     
-    // Se a janela for um terminal, a libvterm cuida do cursor. Não fazemos nada.
+    // If the window is a terminal, libvterm handles the cursor. We do nothing.
     if (active_jw->tipo == TIPOJANELA_TERMINAL) {
-        // A libvterm já posicionou o cursor durante o vterm_render ou vterm_wnd_update.
-        // Apenas garantimos que ele esteja visível se o processo estiver ativo.
+        // libvterm has already positioned the cursor during vterm_render or vterm_wnd_update.
+        // We just ensure it is visible if the process is active.
         curs_set(active_jw->pid != -1 ? 1 : 0);
     } 
-    // Se a janela for um editor, nós cuidamos do cursor manualmente.
+    // If the window is an editor, we handle the cursor manually.
     else if (active_jw->tipo == TIPOJANELA_EDITOR) {
         EditorState* state = active_jw->estado;
         if (!state) { curs_set(0); return; }
         
         WINDOW* win = active_jw->win;
         if (state->completion_mode != COMPLETION_NONE) {
-            editor_draw_completion_win(win, state); // Esconde o cursor principal
+            editor_draw_completion_win(win, state); // Hide the main cursor
         } else {
-            curs_set(1); // Liga o cursor
+            curs_set(1); // Turn on the cursor
             if (state->mode == COMMAND) {
                 int rows, cols;
                 getmaxyx(win, rows, cols);
@@ -919,7 +919,7 @@ void prompt_and_create_gdb_workspace() {
     int screen_rows, screen_cols;
     getmaxyx(stdscr, screen_rows, screen_cols);
 
-    // (O código para criar a janela de prompt e pegar o path_buffer continua o mesmo)
+    // (The code to create the prompt window and get the path_buffer remains the same)
     int win_h = 5;
     int win_w = screen_cols - 20;
     if (win_w < 50) win_w = 50;
@@ -944,10 +944,10 @@ void prompt_and_create_gdb_workspace() {
     redesenhar_todas_as_janelas();
 
     if (strlen(path_buffer) > 0) {
-        // 1. Cria um workspace novo e vazio
+        // 1. Create a new empty workspace
         criar_novo_workspace_vazio();
         
-        // 2. Adiciona uma única janela de terminal a este novo workspace
+        // 2. Add a single terminal window to this new workspace
         char *const cmd[] = {"gdb", "-tui", path_buffer, NULL};
         criar_janela_terminal_generica(cmd);
     }
@@ -1001,10 +1001,10 @@ void handle_gdb_session(int pty_fd, pid_t child_pid) {
 }
 
 void gf2_starter() {
-    // Esta função agora abre o 'gf2' em uma nova janela de terminal,
-    // em vez de congelar o editor.
-    // Você pode adicionar um prompt para o usuário digitar o nome do arquivo,
-    // ou passar um argumento fixo.
+    // This function now opens 'gf2' in a new terminal window,
+    // instead of freezing the editor.
+    // You can add a prompt for the user to type the filename,
+    // or pass a fixed argument.
     char *const cmd[] = {"gf2", NULL};
     criar_janela_terminal_generica(cmd);
 }
