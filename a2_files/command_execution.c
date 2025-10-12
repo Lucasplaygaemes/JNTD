@@ -3,7 +3,7 @@
 #include "fileio.h" // For save_file, load_file, get_syntax_file_from_extension, load_syntax_file
 #include "lsp_client.h" // For lsp_did_save, lsp_did_change
 #include "screen_ui.h" // For display_help_screen, display_output_screen
-#include "window_managment.h" // For fechar_janela_ativa
+#include "window_managment.h" // For closing the active window
 #include "others.h" // For trim_whitespace, display_work_summary
 #include "timer.h" // For display_work_summary
 
@@ -103,19 +103,19 @@ void process_command(EditorState *state, bool *should_exit) {
         }
         else if (strcmp(args, "wrap") == 0) {
             state->word_wrap_enabled = true;
-            snprintf(state->status_msg, sizeof(state->status_msg), "Word wrap ativado");
+            snprintf(state->status_msg, sizeof(state->status_msg), "Word wrap enabled");
         } else if (strcmp(args, "nowrap") == 0) {
             state->word_wrap_enabled = false;
-            snprintf(state->status_msg, sizeof(state->status_msg), "Word wrap desativado");
+            snprintf(state->status_msg, sizeof(state->status_msg), "Word wrap disabled");
         }
         else {
-            snprintf(state->status_msg, sizeof(state->status_msg), "Argumento desconhecido para set: %s", args);
+            snprintf(state->status_msg, sizeof(state->status_msg), "Unknown argument for set: %s", args);
         }
         
     } else if (strcmp(command, "term") == 0) {
         executar_comando_em_novo_workspace(args);
         
-      // Comandos LSP
+      // LSP Commands
     } else if (strncmp(command, "lsp-restart", 11) == 0) {
           process_lsp_restart(state);
       
@@ -129,12 +129,12 @@ void process_command(EditorState *state, bool *should_exit) {
           process_lsp_references(state);
       
     } else if (strncmp(command, "lsp-rename", 10) == 0) {
-          // Extrair o novo nome do comando (formato: lsp-rename novo_nome)
+          // Extract the new name from the command (format: lsp-rename new_name)
           char *space = strchr(command, ' ');
           if (space) {
               process_lsp_rename(state, space + 1);
           } else {
-              snprintf(state->status_msg, STATUS_MSG_LEN, "Uso: lsp-rename <novo_nome>");
+              snprintf(state->status_msg, STATUS_MSG_LEN, "Usage: lsp-rename <new_name>");
           }
     } else if (strcmp(command, "lsp-status") == 0) {
           process_lsp_status(state);
@@ -147,26 +147,26 @@ void process_command(EditorState *state, bool *should_exit) {
     } else if (strcmp(command, "lsp-refresh") == 0) {
         if (state->lsp_enabled) {
             lsp_did_change(state);
-            snprintf(state->status_msg, STATUS_MSG_LEN, "Diagnósticos atualizados");
+            snprintf(state->status_msg, STATUS_MSG_LEN, "Diagnostics updated");
         } else {
-            snprintf(state->status_msg, STATUS_MSG_LEN, "LSP não está ativo");
+            snprintf(state->status_msg, STATUS_MSG_LEN, "LSP not active");
         }
     } else if (strcmp(command, "lsp-check") == 0) {
         if (state->lsp_enabled) {
-            // Forçar uma mudança para trigger diagnósticos
+            // Force a change to trigger diagnostics
             lsp_did_change(state);
-            snprintf(state->status_msg, STATUS_MSG_LEN, "Verificação LSP forçada");
+            snprintf(state->status_msg, STATUS_MSG_LEN, "LSP check forced");
         } else {
-            snprintf(state->status_msg, STATUS_MSG_LEN, "LSP não está ativo");
+            snprintf(state->status_msg, STATUS_MSG_LEN, "LSP not active");
         }
     } else if (strcmp(command, "lsp-debug") == 0) {
         if (state->lsp_enabled) {
-              // Forçar o envio de didChange para trigger diagnósticos
+              // Force sending didChange to trigger diagnostics
               lsp_did_change(state);
-              snprintf(state->status_msg, STATUS_MSG_LEN, "Debug LSP: didChange enviado");
+              snprintf(state->status_msg, STATUS_MSG_LEN, "LSP Debug: didChange sent");
           }
          else {
-              snprintf(state->status_msg, STATUS_MSG_LEN, "LSP não está ativo");
+              snprintf(state->status_msg, STATUS_MSG_LEN, "LSP not active");
           }
     } else if (strcmp(command, "lsp-list") == 0) {
         display_diagnostics_list(state); 
@@ -191,21 +191,21 @@ void execute_shell_command(EditorState *state) {
     if (strncmp(cmd, "cd ", 3) == 0) {
         char *path = cmd + 3;
         if (chdir(path) != 0) {
-            snprintf(state->status_msg, sizeof(state->status_msg), "Erro ao mudar diretório: %s", strerror(errno));
+            snprintf(state->status_msg, sizeof(state->status_msg), "Error changing directory: %s", strerror(errno));
         } else {
             char cwd[1024];
             if (getcwd(cwd, sizeof(cwd)) != 0) {
                 char display_cwd[80];
                 strncpy(display_cwd, cwd, sizeof(display_cwd) - 1);
                 display_cwd[sizeof(display_cwd) - 1] = '\0';
-                snprintf(state->status_msg, sizeof(state->status_msg), "Diretório atual: %s", display_cwd);
+                snprintf(state->status_msg, sizeof(state->status_msg), "Current directory: %s", display_cwd);
             }
         }
         return;
     }
     char temp_output_file[] = "/tmp/editor_shell_output.XXXXXX";
     int fd = mkstemp(temp_output_file);
-    if(fd == -1) { snprintf(state->status_msg, sizeof(state->status_msg), "Erro ao criar arquivo temporário."); return; }
+    if(fd == -1) { snprintf(state->status_msg, sizeof(state->status_msg), "Error creating temporary file."); return; }
     close(fd);
     char full_shell_command[2048];
     snprintf(full_shell_command, sizeof(full_shell_command), "%s > %s 2>&1", cmd, temp_output_file);
@@ -228,21 +228,21 @@ void execute_shell_command(EditorState *state) {
             }
 
             if(strchr(buffer, '\n') == NULL) {
-                snprintf(state->status_msg, sizeof(state->status_msg), "Saída: %s", buffer);
+                snprintf(state->status_msg, sizeof(state->status_msg), "Output: %s", buffer);
                 remove(temp_output_file);
                 return;
             }
         }
-        display_output_screen("---　SAÍDA DO COMANDO---", temp_output_file);
-        snprintf(state->status_msg, sizeof(state->status_msg), "Comando '%s' executado.", cmd);
+        display_output_screen("--- COMMAND OUTPUT ---", temp_output_file);
+        snprintf(state->status_msg, sizeof(state->status_msg), "Command '%s' executed.", cmd);
     } else {
-        snprintf(state->status_msg, sizeof(state->status_msg), "Comando executado, mas sem saída.");
+        snprintf(state->status_msg, sizeof(state->status_msg), "Command executed, but no output.");
         remove(temp_output_file);
     }
 }
 
 void compile_file(EditorState *state, char* args) {
-    int ret; // Declared here
+    int ret;
     save_file(state);
     if (strcmp(state->filename, "[No Name]") == 0) {
         snprintf(state->status_msg, sizeof(state->status_msg), "Save the file with a name before compiling.");
@@ -266,9 +266,9 @@ void compile_file(EditorState *state, char* args) {
         char display_output_name[40];
         strncpy(display_output_name, output_filename, sizeof(display_output_name) - 1);
         display_output_name[sizeof(display_output_name)-1] = '\0';
-        snprintf(state->status_msg, sizeof(state->status_msg), "Compiation succeded! Executable: %s", display_output_name);
+        snprintf(state->status_msg, sizeof(state->status_msg), "Compilation succeeded! Executable: %s", display_output_name);
     } else {
-        display_output_screen("---COMPILATION ERROS---", temp_output_file);
+        display_output_screen("--- COMPILATION ERRORS ---", temp_output_file);
         snprintf(state->status_msg, sizeof(state->status_msg), "Compilation failed, see the errors");
     }
 }
@@ -292,12 +292,12 @@ void run_and_display_command(const char* command, const char* title) {
 void diff_command(EditorState *state, const char *args) {
     char filename1[256] = {0}, filename2[256] = {0};
     if (sscanf(args, "%255s %255s", filename1, filename2) != 2) {
-        snprintf(state->status_msg, sizeof(state->status_msg), "Uso: :diff <arquivo1> <arquivo2>");
+        snprintf(state->status_msg, sizeof(state->status_msg), "Usage: :diff <file1> <file2>");
         return;
     }
     char diff_cmd_str[1024];
     snprintf(diff_cmd_str, sizeof(diff_cmd_str), "git diff --no-index -- %s %s", filename1, filename2);
-    run_and_display_command(diff_cmd_str, "---Diferenças---");
+    run_and_display_command(diff_cmd_str, "--- Differences ---");
 }
 
 void add_to_command_history(EditorState *state, const char* command) {
