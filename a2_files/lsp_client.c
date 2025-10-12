@@ -42,10 +42,10 @@ int get_character_col_from_byte(const char *line, int byte_col) {
 #endif
 
 // ===================================================================
-// Implementação robusta do Cliente LSP com parsing JSON completo
+// Robust implementation of the LSP Client with full JSON parsing
 // ===================================================================
 
-// Cria uma mensagem LSP
+// Creates an LSP message
 LspMessage* lsp_create_message() {
     LspMessage *msg = malloc(sizeof(LspMessage));
     msg->jsonrpc = strdup("2.0");
@@ -57,7 +57,7 @@ LspMessage* lsp_create_message() {
     return msg;
 }
 
-// Libera uma mensagem LSP
+// Frees an LSP message
 void lsp_free_message(LspMessage *msg) {
     if (!msg) return;
     
@@ -123,7 +123,7 @@ LspMessage* lsp_parse_message(const char *json_str) {
     return msg;
 }
 
-// Serializa uma LspMessage para JSON
+// Serializes an LspMessage to JSON
 char* lsp_serialize_message(LspMessage *msg) {
     json_t *root = json_object();
     
@@ -147,17 +147,17 @@ char* lsp_serialize_message(LspMessage *msg) {
         json_object_set_new(root, "method", json_string(msg->method));
     }
     
-    // Add params - usando json_object_set para não transferir propriedade
+    // Add params - using json_object_set to not transfer ownership
     if (msg->params) {
         json_object_set(root, "params", msg->params);
     }
     
-    // Add result - usando json_object_set para não transferir propriedade
+    // Add result - using json_object_set to not transfer ownership
     if (msg->result) {
         json_object_set(root, "result", msg->result);
     }
     
-    // Add error - usando json_object_set para não transferir propriedade
+    // Add error - using json_object_set to not transfer ownership
     if (msg->error) {
         json_object_set(root, "error", msg->error);
     }
@@ -167,7 +167,7 @@ char* lsp_serialize_message(LspMessage *msg) {
     return json_str;
 }
 
-// Parseia diagnósticos do LSP
+// Parses LSP diagnostics
 void lsp_parse_diagnostics(EditorState *state, const char *json_response) {
     lsp_log("=== START DIAGNOSTICS PARSING ===\n");
     lsp_log("JSON received: %s\n", json_response);
@@ -184,18 +184,18 @@ void lsp_parse_diagnostics(EditorState *state, const char *json_response) {
         return;
     }
     
-    // Log detalhado dos parâmetros
+    // Detailed log of parameters
     char *params_str = json_dumps(msg->params, JSON_INDENT(2));
     lsp_log("Params: %s\n", params_str);
     free(params_str);
     lsp_log("Parsing diagnostics: %s\n", json_response);
-    lsp_log("Debug: Recebida mensagem de diagnóstico\n");
+    lsp_log("Debug: Received diagnostic message\n");
     lsp_log("Drawing %d diagnostics\n", state->lsp_document->diagnostics_count);
     if (!msg || !msg->params) {
         lsp_free_message(msg);
         return;
     }
-    lsp_log("Debug: Recebida mensagem de diagnóstico\n");
+    lsp_log("Debug: Received diagnostic message\n");
     // Clean up existing diagnostics
     lsp_cleanup_diagnostics(state);
         
@@ -285,21 +285,21 @@ void lsp_parse_diagnostics(EditorState *state, const char *json_response) {
     }
     
     lsp_free_message(msg);
-    lsp_log("Debug: %d diagnósticos processados\n", state->lsp_document->diagnostics_count);
+    lsp_log("Debug: %d diagnostics processed\n", state->lsp_document->diagnostics_count);
 }
 
 void process_lsp_status(EditorState *state) {
     if (state->lsp_enabled && state->lsp_client) {
-        snprintf(state->status_msg, STATUS_MSG_LEN, "LSP ativo para %s (PID: %d)", 
+        snprintf(state->status_msg, STATUS_MSG_LEN, "LSP active for %s (PID: %d)", 
                 state->lsp_client->languageId, state->lsp_client->server_pid);
     } else {
-        snprintf(state->status_msg, STATUS_MSG_LEN, "LSP não está ativo");
+        snprintf(state->status_msg, STATUS_MSG_LEN, "LSP not active");
     }
 }
 
 void process_lsp_hover(EditorState *state) {
     if (!lsp_is_available(state)) {
-        snprintf(state->status_msg, STATUS_MSG_LEN, "LSP não está disponível");
+        snprintf(state->status_msg, STATUS_MSG_LEN, "LSP not available");
         return;
     }
     
@@ -307,26 +307,26 @@ void process_lsp_hover(EditorState *state) {
     get_word_at_cursor(state, current_word, sizeof(current_word));
     
     if (current_word[0] != '\0') {
-        // Simulação básica - na prática, enviaria uma requisição hover para o LSP
-        snprintf(state->status_msg, STATUS_MSG_LEN, "Informações sobre: %s", current_word);
+        // Basic simulation - in practice, it would send a hover request to the LSP
+        snprintf(state->status_msg, STATUS_MSG_LEN, "Information about: %s", current_word);
     } else {
-        snprintf(state->status_msg, STATUS_MSG_LEN, "Nenhum símbolo sob o cursor");
+        snprintf(state->status_msg, STATUS_MSG_LEN, "No symbol under cursor");
     }
 }
 
 void process_lsp_symbols(EditorState *state) {
     if (!lsp_is_available(state)) {
-        snprintf(state->status_msg, STATUS_MSG_LEN, "LSP não está disponível");
+        snprintf(state->status_msg, STATUS_MSG_LEN, "LSP not available");
         return;
     }
     
-    // Simulação básica - contar funções e variáveis
+    // Basic simulation - count functions and variables
     int function_count = 0;
     int variable_count = 0;
     
     for (int i = 0; i < state->num_lines; i++) {
         if (state->lines[i]) {
-            // Buscar funções
+            // Search for functions
             if (strstr(state->lines[i], "(") && strstr(state->lines[i], ")")) {
                 if (strstr(state->lines[i], "void") || strstr(state->lines[i], "int") ||
                     strstr(state->lines[i], "char") || strstr(state->lines[i], "float") ||
@@ -334,7 +334,7 @@ void process_lsp_symbols(EditorState *state) {
                     function_count++;
                 }
             }
-            // Buscar variáveis (simplificado)
+            // Search for variables (simplified)
             if (strstr(state->lines[i], "=") && 
                 (strstr(state->lines[i], "int") || strstr(state->lines[i], "char") ||
                  strstr(state->lines[i], "float") || strstr(state->lines[i], "double"))) {
@@ -343,7 +343,7 @@ void process_lsp_symbols(EditorState *state) {
         }
     }
     
-    snprintf(state->status_msg, STATUS_MSG_LEN, "Símbolos: %d funções, %d variáveis", 
+    snprintf(state->status_msg, STATUS_MSG_LEN, "Symbols: %d functions, %d variables", 
             function_count, variable_count);
 }
 
@@ -352,14 +352,14 @@ void process_lsp_symbols(EditorState *state) {
 void lsp_did_change(EditorState *state) {
     if (!lsp_is_available(state)) return;
 
-    // Limpa diagnósticos antigos imediatamente para que a UI seja atualizada.
-    // Os novos diagnósticos virão do servidor LSP.
+    // Immediately clears old diagnostics so the UI is updated.
+    // The new diagnostics will come from the LSP server.
     lsp_cleanup_diagnostics(state);
     
     state->lsp_document->needs_update = true;
     state->lsp_document->version++;
     
-    // Envia a notificação de mudança imediatamente para obter feedback rápido.
+    // Sends the change notification immediately to get quick feedback.
     lsp_send_did_change(state);
 }
 
@@ -376,7 +376,7 @@ void lsp_did_save(EditorState *state) {
     
     write(state->lsp_client->stdin_fd, save_buf, strlen(save_buf));
     
-    free(uri); // Liberar a memória alocada para a URI
+    free(uri); // Free the memory allocated for the URI
 }
 
 
@@ -386,12 +386,12 @@ void lsp_shutdown(EditorState *state) {
     if (shutting_down) return;
     shutting_down = true;
     
-    // Verificar se o ponteiro lsp_client parece válido (não um endereço baixo)
+    // Check if the lsp_client pointer seems valid (not a low address)
     if ((uintptr_t)state->lsp_client < 0x1000) {
         state->lsp_client = NULL;
         return;
     }
-    // Enviar mensagens de shutdown e exit se os pipes ainda estiverem válidos
+    // Send shutdown and exit messages if the pipes are still valid
     if (state->lsp_client->stdin_fd != -1) {
         char *shutdown_msg = "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"shutdown\",\"params\":{}}";
         write(state->lsp_client->stdin_fd, shutdown_msg, strlen(shutdown_msg));
@@ -400,7 +400,7 @@ void lsp_shutdown(EditorState *state) {
         write(state->lsp_client->stdin_fd, exit_msg, strlen(exit_msg));
     }
     
-    // Fechar pipes
+    // Close pipes
     if (state->lsp_client->stdin_fd != -1) {
         close(state->lsp_client->stdin_fd);
         state->lsp_client->stdin_fd = -1;
@@ -414,13 +414,13 @@ void lsp_shutdown(EditorState *state) {
         state->lsp_client->stderr_fd = -1;
     }
     
-    // Esperar pelo processo do servidor LSP
+    // Wait for the LSP server process
     if (state->lsp_client->server_pid != -1) {
         waitpid(state->lsp_client->server_pid, NULL, 0);
         state->lsp_client->server_pid = -1;
     }
     
-    // Liberar toda a memória alocada para o cliente LSP
+    // Free all memory allocated for the LSP client
     if (state->lsp_client->languageId) {
         free(state->lsp_client->languageId);
         state->lsp_client->languageId = NULL;
@@ -442,12 +442,12 @@ void lsp_shutdown(EditorState *state) {
         state->lsp_client->compilationDatabase = NULL;
     }
     
-    // Liberar a estrutura principal do cliente LSP
+    // Free the main LSP client structure
     free(state->lsp_client);
     state->lsp_client = NULL;
     state->lsp_enabled = false;
     
-    // Liberar estado do documento LSP
+    // Free LSP document state
     lsp_free_document_state(state);
 }
 
@@ -456,7 +456,7 @@ void lsp_did_open(EditorState *state) {
     
     lsp_log("Sending didOpen for: %s\n", state->filename);
     
-    // Construir o conteúdo do arquivo
+    // Build the file content
     size_t total_length = 0;
     for (int i = 0; i < state->num_lines; i++) {
         if (state->lines[i]) {
@@ -475,7 +475,7 @@ void lsp_did_open(EditorState *state) {
         }
     }
     
-    // Escape do conteúdo para JSON
+    // Escape content for JSON
     char *escaped_content = json_escape_string(content);
     free(content);
     
@@ -484,7 +484,7 @@ void lsp_did_open(EditorState *state) {
         return;
     }
     
-    // Criar mensagem didOpen
+    // Create didOpen message
     char *uri = lsp_get_uri_from_path(state->filename);
     char *open_msg_format = "{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/didOpen\",\"params\":{\"textDocument\":{\"uri\":\"%s\",\"languageId\":\"%s\",\"version\":1,\"text\":\"%s\"}}}";
     
@@ -500,14 +500,14 @@ void lsp_did_open(EditorState *state) {
     
     lsp_log("didOpen message: %s\n", open_buf);
     
-    // Enviar a mensagem
+    // Send the message
     lsp_send_message(state, open_buf);
     
     free(open_buf);
     free(uri);
     free(escaped_content);
     
-    // Inicializar o estado do documento se não existir
+    // Initialize the document state if it doesn't exist
     if (!state->lsp_document) {
         lsp_init_document_state(state);
     }
@@ -517,16 +517,16 @@ void lsp_did_open(EditorState *state) {
 char* json_escape_string(const char *str) {
     if (!str) return strdup("");
     
-    // Calcular o tamanho necessário para a string escapada
+    // Calculate the required size for the escaped string
     size_t len = strlen(str);
     size_t escaped_len = 0;
     
-    // Primeiro passagem: calcular o tamanho necessário
+    // First pass: calculate the required size
     for (size_t i = 0; i < len; i++) {
         switch (str[i]) {
             case '"': case '\\': case '\b': case '\f': 
             case '\n': case '\r': case '\t':
-                escaped_len += 2; // \ + caractere especial
+                escaped_len += 2; // \ + special character
                 break;
             default:
                 if (str[i] < 0x20 || str[i] > 0x7E) {
@@ -538,11 +538,11 @@ char* json_escape_string(const char *str) {
         }
     }
     
-    // Alocar memória para a string escapada
+    // Allocate memory for the escaped string
     char *escaped = malloc(escaped_len + 1);
     if (!escaped) return NULL;
     
-    // Segunda passagem: fazer o escape
+    // Second pass: do the escaping
     size_t j = 0;
     for (size_t i = 0; i < len; i++) {
         switch (str[i]) {
@@ -569,7 +569,7 @@ char* json_escape_string(const char *str) {
                 break;
             default:
                 if (str[i] < 0x20 || str[i] > 0x7E) {
-                    // Caractere não-ASCII: usar escape Unicode
+                    // Non-ASCII character: use Unicode escape
                     snprintf(escaped + j, 7, "\\u%04x", (unsigned char)str[i]);
                     j += 6;
                 } else {
@@ -586,17 +586,17 @@ char* json_escape_string(const char *str) {
 void lsp_request_diagnostics(EditorState *state) {
     if (!lsp_is_available(state)) return;
     
-    // O clangd envia diagnósticos automaticamente após didChange
-    // Não precisamos solicitar explicitamente
-    lsp_log("Diagnósticos serão enviados automaticamente pelo clangd\n");
+    // clangd sends diagnostics automatically after didChange
+    // We don't need to request them explicitly
+    lsp_log("Diagnostics will be sent automatically by clangd\n");
 }
 
 void lsp_force_diagnostics(EditorState *state) {
     if (!lsp_is_available(state)) return;
     
-    // Apenas envia didChange, o clangd responderá automaticamente com diagnósticos
+    // Just sends didChange, clangd will automatically respond with diagnostics
     lsp_send_did_change(state);
-    lsp_log("Forçando atualização de diagnósticos via didChange\n");
+    lsp_log("Forcing diagnostics update via didChange\n");
 }
 
 LspDiagnostic* get_diagnostic_under_cursor(EditorState *state) {
@@ -604,7 +604,7 @@ LspDiagnostic* get_diagnostic_under_cursor(EditorState *state) {
         return NULL;
     }
 
-    // Converte a coluna do cursor de bytes para caracteres antes de comparar
+    // Converts the cursor column from bytes to characters before comparing
     int cursor_char_col = get_character_col_from_byte(state->lines[state->current_line], state->current_col);
 
     for (int i = 0; i < state->lsp_document->diagnostics_count; i++) {
@@ -629,61 +629,61 @@ void process_lsp_restart(EditorState *state) {
     if (state->lsp_enabled) {
         lsp_did_open(state);
     }
-    snprintf(state->status_msg, STATUS_MSG_LEN, "LSP reiniciado");
+    snprintf(state->status_msg, STATUS_MSG_LEN, "LSP restarted");
 }
 
 void process_lsp_diagnostics(EditorState *state) {
     if (!lsp_is_available(state)) {
-        snprintf(state->status_msg, STATUS_MSG_LEN, "LSP não está disponível");
+        snprintf(state->status_msg, STATUS_MSG_LEN, "LSP not available");
         return;
     }
     
     if (state->lsp_document && state->lsp_document->diagnostics_count > 0) {
-        // Mostrar o primeiro diagnóstico como exemplo
+        // Show the first diagnostic as an example
         LspDiagnostic *diag = &state->lsp_document->diagnostics[0];
-        snprintf(state->status_msg, STATUS_MSG_LEN, "Diagnóstico: %s (Linha %d)", 
+        snprintf(state->status_msg, STATUS_MSG_LEN, "Diagnostic: %s (Line %d)", 
                 diag->message, diag->range.start.line + 1);
     } else {
-        snprintf(state->status_msg, STATUS_MSG_LEN, "Nenhum diagnóstico encontrado");
+        snprintf(state->status_msg, STATUS_MSG_LEN, "No diagnostics found");
     }
 }
 
 void process_lsp_definition(EditorState *state) {
     if (!lsp_is_available(state)) {
-        snprintf(state->status_msg, STATUS_MSG_LEN, "LSP não está disponível");
+        snprintf(state->status_msg, STATUS_MSG_LEN, "LSP not available");
         return;
     }
     
-    // Implementação simplificada - na prática, enviaria uma requisição para o servidor LSP
-    snprintf(state->status_msg, STATUS_MSG_LEN, "Indo para definição - não totalmente implementado");
+    // Simplified implementation - in practice, it would send a request to the LSP server
+    snprintf(state->status_msg, STATUS_MSG_LEN, "Go to definition - not fully implemented");
     
-    // Buscar a palavra sob o cursor
+    // Get the word under the cursor
     char current_word[100];
     get_word_at_cursor(state, current_word, sizeof(current_word));
     
-    // Buscar a definição no próprio arquivo (implementação simplificada)
+    // Search for the definition in the file itself (simplified implementation)
     for (int i = 0; i < state->num_lines; i++) {
         if (strstr(state->lines[i], current_word) && 
             (strstr(state->lines[i], "int ") || strstr(state->lines[i], "void ") || 
              strstr(state->lines[i], "char ") || strstr(state->lines[i], "float "))) {
             state->current_line = i;
             state->current_col = 0;
-            snprintf(state->status_msg, STATUS_MSG_LEN, "Definição de %s encontrada na linha %d", 
+            snprintf(state->status_msg, STATUS_MSG_LEN, "Definition of %s found on line %d", 
                     current_word, i + 1);
             return;
         }
     }
     
-    snprintf(state->status_msg, STATUS_MSG_LEN, "Definição de %s não encontrada", current_word);
+    snprintf(state->status_msg, STATUS_MSG_LEN, "Definition of %s not found", current_word);
 }
 
 void process_lsp_references(EditorState *state) {
     if (!lsp_is_available(state)) {
-        snprintf(state->status_msg, STATUS_MSG_LEN, "LSP não está disponível");
+        snprintf(state->status_msg, STATUS_MSG_LEN, "LSP not available");
         return;
     }
     
-    // Implementação simplificada
+    // Simplified implementation
     char current_word[100];
     get_word_at_cursor(state, current_word, sizeof(current_word));
     
@@ -694,21 +694,21 @@ void process_lsp_references(EditorState *state) {
         }
     }
     
-    snprintf(state->status_msg, STATUS_MSG_LEN, "%d referências encontradas para %s", count, current_word);
+    snprintf(state->status_msg, STATUS_MSG_LEN, "%d references found for %s", count, current_word);
 }
 
 void process_lsp_rename(EditorState *state, const char *new_name) {
     if (!lsp_is_available(state)) {
-        snprintf(state->status_msg, STATUS_MSG_LEN, "LSP não está disponível");
+        snprintf(state->status_msg, STATUS_MSG_LEN, "LSP not available");
         return;
     }
     
-    // Implementação simplificada - renomear no próprio arquivo
+    // Simplified implementation - rename in the file itself
     char current_word[100];
     get_word_at_cursor(state, current_word, sizeof(current_word));
     
     if (strlen(new_name) == 0) {
-        snprintf(state->status_msg, STATUS_MSG_LEN, "Nome inválido para renomeação");
+        snprintf(state->status_msg, STATUS_MSG_LEN, "Invalid name for rename");
         return;
     }
     
@@ -717,10 +717,10 @@ void process_lsp_rename(EditorState *state, const char *new_name) {
         if (state->lines[i]) {
             char *pos = state->lines[i];
             while ((pos = strstr(pos, current_word)) != NULL) {
-                // Verificar se é uma palavra completa (não parte de outra palavra)
+                // Check if it is a whole word (not part of another word)
                 if ((pos == state->lines[i] || !isalnum(pos[-1])) && 
                     !isalnum(pos[strlen(current_word)])) {
-                    // Substituir a palavra
+                    // Replace the word
                     char new_line[MAX_LINE_LEN];
                     strncpy(new_line, state->lines[i], pos - state->lines[i]);
                     new_line[pos - state->lines[i]] = '\0';
@@ -736,12 +736,12 @@ void process_lsp_rename(EditorState *state, const char *new_name) {
         }
     }
     
-    snprintf(state->status_msg, STATUS_MSG_LEN, "Renomeado %s para %s (%d ocorrências)", 
+    snprintf(state->status_msg, STATUS_MSG_LEN, "Renamed %s to %s (%d occurrences)", 
             current_word, new_name, count);
     state->buffer_modified = true;
 }
 
-// Função auxiliar para obter a palavra sob o cursor
+// Helper function to get the word under the cursor
 void get_word_at_cursor(EditorState *state, char *buffer, size_t buffer_size) {
     if (state->current_line < 0 || state->current_line >= state->num_lines) {
         buffer[0] = '\0';
@@ -754,19 +754,19 @@ void get_word_at_cursor(EditorState *state, char *buffer, size_t buffer_size) {
         return;
     }
     
-    // Encontrar o início da palavra
+    // Find the start of the word
     int start = state->current_col;
     while (start > 0 && isalnum(line[start - 1])) {
         start--;
     }
     
-    // Encontrar o fim da palavra
+    // Find the end of the word
     int end = state->current_col;
     while (end < strlen(line) && isalnum(line[end])) {
         end++;
     }
     
-    // Copiar a palavra
+    // Copy the word
     int length = end - start;
     if (length > 0 && length < buffer_size) {
         strncpy(buffer, line + start, length);
@@ -785,13 +785,13 @@ void lsp_initialize(EditorState *state) {
 
     state->lsp_client = malloc(sizeof(LspClient));
     if (!state->lsp_client) {
-        snprintf(state->status_msg, STATUS_MSG_LEN, "Erro de alocação para LSP");
+        snprintf(state->status_msg, STATUS_MSG_LEN, "Allocation error for LSP");
         return;
     }
-    memset(state->lsp_client, 0, sizeof(LspClient)); // Inicializa com zeros
+    memset(state->lsp_client, 0, sizeof(LspClient)); // Initialize with zeros
     
     
-    // Determinar a linguagem baseada na extensão do arquivo
+    // Determine the language based on the file extension
     const char *ext = strrchr(state->filename, '.');
     if (ext) {
         if (strcmp(ext, ".c") == 0 || strcmp(ext, ".h") == 0) {
@@ -807,15 +807,15 @@ void lsp_initialize(EditorState *state) {
         state->lsp_client->languageId = strdup("plaintext");
     }
     
-    // Verificar se a alocação de languageId foi bem-sucedida
+    // Check if the languageId allocation was successful
     if (!state->lsp_client->languageId) {
-        snprintf(state->status_msg, STATUS_MSG_LEN, "Erro de alocação para languageId");
+        snprintf(state->status_msg, STATUS_MSG_LEN, "Allocation error for languageId");
         free(state->lsp_client);
         state->lsp_client = NULL;
         return;
     }
 
-    // Se a linguagem for plaintext, não inicie o servidor LSP.
+    // If the language is plaintext, do not start the LSP server.
     if (strcmp(state->lsp_client->languageId, "plaintext") == 0) {
         free(state->lsp_client->languageId);
         free(state->lsp_client);
@@ -824,11 +824,11 @@ void lsp_initialize(EditorState *state) {
         return;
     }
     
-    // Iniciar o servidor LSP (clangd para C/C++)
+    // Start the LSP server (clangd for C/C++)
     int stdin_pipe[2], stdout_pipe[2], stderr_pipe[2];
     
     if (pipe(stdin_pipe) != 0 || pipe(stdout_pipe) != 0 || pipe(stderr_pipe) != 0) {
-        snprintf(state->status_msg, STATUS_MSG_LEN, "Erro ao criar pipes para LSP");
+        snprintf(state->status_msg, STATUS_MSG_LEN, "Error creating pipes for LSP");
         free(state->lsp_client->languageId);
         free(state->lsp_client);
         state->lsp_client = NULL;
@@ -837,7 +837,7 @@ void lsp_initialize(EditorState *state) {
     
     pid_t pid = fork();
     if (pid == 0) {
-        // Processo filho
+        // Child process
         close(stdin_pipe[1]);
         close(stdout_pipe[0]);
         close(stderr_pipe[0]);
@@ -846,13 +846,13 @@ void lsp_initialize(EditorState *state) {
         dup2(stdout_pipe[1], STDOUT_FILENO);
         dup2(stderr_pipe[1], STDERR_FILENO);
         
-        // Fecha todos os outros file descriptors
+        // Close all other file descriptors
         for (int i = 3; i < 1024; i++) {
             close(i);
         }
         
-        // Inicia o servidor LSP
-        // Em lsp_initialize, use argumentos otimizados:
+        // Start the LSP server
+        // In lsp_initialize, use optimized arguments:
         
         if (strcmp(state->lsp_client->languageId, "c") == 0 || strcmp(state->lsp_client->languageId, "cpp") == 0) {
             execlp("clangd", "clangd", 
@@ -865,7 +865,7 @@ void lsp_initialize(EditorState *state) {
         }
         exit(1);
     } else if (pid > 0) {
-        // Processo pai
+        // Parent process
         close(stdin_pipe[0]);
         close(stdout_pipe[1]);
         close(stderr_pipe[1]);
@@ -881,13 +881,13 @@ void lsp_initialize(EditorState *state) {
         lsp_init_document_state(state);
         lsp_send_initialize(state);
         
-        snprintf(state->status_msg, STATUS_MSG_LEN, "LSP inicializado para %s", state->lsp_client->languageId);
+        snprintf(state->status_msg, STATUS_MSG_LEN, "LSP initialized for %s", state->lsp_client->languageId);
         state->lsp_enabled = true;
         state->lsp_client->initialized = true;
     } else {
-        snprintf(state->status_msg, STATUS_MSG_LEN, "Erro ao iniciar LSP: %s", strerror(errno));
+        snprintf(state->status_msg, STATUS_MSG_LEN, "Error starting LSP: %s", strerror(errno));
         
-        // Fechar pipes e liberar recursos
+        // Close pipes and free resources
         close(stdin_pipe[0]);
         close(stdin_pipe[1]);
         close(stdout_pipe[0]);
@@ -901,30 +901,30 @@ void lsp_initialize(EditorState *state) {
     }
 }
 
-// Verifica se o LSP está disponível
+// Checks if LSP is available
 bool lsp_is_available(EditorState *state) {
     return state && state->lsp_client && (uintptr_t)state->lsp_client >= 0x1000 && state->lsp_client->initialized;
 }
 
 
-// Converte um caminho de arquivo para URI no formato LSP
+// Converts a file path to a URI in LSP format
 char* lsp_get_uri_from_path(const char *path) {
     char absolute_path[PATH_MAX];
     if (realpath(path, absolute_path) == NULL) {
-        // Se realpath falhar, use o path original
+        // If realpath fails, use the original path
         strncpy(absolute_path, path, PATH_MAX - 1);
         absolute_path[PATH_MAX - 1] = '\0';
     }
     
     size_t path_len = strlen(absolute_path);
-    char *uri = malloc(path_len * 3 + 8); // Espaço para encoding + "file://"
+    char *uri = malloc(path_len * 3 + 8); // Space for encoding + "file://"
     if (!uri) return NULL;
     
     char *ptr = uri;
     strcpy(ptr, "file://");
     ptr += 7;
     
-    // Codificar caracteres especiais
+    // Encode special characters
     for (const char *p = absolute_path; *p; p++) {
         if (*p == ' ') {
             strcpy(ptr, "%20");
@@ -943,13 +943,13 @@ char* lsp_get_uri_from_path(const char *path) {
     *ptr = '\0';
     return uri;
 }
-// Inicializa o estado do documento LSP
+// Initializes the LSP document state
 void lsp_init_document_state(EditorState *state) {
     if (!state->lsp_document) {
         state->lsp_document = malloc(sizeof(LspDocumentState));
         memset(state->lsp_document, 0, sizeof(LspDocumentState));
     } else {
-        // Liberar URI anterior se existir
+        // Free previous URI if it exists
         if (state->lsp_document->uri) {
             free(state->lsp_document->uri);
             state->lsp_document->uri = NULL;
@@ -977,7 +977,7 @@ void lsp_free_document_state(EditorState *state) {
     state->lsp_document = NULL;
 }
 
-// Limpa diagnósticos do LSP
+// Clears LSP diagnostics
 void lsp_cleanup_diagnostics(EditorState *state) {
     if (!state->lsp_document || !state->lsp_document->diagnostics) return;
     
@@ -991,7 +991,7 @@ void lsp_cleanup_diagnostics(EditorState *state) {
     state->lsp_document->diagnostics_count = 0;
 }
 
-// Parseia sugestões de completion do LSP
+// Parses completion suggestions from LSP
 void lsp_parse_completion(EditorState *state, const char *json_response) {
     LspMessage *msg = lsp_parse_message(json_response);
     if (!msg || !msg->result) {
@@ -1149,22 +1149,22 @@ void lsp_send_initialize(EditorState *state) {
     
     FILE *log = fopen("/tmp/lsp_log.txt", "a");
     if (log) {
-        fprintf(log, "Enviando mensagem de inicialização:\n%s\n", json_str);
+        fprintf(log, "Sending initialization message:\n%s\n", json_str);
         fclose(log);
     }
     
-    // Adicionar cabeçalho Content-Length conforme o protocolo LSP
+    // Add Content-Length header as per LSP protocol
     char header[100];
     size_t content_length = strlen(json_str);
     snprintf(header, sizeof(header), "Content-Length: %zu\r\n\r\n", content_length);
     
-    // Enviar cabeçalho seguido do conteúdo JSON
+    // Send header followed by JSON content
     write(state->lsp_client->stdin_fd, header, strlen(header));
     ssize_t bytes_written = write(state->lsp_client->stdin_fd, json_str, content_length);
     
     log = fopen("/tmp/lsp_log.txt", "a");
     if (log) {
-        fprintf(log, "Bytes escritos: %zd (header: %zu, content: %zu)\n", 
+        fprintf(log, "Bytes written: %zd (header: %zu, content: %zu)\n", 
                 bytes_written, strlen(header), content_length);
         fclose(log);
     }
@@ -1191,7 +1191,7 @@ void lsp_send_message(EditorState *state, const char *json_message) {
 void lsp_send_did_change(EditorState *state) {
     if (!lsp_is_available(state)) return;
     
-    // Construir o conteúdo do arquivo de forma mais simples
+    // Build the file content in a simpler way
     size_t total_length = 0;
     for (int i = 0; i < state->num_lines; i++) {
         if (state->lines[i]) {
@@ -1210,7 +1210,7 @@ void lsp_send_did_change(EditorState *state) {
         }
     }
     
-    // Escape do conteúdo para JSON
+    // Escape content for JSON
     char *escaped_content = json_escape_string(content);
     free(content);
     
@@ -1219,7 +1219,7 @@ void lsp_send_did_change(EditorState *state) {
         return;
     }
     
-    // Criar mensagem didChange
+    // Create didChange message
     char *uri = lsp_get_uri_from_path(state->filename);
     char *change_msg_format = "{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/didChange\",\"params\":{\"textDocument\":{\"uri\":\"%s\",\"version\":%d},\"contentChanges\":[{\"text\":\"%s\"}]}}";
     
@@ -1252,9 +1252,9 @@ bool lsp_process_alive(EditorState *state) {
     pid_t result = waitpid(state->lsp_client->server_pid, &status, WNOHANG);
     
     if (result == 0) {
-        return true; // Processo ainda está rodando
+        return true; // Process is still running
     } else {
-        return false; // Processo terminou
+        return false; // Process finished
     }
 }
 
@@ -1306,7 +1306,7 @@ void lsp_process_received_data(EditorState *state, const char *buffer, size_t bu
     static size_t message_pos = 0;
     static size_t buffer_capacity = 0;
 
-    // Garantir que o buffer tenha capacidade para os novos dados
+    // Ensure the buffer has capacity for the new data
     if (message_pos + buffer_len + 1 > buffer_capacity) {
         size_t new_capacity = buffer_capacity == 0 ? 32768 : buffer_capacity;
         while (new_capacity < message_pos + buffer_len + 1) {
@@ -1325,12 +1325,12 @@ void lsp_process_received_data(EditorState *state, const char *buffer, size_t bu
         buffer_capacity = new_capacity;
     }
     
-    // Adicionar novos dados ao buffer
+    // Add new data to the buffer
     memcpy(message_buffer + message_pos, buffer, buffer_len);
     message_pos += buffer_len;
     message_buffer[message_pos] = '\0';
     
-    // Processar mensagens completas
+    // Process complete messages
     char *ptr = message_buffer;
     while (ptr < message_buffer + message_pos) {
         char *content_length_start = strstr(ptr, "Content-Length:");
@@ -1348,11 +1348,11 @@ void lsp_process_received_data(EditorState *state, const char *buffer, size_t bu
         
         if ((size_t)(message_buffer + message_pos - json_start) < (size_t)content_length) break;
         
-        // Alocar memória para a mensagem JSON
+        // Allocate memory for the JSON message
         char *json_message = malloc(content_length + 1);
         if (!json_message) {
             lsp_log("Failed to allocate buffer for JSON message\n");
-            ptr = json_start + content_length; // Pular esta mensagem
+            ptr = json_start + content_length; // Skip this message
             continue;
         }
         memcpy(json_message, json_start, content_length);
@@ -1371,7 +1371,7 @@ void lsp_process_received_data(EditorState *state, const char *buffer, size_t bu
             lsp_free_message(msg);
         }
         
-        free(json_message); // Liberar memória da mensagem
+        free(json_message); // Free the message memory
         
         ptr = json_start + content_length;
     }
@@ -1402,7 +1402,7 @@ void lsp_draw_diagnostics(WINDOW *win, EditorState *state) {
     for (int i = 0; i < state->lsp_document->diagnostics_count; i++) {
         LspDiagnostic *diag = &state->lsp_document->diagnostics[i];
         
-        // Verificar se o diagnóstico está na área visível
+        // Check if the diagnostic is in the visible area
         if (diag->range.start.line >= state->top_line && 
             diag->range.start.line < state->top_line + getmaxy(win) - 2) {
             
@@ -1410,22 +1410,22 @@ void lsp_draw_diagnostics(WINDOW *win, EditorState *state) {
             int start_x = diag->range.start.character - state->left_col;
             int end_x = diag->range.end.character - state->left_col;
             
-            // Ajustar coordenadas para dentro da janela visível
+            // Adjust coordinates to be inside the visible window
             if (start_x < 0) start_x = 0;
             if (end_x > getmaxx(win)) end_x = getmaxx(win);
             
             if (start_x < end_x && y >= 0 && y < getmaxy(win)) {
-                // Escolher cor baseada na severidade
+                // Choose color based on severity
                 int color_pair;
                 switch (diag->severity) {
-                    case LSP_SEVERITY_ERROR: color_pair = 11; break; // Vermelho
-                    case LSP_SEVERITY_WARNING: color_pair = 3; break; // Amarelo
-                    case LSP_SEVERITY_INFO: color_pair = 6; break; // Ciano
-                    case LSP_SEVERITY_HINT: color_pair = 4; break; // Verde
-                    default: color_pair = 8; break; // Branco
+                    case LSP_SEVERITY_ERROR: color_pair = 11; break; // Red
+                    case LSP_SEVERITY_WARNING: color_pair = 3; break; // Yellow
+                    case LSP_SEVERITY_INFO: color_pair = 6; break; // Cyan
+                    case LSP_SEVERITY_HINT: color_pair = 4; break; // Green
+                    default: color_pair = 8; break; // White
                 }
                 
-                // Desenhar colchetes e sublinhar o range do diagnóstico
+                // Draw brackets and underline the diagnostic range
                 wattron(win, COLOR_PAIR(color_pair));
                 if (start_x >= 1) {
                     mvwaddch(win, y, start_x - 1, '[');
@@ -1440,7 +1440,7 @@ void lsp_draw_diagnostics(WINDOW *win, EditorState *state) {
                 }
                 wattroff(win, COLOR_PAIR(color_pair));
                 
-                // Mostrar mensagem no status se o cursor estiver na linha
+                // Show message in status if the cursor is on the line
                 if (state->current_line == diag->range.start.line) {
                     snprintf(state->status_msg, STATUS_MSG_LEN, "[%s] %s", 
                             diag->code, diag->message);
