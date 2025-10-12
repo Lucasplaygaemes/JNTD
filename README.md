@@ -28,8 +28,7 @@ A image of how the a2 is, but remember that it will probably be different for al
 
 
 # Documentation!
-Documentation will be made for both a2 and JNTD
-
+Documentation is in - [**Documentation**](./index.md)
 # New Release!
 A lot of things were added! So, any doubt's of keyboard shortcuts? :ksc show all of them.
 Now there is the gdb "mode", if you start gdb, it process take over the a2, and a2 is "killed" until he closes, after that you can use a2 again.
