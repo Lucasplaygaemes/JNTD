@@ -245,7 +245,7 @@ void compile_file(EditorState *state, char* args) {
     int ret; // Declared here
     save_file(state);
     if (strcmp(state->filename, "[No Name]") == 0) {
-        snprintf(state->status_msg, sizeof(state->status_msg), "Salve o arquivo com um nome antes de compilar.");
+        snprintf(state->status_msg, sizeof(state->status_msg), "Save the file with a name before compiling.");
         return;
     }
     char output_filename[300];
@@ -255,7 +255,7 @@ void compile_file(EditorState *state, char* args) {
     snprintf(command, sizeof(command), "gcc %s -o %s %s", state->filename, output_filename, args);
     char temp_output_file[] = "/tmp/editor_compile_output.XXXXXX";
     int fd = mkstemp(temp_output_file);
-    if(fd == -1) { snprintf(state->status_msg, sizeof(state->status_msg), "Erro ao criar arquivo temporário."); return; }
+    if(fd == -1) { snprintf(state->status_msg, sizeof(state->status_msg), "Error creating temporary file."); return; }
     close(fd);
     char full_shell_command[2048];
     snprintf(full_shell_command, sizeof(full_shell_command), "%s > %s 2>&1", command, temp_output_file);
@@ -266,10 +266,10 @@ void compile_file(EditorState *state, char* args) {
         char display_output_name[40];
         strncpy(display_output_name, output_filename, sizeof(display_output_name) - 1);
         display_output_name[sizeof(display_output_name)-1] = '\0';
-        snprintf(state->status_msg, sizeof(state->status_msg), "Compilação bem-sucedida! Executável: %s", display_output_name);
+        snprintf(state->status_msg, sizeof(state->status_msg), "Compiation succeded! Executable: %s", display_output_name);
     } else {
-        display_output_screen("---ERROS DE COMPILAÇÃO---", temp_output_file);
-        snprintf(state->status_msg, sizeof(state->status_msg), "Compilação falhou. Veja os erros.");
+        display_output_screen("---COMPILATION ERROS---", temp_output_file);
+        snprintf(state->status_msg, sizeof(state->status_msg), "Compilation failed, see the errors");
     }
 }
 
