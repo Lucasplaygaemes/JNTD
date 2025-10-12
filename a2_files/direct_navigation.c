@@ -1,7 +1,7 @@
 #include "direct_navigation.h" // Include its own header
 #include "defs.h" // For EditorState, etc.
-#include "screen_ui.h" // For redesenhar_todas_as_janelas
-#include "window_managment.h" // For redesenhar_todas_as_janelas
+#include "screen_ui.h" // For redrawing all windows
+#include "window_managment.h" // For redrawing all windows
 
 #include <limits.h> // For PATH_MAX
 #include <unistd.h> // For chdir, getcwd
@@ -150,11 +150,11 @@ void change_directory(EditorState *state, const char *new_path) {
         update_directory_access(state, new_path);
         char cwd[1024];
         if (getcwd(cwd, sizeof(cwd)) != NULL) {
-            snprintf(state->status_msg, sizeof(state->status_msg), "Diretório mudado para: %s", cwd);
+            snprintf(state->status_msg, sizeof(state->status_msg), "Directory changed to: %s", cwd);
         }
     }
     else {
-        snprintf(state->status_msg, sizeof(state->status_msg), "Erro ao mudar para: %s", strerror(errno));
+        snprintf(state->status_msg, sizeof(state->status_msg), "Error changing to: %s", strerror(errno));
     }
 }
 
@@ -219,7 +219,7 @@ void display_directory_navigator(EditorState *state) {
 
         werase(nav_win);
         box(nav_win, 0, 0);
-        mvwprintw(nav_win, 1, (win_w - 25) / 2, "Navegador de Diretórios");
+        mvwprintw(nav_win, 1, (win_w - 25) / 2, "Directory Navigator");
 
         for (int i = 0; i < max_visible; i++) {
             int dir_idx = top_of_list + i;
@@ -234,14 +234,14 @@ void display_directory_navigator(EditorState *state) {
                     strcpy(display_path + sizeof(display_path) - 4, "...");
                 }
                 
-                mvwprintw(nav_win, i + 2, 2, "%s (%d acessos)", 
+                mvwprintw(nav_win, i + 2, 2, "%s (%d accesses)", 
                          display_path, filtered_dirs[dir_idx]->access_count);
                 
                 if (dir_idx == current_selection) wattroff(nav_win, A_REVERSE);
             }
         }
 
-        mvwprintw(nav_win, win_h - 2, 2, "ESC: Sair | /: Buscar | ENTER: Selecionar");
+        mvwprintw(nav_win, win_h - 2, 2, "ESC: Exit | /: Search | ENTER: Select");
         mvwprintw(nav_win, win_h - 1, 2, "/%s", search_term);
         if (search_mode) {
             wmove(nav_win, win_h - 1, 3 + search_pos);
@@ -473,7 +473,7 @@ void add_to_file_history(EditorState *state, const char *path) {
         canonical_path[sizeof(canonical_path)-1] = '\0';
     }
 
-    // Verifica se o arquivo já existe e incrementa a contagem de acesso
+    // Check if the file already exists and increment the access count
     for (int i = 0; i < state->num_recent_files; i++) {
         if (strcmp(state->recent_files[i]->path, canonical_path) == 0) {
             state->recent_files[i]->access_count++;
@@ -483,13 +483,13 @@ void add_to_file_history(EditorState *state, const char *path) {
         }
     }
 
-    // Se não for encontrado, adiciona um novo com contagem 1
+    // If not found, add a new one with count 1
     state->num_recent_files++;
     state->recent_files = realloc(state->recent_files, sizeof(FileInfo*) * state->num_recent_files);
 
     FileInfo *new_file = malloc(sizeof(FileInfo));
-    if (!new_file || !state->recent_files) { // This condition seems to be checking against state->recent_files, which might be incorrect if realloc succeeded but new_file failed.
-        // Lida com falha de alocação
+    if (!new_file || !state->recent_files) { 
+        // Handle allocation failure
         state->num_recent_files--;
         return;
     }
