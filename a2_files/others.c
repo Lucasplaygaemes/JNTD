@@ -1,14 +1,13 @@
 #include "others.h" // Include its own header
 #include "defs.h" // For EditorState, etc.
 #include "lsp_client.h" // For lsp_did_change
-#include "screen_ui.h" // For editor_redraw, redesenhar_todas_as_janelas, get_visual_pos, get_visual_col
+#include "screen_ui.h" // For editor_redraw, redrawing all windows, get_visual_pos, get_visual_col
 #include "fileio.h" // For load_last_line, save_last_line
-#include "window_managment.h" // For gerenciador
+#include "window_managment.h" // For manager
 #include "command_execution.h"
 #include <ctype.h>
 #include <dirent.h>
 
-// Dummy definitions for autocompletion symbols to allow compilation
 const char *editor_commands[] = {
     "q", "q!", "w", "wq", "help", "gcc", "rc", "rc!", "open", "new", "timer", "diff", "set",
     "lsp-restart", "lsp-diag", "lsp-definition", "lsp-references", "lsp-rename",
@@ -684,7 +683,7 @@ void editor_find(EditorState *state) {
 
 void editor_find_next(EditorState *state) {
     if (state->last_search[0] == '\0') {
-        snprintf(state->status_msg, sizeof(state->status_msg), "Nenhum termo para buscar. Use Ctrl+F primeiro.");
+        snprintf(state->status_msg, sizeof(state->status_msg), "No search term. Use Ctrl+F first.");
         return;
     }
 
@@ -698,16 +697,16 @@ void editor_find_next(EditorState *state) {
             state->current_line = current_line_idx;
             state->current_col = match - line;
             state->ideal_col = state->current_col;
-            snprintf(state->status_msg, sizeof(state->status_msg), "Encontrado em L:%d C:%d", state->current_line + 1, state->current_col + 1);
+            snprintf(state->status_msg, sizeof(state->status_msg), "Found at L:%d C:%d", state->current_line + 1, state->current_col + 1);
             return;
         }
     }
-    snprintf(state->status_msg, sizeof(state->status_msg), "Nenhuma outra ocorrência de: %s", state->last_search);
+    snprintf(state->status_msg, sizeof(state->status_msg), "No other occurrence of: %s", state->last_search);
 }
 
 void editor_find_previous(EditorState *state) {
     if (state->last_search[0] == '\0') {
-        snprintf(state->status_msg, sizeof(state->status_msg), "Nenhum termo para buscar. Use Ctrl+F primeiro.");
+        snprintf(state->status_msg, sizeof(state->status_msg), "No search term. Use Ctrl+F first.");
         return;
     }
 
@@ -726,12 +725,12 @@ void editor_find_previous(EditorState *state) {
             state->current_line = current_line_idx;
             state->current_col = last_match_in_line - line;
             state->ideal_col = state->current_col;
-            snprintf(state->status_msg, sizeof(state->status_msg), "Encontrado em L:%d C:%d", state->current_line + 1, state->current_col + 1);
+            snprintf(state->status_msg, sizeof(state->status_msg), "Found at L:%d C:%d", state->current_line + 1, state->current_col + 1);
             return;
         }
         start_col = strlen(line);
     }
-    snprintf(state->status_msg, sizeof(state->status_msg), "Nenhuma outra ocorrência de: %s", state->last_search);
+    snprintf(state->status_msg, sizeof(state->status_msg), "No other occurrence of: %s", state->last_search);
 }
 
 // ===================================================================
