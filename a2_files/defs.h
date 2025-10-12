@@ -3,7 +3,7 @@
 
 #define _XOPEN_SOURCE 700
 #define NCURSES_WIDECHAR 1
-#include <limits.h> // Para PATH_MAX
+#include <limits.h> // For PATH_MAX
 
 #include <ncurses.h>
 #include <stdlib.h>
@@ -272,11 +272,11 @@ typedef struct JanelaEditor {
     int y, x, altura, largura;
     TipoJanela tipo;
 
-    EditorState *estado; // Usado apenas por TIPOJANELA_EDITOR
+    EditorState *estado; // Used only by TIPOJANELA_EDITOR
 
-    int pty_fd;          // Usado apenas por TIPOJANELA_TERMINAL
-    pid_t pid;           // Usado apenas por TIPOJANELA_TERMINAL
-    vterm_t *vterm;      // O único campo da libvterm que precisamos!
+    int pty_fd;          // Used only by TIPOJANELA_TERMINAL
+    pid_t pid;           // Used only by TIPOJANELA_TERMINAL
+    vterm_t *vterm;      // The only field from libvterm that we need!
 } JanelaEditor;
 #endif
 
