@@ -275,6 +275,15 @@ void process_editor_input(EditorState *state, wint_t ch, bool *should_exit) {
                 break;
             case NORMAL:
                 switch (ch) {
+                    case 'G':
+                        state->current_line = state->num_lines - 1;
+                        state->current_col = 0;
+                        state->ideal_col = 0;
+                        break;
+                    case 'g':
+                        state->current_line = 0;
+                        state->current_col = 0;
+                        state->ideal_col = 0;
                     case 'm':
                         if (state->is_moving) {
                             editor_paste_from_move_register(state);

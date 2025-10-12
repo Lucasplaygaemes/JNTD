@@ -104,6 +104,8 @@ Both a2 and JNTD use commands or shortcuts similar to Vim.
 | `L` / `Page Down` | Move one page down |
 | `K` / `Home` | Go to the beginning of the line |
 | `Ç` / `End` | Go to the end of the line |
+| `g` | Go to the first line of the code |
+| `G` | Go to the last line of the code |
 
 ### Normal Mode (Actions)
 
