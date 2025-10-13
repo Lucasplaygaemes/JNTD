@@ -535,9 +535,6 @@ void editor_redraw(WINDOW *win, EditorState *state) {
 
     wnoutrefresh(win);
 
-    if (!diag) {
-        state->status_msg[0] = '\0';
-    }
 }
 
 

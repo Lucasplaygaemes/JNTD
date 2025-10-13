@@ -62,6 +62,7 @@ void inicializar_ncurses() {
 }
 
 void process_editor_input(EditorState *state, wint_t ch, bool *should_exit) {
+    state->status_msg[0] = '\0';
     JanelaEditor* active_jw = ACTIVE_WS->janelas[ACTIVE_WS->janela_ativa_idx];
     WINDOW *active_win = active_jw->win;
 
@@ -164,6 +165,10 @@ void process_editor_input(EditorState *state, wint_t ch, bool *should_exit) {
         switch (state->mode) {
             case VISUAL:
                 switch (ch) {
+                    case KEY_ENTER:
+                    case '\n':
+                        editor_handle_enter(state);
+                        break;
                     case 25: // Ctrl+Y
                         if (state->visual_selection_mode == VISUAL_MODE_NONE) {
                             state->selection_start_line = state->current_line;
