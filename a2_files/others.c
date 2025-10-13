@@ -302,7 +302,7 @@ void editor_paste(EditorState *state) {
     }
 
     bool ends_with_newline = state->yank_register[strlen(state->yank_register)-1] == '\n';
-    if (ends_with_newline && (strchr(state->yank_register, '\n') == (state->yank_register + strlen(state->yank_register) - 1))) {
+    if (ends_with_newline) {
         if (state->num_lines + num_new_lines < MAX_LINES) {
              lines_to_insert[num_new_lines++] = strdup("");
         }
@@ -346,10 +346,6 @@ void editor_paste(EditorState *state) {
         lsp_did_change(state);
     }
 }
-
-
-
-
 
 void editor_handle_enter(EditorState *state) {
     push_undo(state);
@@ -1003,6 +999,10 @@ void editor_draw_completion_win(WINDOW *win, EditorState *state) {
 void handle_insert_mode_key(EditorState *state, wint_t ch) {
     WINDOW *win = ACTIVE_WS->janelas[ACTIVE_WS->janela_ativa_idx]->win;
     switch (ch) {
+        //shift tab
+        case KEY_BTAB:
+            push_undo(state);
+            editor_unindent_line(state, state->current_line); break;
         case KEY_CTRL_P: editor_start_completion(state); break;
         case KEY_CTRL_DEL: case KEY_CTRL_K: editor_delete_line(state); break;
         case KEY_CTRL_D: editor_find_next(state); break;
@@ -1015,6 +1015,7 @@ void handle_insert_mode_key(EditorState *state, wint_t ch) {
         case KEY_ENTER: case '\n': editor_handle_enter(state); break;
         case KEY_BACKSPACE: case 127: case 8: editor_handle_backspace(state); break;
         case '\t':
+            push_undo(state);
             editor_start_completion(state);
             if (state->completion_mode != COMPLETION_TEXT) {
                 for (int i = 0; i < TAB_SIZE; i++) editor_insert_char(state, ' ');
@@ -1227,3 +1228,44 @@ void editor_paste_from_move_register(EditorState *state) {
     
     editor_paste(state);
 }
+
+void editor_ident_line(EditorState *state, int line_num) {
+    char *line = state->lines[line_num];
+    if (!line) return;
+    
+    char *new_line = malloc(strlen(line) + TAB_SIZE + 1);
+    if (!new_line) return;
+    
+    memset(new_line,' ', TAB_SIZE);
+    strcpy(new_line + TAB_SIZE, line);
+    
+    free(state->lines[line_num]);
+    state->lines[line_num] = new_line;
+    
+    if (line_num == state->current_line) {
+        state->current_col += TAB_SIZE;
+    }
+    state->buffer_modified = true;
+    
+}
+
+void editor_unindent_line(EditorState *state, int line_num) {
+    char *line = state->lines[line_num];
+    if (!line) return;
+    
+    int spaces_to_remove = 0;
+    for (int i = 0; i < TAB_SIZE && isspace(line[i]); i++) {
+        spaces_to_remove++;
+    }
+    
+    if (spaces_to_remove > 0) {
+        memmove(line, line + spaces_to_remove, strlen(line) - spaces_to_remove + 1);
+        
+        if (line_num  == state->current_line) {
+            state->current_col -= spaces_to_remove;
+            if (state->current_col < 0) state->current_col = 0;
+        }
+        state->buffer_modified = true;
+    }
+}
+

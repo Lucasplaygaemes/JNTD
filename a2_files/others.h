@@ -21,6 +21,8 @@ void editor_delete_selection(EditorState *state);
 void editor_yank_to_move_register(EditorState *state);
 void editor_paste_from_move_register(EditorState *state);
 char* trim_whitespace(char *str);
+void editor_ident_line(EditorState *state, int line_num);
+void editor_unindent_line(EditorState *state, int line_num);
 
 // Cursor Movement & Navigation
 void ensure_cursor_in_bounds(EditorState *state);

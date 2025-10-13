@@ -142,6 +142,23 @@ void process_editor_input(EditorState *state, wint_t ch, bool *should_exit) {
                 if (p) mover_janela_para_posicao(p - symbols);
             }
             else if (next_ch == 'r' || next_ch == 'R') rotacionar_janelas();
+            else if (next_ch == '	') {   
+                if (state->mode == VISUAL) {
+                    int start_line, end_line;
+                    if (state->selection_start_line < state->current_line) {
+                        start_line = state->selection_start_line;
+                        end_line = state->current_line;
+                    } else {
+                        start_line = state->current_line;
+                        end_line = state->selection_start_line;
+                    }
+                    for (int i = start_line; i <= end_line; i++) {
+                        editor_ident_line(state, i);
+                    }
+                } else {
+                   editor_ident_line(state, state->current_line);
+                }
+            }
             else if (next_ch == 'o' || next_ch == 'O') {
                 if (state->mode == VISUAL && state->visual_selection_mode != VISUAL_MODE_NONE) copy_selection_to_clipboard(state);
             }
@@ -153,6 +170,7 @@ void process_editor_input(EditorState *state, wint_t ch, bool *should_exit) {
                 editor_global_paste(state);
                 state->mode = INSERT;
             }
+            else if (next_ch == 'k' || next_ch == 'K') editor_global_paste(state);
             else if (next_ch == 'j' || next_ch == 'J') {
                 state->current_col = strlen(state->lines[state->current_line]);
                 editor_handle_enter(state);
@@ -176,8 +194,26 @@ void process_editor_input(EditorState *state, wint_t ch, bool *should_exit) {
         switch (state->mode) {
             case VISUAL:
                 switch (ch) {
+                    case KEY_BTAB: {
+                        push_undo(state);
+                        int start_line, end_line;
+                        if (state->selection_start_line < state->current_line) {
+                            start_line = state->selection_start_line;
+                            end_line = state->current_line;
+                        } else {
+                            push_undo(state);
+                            start_line = state->current_line;
+                            end_line = state->selection_start_line;
+                        }
+                        for (int i = start_line; i <= end_line; i++) {
+                            push_undo(state);
+                            editor_unindent_line(state, i);
+                        }
+                        break;
+                    }
                     case KEY_ENTER:
                     case '\n':
+                        push_undo(state);
                         editor_handle_enter(state);
                         break;
                     case 25: // Ctrl+Y
@@ -223,7 +259,6 @@ void process_editor_input(EditorState *state, wint_t ch, bool *should_exit) {
                         break;
                     default: // Fallback to normal mode keys
                         switch (ch) {
-
                             case 'u':
                                 state->current_col = 0;
                                 state->ideal_col = 0;
@@ -245,6 +280,7 @@ void process_editor_input(EditorState *state, wint_t ch, bool *should_exit) {
                                 state->current_line = 0;
                                 state->current_col = 0;
                                 state->ideal_col = 0;
+                                break;
 
                             case 'v': state->mode = NORMAL; break;
                             case 'i': state->mode = INSERT; break;
@@ -314,6 +350,10 @@ void process_editor_input(EditorState *state, wint_t ch, bool *should_exit) {
                 break;
             case NORMAL:
                 switch (ch) {
+                            //shift tab
+                    case KEY_BTAB:
+                        push_undo(state);
+                        editor_unindent_line(state, state->current_line); break;
                     case 'u':
                         state->current_col = 0;
                         state->ideal_col = 0;
@@ -324,8 +364,8 @@ void process_editor_input(EditorState *state, wint_t ch, bool *should_exit) {
                     case 'U':
                         state->current_col = strlen(state->lines[state->current_line]);
                         editor_handle_enter(state);
-                        break;
                         state->mode = INSERT;
+                        break;
                     case 'G':
                         state->current_line = state->num_lines - 1;
                         state->current_col = 0;
@@ -335,6 +375,7 @@ void process_editor_input(EditorState *state, wint_t ch, bool *should_exit) {
                         state->current_line = 0;
                         state->current_col = 0;
                         state->ideal_col = 0;
+                        break;
                     case 'm':
                         if (state->is_moving) {
                             editor_paste_from_move_register(state);
@@ -343,9 +384,6 @@ void process_editor_input(EditorState *state, wint_t ch, bool *should_exit) {
                             state->move_register = NULL;
                             snprintf(state->status_msg, sizeof(state->status_msg), "Text moved.");
                         }
-                        break;
-                    case 16: // Ctrl+P
-                        editor_global_paste(state);
                         break;
                     case 'v': state->mode = VISUAL; break;
                     case 'i': state->mode = INSERT; break;
