@@ -117,6 +117,8 @@ Both a2 and JNTD use commands or shortcuts similar to Vim.
 | `Ctrl+P` | Paste from the global yank register |
 | `m` | Paste from the move register (after a visual cut) |
 | `Ctrl+Del` / `Ctrl+K` | Delete the current line |
+| `u` | Add a line and enter INSERT mode above |
+| `u` | Add a line and enter INSERT mode below |
 
 ### Insert Mode
 
