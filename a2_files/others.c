@@ -238,62 +238,22 @@ void editor_global_paste(EditorState *state) {
         return;
     }
 
-    push_undo(state);
-    clear_redo_stack(state);
-
-    char *yank_copy = strdup(global_yank_register);
-    if (!yank_copy) return;
-
-    char *line = strtok(yank_copy, "\n");
-
-    if (strchr(global_yank_register, '\n') == NULL) {
-        char *current_line_content = state->lines[state->current_line];
-        int paste_len = strlen(line);
-        int old_len = strlen(current_line_content);
-        char *new_line_content = realloc(current_line_content, old_len + paste_len + 1);
-        if (!new_line_content) { free(yank_copy); return; }
-
-        memmove(new_line_content + state->current_col + paste_len, 
-                new_line_content + state->current_col, 
-                old_len - state->current_col + 1);
-        memcpy(new_line_content + state->current_col, line, paste_len);
-
-        state->lines[state->current_line] = new_line_content;
-        state->current_col += paste_len;
-    } else {
-        int paste_line_count = 0;
-        char *temp_yank_copy = strdup(global_yank_register);
-        for (const char *p = temp_yank_copy; *p; p++) {
-            if (*p == '\n') paste_line_count++;
-        }
-        if (temp_yank_copy[strlen(temp_yank_copy)-1] != '\n') paste_line_count++;
-        free(temp_yank_copy);
-
-        for (int i = 0; i < paste_line_count; i++) {
-            if (state->num_lines >= MAX_LINES) break;
-            for (int j = state->num_lines; j > state->current_line + 1 + i; j--) {
-                state->lines[j] = state->lines[j-1];
-            }
-            state->num_lines++;
-            state->lines[state->current_line + 1 + i] = NULL;
-        }
-
-        int insert_at_line = state->current_line + 1;
-        while (line != NULL && paste_line_count > 0) {
-            state->lines[insert_at_line] = strdup(line);
-            line = strtok(NULL, "\n");
-            insert_at_line++;
-            paste_line_count--;
-        }
-        state->current_line++;
-        state->current_col = 0;
+    // Free the old local yank register if it exists
+    if (state->yank_register) {
+        free(state->yank_register);
     }
 
-    free(yank_copy);
-    state->buffer_modified = true;
-    if (state->lsp_enabled) {
-        lsp_did_change(state);
+    // Copy the global register content to the local yank register
+    state->yank_register = strdup(global_yank_register);
+    if (!state->yank_register) {
+        snprintf(state->status_msg, sizeof(state->status_msg), "Error duplicating global register.");
+        return;
     }
+
+    // Call the standard paste function, which uses the local yank register
+    editor_paste(state);
+    
+    snprintf(state->status_msg, sizeof(state->status_msg), "Pasted from global register.");
 }
 
 
