@@ -29,7 +29,6 @@ const int ansi_to_ncurses_map[16] = {
     COLOR_WHITE    // Bright White
 };
 
-
 void inicializar_ncurses() {
     initscr(); cbreak(); noecho(); keypad(stdscr, TRUE);
     set_escdelay(25);
@@ -146,6 +145,19 @@ void process_editor_input(EditorState *state, wint_t ch, bool *should_exit) {
             else if (next_ch == 'o' || next_ch == 'O') {
                 if (state->mode == VISUAL && state->visual_selection_mode != VISUAL_MODE_NONE) copy_selection_to_clipboard(state);
             }
+            else if (next_ch == 'u' || next_ch == 'U') {
+                state->current_col = 0;
+                state->ideal_col = 0;
+                editor_handle_enter(state);
+                state->current_line--;
+                editor_global_paste(state);
+                state->mode = INSERT;
+            }
+            else if (next_ch == 'j' || next_ch == 'J') {
+                state->current_col = strlen(state->lines[state->current_line]);
+                editor_handle_enter(state);
+                editor_global_paste(state);
+            }
             else if (next_ch == 'p' || next_ch == 'P') {
                 if (state->mode == NORMAL || state->mode == INSERT) paste_from_clipboard(state);
                 else if (state->mode == VISUAL && state->visual_selection_mode != VISUAL_MODE_NONE) {
@@ -211,6 +223,29 @@ void process_editor_input(EditorState *state, wint_t ch, bool *should_exit) {
                         break;
                     default: // Fallback to normal mode keys
                         switch (ch) {
+
+                            case 'u':
+                                state->current_col = 0;
+                                state->ideal_col = 0;
+                                editor_handle_enter(state);
+                                state->current_line--;
+                                state->mode = INSERT;
+                                break;
+                            case 'U':
+                                state->current_col = strlen(state->lines[state->current_line]);
+                                editor_handle_enter(state);
+                                break;
+                                state->mode = INSERT;
+                            case 'G':
+                                state->current_line = state->num_lines - 1;
+                                state->current_col = 0;
+                                state->ideal_col = 0;
+                                break;
+                            case 'g':
+                                state->current_line = 0;
+                                state->current_col = 0;
+                                state->ideal_col = 0;
+
                             case 'v': state->mode = NORMAL; break;
                             case 'i': state->mode = INSERT; break;
                             case ':': state->mode = COMMAND; state->history_pos = state->history_count; state->command_buffer[0] = '\0'; state->command_pos = 0; break;
@@ -572,6 +607,29 @@ int main(int argc, char *argv[]) {
         if (check_counter++ % 10 == 0) {
              int status;
              while (waitpid(-1, &status, WNOHANG) > 0);
+
+             // Check for external file modifications in the active window
+             if (gerenciador_workspaces.num_workspaces > 0 && ACTIVE_WS->num_janelas > 0) {
+                 JanelaEditor *active_jw = ACTIVE_WS->janelas[ACTIVE_WS->janela_ativa_idx];
+                 if (active_jw && active_jw->tipo == TIPOJANELA_EDITOR && active_jw->estado) {
+                    check_external_modification(active_jw->estado);
+                 }
+             }
+        }
+
+        // Periodic auto-save
+        time_t current_time = time(NULL);
+        for (int i = 0; i < gerenciador_workspaces.num_workspaces; i++) {
+            GerenciadorJanelas *ws = gerenciador_workspaces.workspaces[i];
+            for (int j = 0; j < ws->num_janelas; j++) {
+                JanelaEditor *jw = ws->janelas[j];
+                if (jw->tipo == TIPOJANELA_EDITOR && jw->estado && jw->estado->buffer_modified) {
+                    if (current_time - jw->estado->last_auto_save_time >= AUTO_SAVE_INTERVAL) {
+                        auto_save(jw->estado);
+                        jw->estado->last_auto_save_time = current_time;
+                    }
+                }
+            }
         }
     }
     

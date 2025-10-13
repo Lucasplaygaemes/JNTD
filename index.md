@@ -89,6 +89,8 @@ Both a2 and JNTD use commands or shortcuts similar to Vim.
 | `Alt`+`[1-9]` | Move the active window to the specified workspace |
 | `Shift`+`Alt`+`[Symbol]`| Move the active window to a specific position |
 | `Alt+D` | Open GDB in a new workspace for debugging |
+| `Alt+u` | Paste what is in the global register above the cursor |
+| `Alt+U` | Paste what is in the global register under the cursor |
 
 ### Normal Mode (Navigation)
 
@@ -118,7 +120,7 @@ Both a2 and JNTD use commands or shortcuts similar to Vim.
 | `m` | Paste from the move register (after a visual cut) |
 | `Ctrl+Del` / `Ctrl+K` | Delete the current line |
 | `u` | Add a line and enter INSERT mode above |
-| `u` | Add a line and enter INSERT mode below |
+| `U` | Add a line and enter INSERT mode below |
 
 ### Insert Mode
 
