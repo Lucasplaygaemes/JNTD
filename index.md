@@ -76,6 +76,14 @@ Both a2 and JNTD use commands or shortcuts similar to Vim.
 | `Alt+H` | Start gf2 |
 | `Alt+G` | Change directory |
 
+### Pasting (All Modes)
+
+| Shortcut | Description |
+|---|---|
+| `Ctrl+V` | Paste from local (window) register. |
+| `Alt+V` | Paste from global register. |
+| `Alt+P` | Paste from system clipboard. |
+
 ### Window & Workspace Management
 
 | Shortcut | Description |
@@ -116,13 +124,12 @@ Both a2 and JNTD use commands or shortcuts similar to Vim.
 | `i` | Enter Insert Mode |
 | `v` | Enter Visual Mode |
 | `:` | Enter Command Mode |
-| `Alt+K` | Paste from the global yank register |
+| `p` | Paste from local register. |
+| `P` | Paste from global register. |
 | `m` | Paste from the move register (after a visual cut) |
 | `Ctrl+Del` / `Ctrl+K` | Delete the current line |
 | `u` | Add a line and enter INSERT mode above |
 | `U` | Add a line and enter INSERT mode below |
-| `Alt+u` | Paste what is in the global register above the cursor |
-| `Alt+j` | Paste what is in the global register below the cursor |
 
 ### Insert Mode
 
@@ -139,7 +146,5 @@ Both a2 and JNTD use commands or shortcuts similar to Vim.
 | `s` | Start/end a selection |
 | `y` | Yank (copy) the selection to the window's register |
 | `Ctrl+Y` | Yank (copy) the selection to the global register |
+| `Alt+Y` | Copy selection to the system clipboard |
 | `m` | Cut the selection to the move register |
-| `p` | Paste the yanked/cut text |
-| `Alt+O` | Copy selection to the system clipboard |
-| `Alt+P` | Paste from the system clipboard |
