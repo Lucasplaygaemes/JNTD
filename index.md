@@ -64,6 +64,8 @@ Both a2 and JNTD use commands or shortcuts similar to Vim.
 
 ### General
 
+This commands work everywhere.
+
 | Shortcut | Description |
 |---|---|
 | `Ctrl+F` | Search |
@@ -75,11 +77,6 @@ Both a2 and JNTD use commands or shortcuts similar to Vim.
 | `Alt+B` | Open recent files navigator |
 | `Alt+H` | Start gf2 |
 | `Alt+G` | Change directory |
-
-### Pasting (All Modes)
-
-| Shortcut | Description |
-|---|---|
 | `Ctrl+V` | Paste from local (window) register. |
 | `Alt+V` | Paste from global register. |
 | `Alt+P` | Paste from system clipboard. |
