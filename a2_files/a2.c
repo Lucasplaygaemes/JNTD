@@ -61,9 +61,28 @@ void inicializar_ncurses() {
 }
 
 void process_editor_input(EditorState *state, wint_t ch, bool *should_exit) {
+    
+    if (state->is_recording_macro && !(state->mode == NORMAL && ch == 'q')) {
+        int reg_idx = state->recording_register_idx;
+        char new_chars[MB_CUR_MAX + 1];
+        int len = wctomb(new_chars, ch);
+        if (len > 0) {
+            new_chars[len] = '\0';
+            char *old_macro = state->macro_registers[reg_idx];
+            if (old_macro == NULL) {
+                state->macro_registers[reg_idx] = strdup(new_chars);
+            } else {
+                char *new_macro = malloc(strlen(old_macro) + len + 1);
+                strcpy(new_macro, old_macro);
+                strcat(new_macro, new_chars);
+                free(old_macro);
+                state->macro_registers[reg_idx] = new_macro;
+            }
+        }
+    }
     JanelaEditor* active_jw = ACTIVE_WS->janelas[ACTIVE_WS->janela_ativa_idx];
     WINDOW *active_win = active_jw->win;
-
+    
     if (state->completion_mode != COMPLETION_NONE) {
         int win_h = 0;
         if (state->completion_win) win_h = getmaxy(state->completion_win);
@@ -358,8 +377,82 @@ void process_editor_input(EditorState *state, wint_t ch, bool *should_exit) {
                         }
                 }
                 break;
+            case OPERATOR_PENDING: {
+                char op = state->pending_operator;
+                state->pending_operator = 0;
+                state->mode = NORMAL; // FIX: Return to NORMAL mode by default
+
+                if (op == 'y' && ch == 'y') {
+                    editor_yank_line(state);
+                }
+                
+                state->status_msg[0] = '\0';
+                return;
+            }
+                
             case NORMAL:
                 switch (ch) {
+                    case 'y':
+                        state->pending_operator = ch;
+                        state->mode = OPERATOR_PENDING;
+                        snprintf(state->status_msg, sizeof(state->status_msg), "%c", ch);
+                        return;
+                    case 'q':
+                        if (state->is_recording_macro) {
+                            state->is_recording_macro = false;
+                            snprintf(state->status_msg, sizeof(state->status_msg), "Recording stopped");
+                        } else {
+                            
+                            snprintf(state->status_msg, sizeof(state->status_msg), "Recording @");
+                            redesenhar_todas_as_janelas();
+                            wint_t reg_ch;
+                            wget_wch(active_win, &reg_ch);
+                            if (reg_ch >= 'a' && reg_ch <= 'z') {
+                                state->is_recording_macro = true;
+                                state->recording_register_idx = reg_ch - 'a';
+                                if (state->macro_registers[state->recording_register_idx]) {
+                                      free(state->macro_registers[state->recording_register_idx]);
+                                      state->macro_registers[state->recording_register_idx] = NULL;
+                                }
+                                snprintf(state->status_msg, sizeof(state->status_msg), "recording @%c", (char)reg_ch);
+                            } else {
+                                snprintf(state->status_msg, sizeof(state->status_msg), "Macro recording cancelled.");
+                            }
+                        }
+                        break;
+                    case '@':
+                        snprintf(state->status_msg, sizeof(state->status_msg), "@");
+                        redesenhar_todas_as_janelas();
+                        wint_t reg_ch_play;
+                        wget_wch(active_win, &reg_ch_play);
+                        if (reg_ch_play >= 'a' && reg_ch_play <= 'z') {
+                            char *macro_to_play = state->macro_registers[reg_ch_play - 'a'];
+                            if (macro_to_play) {
+                                snprintf(state->status_msg, sizeof(state->status_msg), "playing @%c", (char)reg_ch_play);
+                                bool was_recording = state->is_recording_macro;
+                                state->is_recording_macro = false;
+                                
+                                wchar_t wc;
+                                int i = 0;
+                                int len = strlen(macro_to_play);
+                                while (i < len) {
+                                    int consumed = mbtowc(&wc, &macro_to_play[i], len - i);
+                                    if (consumed > 0) {
+                                        process_editor_input(state, wc, should_exit);
+                                        i += consumed;
+                                    } else {
+                                        i++;
+                                    }
+                                }
+                                state->is_recording_macro = was_recording;
+                                snprintf(state->status_msg, sizeof(state->status_msg), "macro finished");
+                             } else {
+                                 snprintf(state->status_msg, sizeof(state->status_msg), "register @%c is empty", (char)reg_ch_play);
+                             }
+                         } else {
+                             snprintf(state->status_msg, sizeof(state->status_msg), "Invalid register.");
+                         }
+                         break;
                     case 22: // Ctrl+V for local paste
                         editor_paste(state);
                         break;
@@ -602,7 +695,15 @@ int main(int argc, char *argv[]) {
             if (active_jw->tipo == TIPOJANELA_EDITOR) {
                 wint_t ch;
                 if (wget_wch(stdscr, &ch) != ERR) {
-                     process_editor_input(active_jw->estado, ch, &should_exit);
+                     EditorState *active_state = active_jw->estado;
+                     process_editor_input(active_state, ch, &should_exit);
+                     
+                     // Logic to return to INSERT mode
+                     if (active_state->single_command_mode) {
+                         active_state->mode = INSERT;
+                         active_state->single_command_mode = false;
+                         active_state->status_msg[0] = '\0';
+                     }
                 }
             } else if (active_jw->tipo == TIPOJANELA_TERMINAL && active_jw->pty_fd != -1) {
                 char input_buf[256];
