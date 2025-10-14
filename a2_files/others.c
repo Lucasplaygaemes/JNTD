@@ -999,6 +999,9 @@ void editor_draw_completion_win(WINDOW *win, EditorState *state) {
 void handle_insert_mode_key(EditorState *state, wint_t ch) {
     WINDOW *win = ACTIVE_WS->janelas[ACTIVE_WS->janela_ativa_idx]->win;
     switch (ch) {
+        case 22: // Ctrl+V for local paste
+            editor_paste(state);
+            break;
         //shift tab
         case KEY_BTAB:
             push_undo(state);
