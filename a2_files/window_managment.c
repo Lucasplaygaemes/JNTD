@@ -55,7 +55,6 @@ void criar_janela_terminal_generica(char *const argv[]) {
     ws->janelas[ws->num_janelas - 1] = jw;
     ws->janela_ativa_idx = ws->num_janelas - 1;
 
-    // The forkpty logic remains the same...
     int master_fd;
     pid_t pid = forkpty(&master_fd, NULL, NULL, NULL);
 
@@ -115,6 +114,9 @@ void free_editor_state(EditorState* state) {
     if (state->move_register) free(state->move_register);
     for (int j = 0; j < state->num_lines; j++) {
         if (state->lines[j]) free(state->lines[j]);
+    }
+    for (int j = 0; j < 26; j++) {
+        if(state->macro_registers[j]) free(state->macro_registers[j]);
     }
     free(state);
 }
@@ -230,6 +232,13 @@ void criar_nova_janela(const char *filename) {
     load_directory_history(state);
     load_file_history(state);
 
+    state->is_recording_macro = false;
+    state->last_played_macro_register = 0;
+    state->single_command_mode = false;
+    for (int i = 0; i < 26; i++) {
+        state->macro_registers[i] = NULL;
+    }
+
     ws->janelas[ws->num_janelas - 1] = nova_janela;
     ws->janela_ativa_idx = ws->num_janelas - 1;
 
@@ -261,21 +270,31 @@ void fechar_janela_ativa(bool *should_exit) {
         return;
     }
 
-    free_janela_editor(ws->janelas[idx]);
+    JanelaEditor *jw_to_free = ws->janelas[idx];
+
+    // Shift the array to remove the pointer
     for (int i = idx; i < ws->num_janelas - 1; i++) {
         ws->janelas[i] = ws->janelas[i+1];
     }
     ws->num_janelas--;
     ws->janelas = realloc(ws->janelas, sizeof(JanelaEditor*) * ws->num_janelas);
 
+    // Update the active index
     if (ws->janela_ativa_idx >= ws->num_janelas) {
         ws->janela_ativa_idx = ws->num_janelas - 1;
     }
+
+    // Now it is safe to free the memory
+    free_janela_editor(jw_to_free);
 
     recalcular_layout_janelas();
 }
 
 void fechar_workspace_ativo(bool *should_exit) {
+    if (gerenciador_workspaces.num_workspaces == 0) return;
+
+    // If it's the last workspace, just signal the main loop to exit.
+    // The cleanup at the end of main() will handle freeing the last workspace.
     if (gerenciador_workspaces.num_workspaces == 1) {
         EditorState *last_state = ACTIVE_WS->janelas[0]->estado;
         if (last_state && last_state->buffer_modified) {
@@ -283,26 +302,28 @@ void fechar_workspace_ativo(bool *should_exit) {
             return;
         }
         *should_exit = true;
+        return;
     }
 
     int idx_to_close = gerenciador_workspaces.workspace_ativo_idx;
-    free_workspace(gerenciador_workspaces.workspaces[idx_to_close]);
+    GerenciadorJanelas *ws_to_free = gerenciador_workspaces.workspaces[idx_to_close];
 
+    // Shift the array to remove the pointer
     for (int i = idx_to_close; i < gerenciador_workspaces.num_workspaces - 1; i++) {
         gerenciador_workspaces.workspaces[i] = gerenciador_workspaces.workspaces[i+1];
     }
     gerenciador_workspaces.num_workspaces--;
-    if (gerenciador_workspaces.num_workspaces > 0) {
-        gerenciador_workspaces.workspaces = realloc(gerenciador_workspaces.workspaces, sizeof(GerenciadorJanelas*) * gerenciador_workspaces.num_workspaces);
-    } else {
-        free(gerenciador_workspaces.workspaces);
-        gerenciador_workspaces.workspaces = NULL;
-    }
+    gerenciador_workspaces.workspaces = realloc(gerenciador_workspaces.workspaces, sizeof(GerenciadorJanelas*) * gerenciador_workspaces.num_workspaces);
 
+    // Update active index
     if (gerenciador_workspaces.workspace_ativo_idx >= gerenciador_workspaces.num_workspaces) {
         gerenciador_workspaces.workspace_ativo_idx = gerenciador_workspaces.num_workspaces - 1;
     }
     
+    // Now it's safe to free the memory of the closed workspace
+    free_workspace(ws_to_free);
+    
+    // Redraw the UI with the remaining workspaces
     if (gerenciador_workspaces.num_workspaces > 0) {
         recalcular_layout_janelas();
         redesenhar_todas_as_janelas();
