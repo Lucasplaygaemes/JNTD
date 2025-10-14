@@ -72,7 +72,8 @@ typedef enum {
     NORMAL,
     INSERT,
     COMMAND,
-    VISUAL
+    VISUAL,
+    OPERATOR_PENDING
 } EditorMode;
 #endif
 
@@ -261,6 +262,16 @@ typedef struct EditorState {
     int lsp_init_retries;
     FileInfo **recent_files;
     int num_recent_files;
+
+    // Macro recording
+    char* macro_registers[26];
+    bool is_recording_macro;
+    int recording_register_idx; // 0-25 for a-z
+    
+    char pending_operator;
+    
+    char last_played_macro_register;
+    bool single_command_mode;    
 
 } EditorState;
 #endif
