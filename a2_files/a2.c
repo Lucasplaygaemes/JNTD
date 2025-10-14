@@ -420,18 +420,29 @@ void process_editor_input(EditorState *state, wint_t ch, bool *should_exit) {
                             }
                         }
                         break;
-                    case '@':
+                    case '@': {
                         snprintf(state->status_msg, sizeof(state->status_msg), "@");
                         redesenhar_todas_as_janelas();
                         wint_t reg_ch_play;
                         wget_wch(active_win, &reg_ch_play);
+
+                        if (reg_ch_play == '@') { // Logic for @@
+                            if (state->last_played_macro_register != 0) {
+                                reg_ch_play = state->last_played_macro_register;
+                            } else {
+                                snprintf(state->status_msg, sizeof(state->status_msg), "No previous macro executed.");
+                                break; 
+                            }
+                        }
+
                         if (reg_ch_play >= 'a' && reg_ch_play <= 'z') {
-                            char *macro_to_play = state->macro_registers[reg_ch_play - 'a'];
+                            char* macro_to_play = state->macro_registers[reg_ch_play - 'a'];
                             if (macro_to_play) {
                                 snprintf(state->status_msg, sizeof(state->status_msg), "playing @%c", (char)reg_ch_play);
+                                state->last_played_macro_register = reg_ch_play; // Store the executed macro register
                                 bool was_recording = state->is_recording_macro;
                                 state->is_recording_macro = false;
-                                
+
                                 wchar_t wc;
                                 int i = 0;
                                 int len = strlen(macro_to_play);
@@ -444,15 +455,17 @@ void process_editor_input(EditorState *state, wint_t ch, bool *should_exit) {
                                         i++;
                                     }
                                 }
+                                
                                 state->is_recording_macro = was_recording;
                                 snprintf(state->status_msg, sizeof(state->status_msg), "macro finished");
-                             } else {
-                                 snprintf(state->status_msg, sizeof(state->status_msg), "register @%c is empty", (char)reg_ch_play);
-                             }
-                         } else {
-                             snprintf(state->status_msg, sizeof(state->status_msg), "Invalid register.");
-                         }
-                         break;
+                            } else {
+                                snprintf(state->status_msg, sizeof(state->status_msg), "register @%c is empty", (char)reg_ch_play);
+                            }
+                        } else {
+                            snprintf(state->status_msg, sizeof(state->status_msg), "Invalid register.");
+                        }
+                        break;
+                    }
                     case 22: // Ctrl+V for local paste
                         editor_paste(state);
                         break;
