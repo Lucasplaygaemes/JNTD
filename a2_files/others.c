@@ -232,6 +232,21 @@ void editor_global_yank(EditorState *state) {
     snprintf(state->status_msg, sizeof(state->status_msg), "%d lines yanked to global register", end_line - start_line + 1);
 }
 
+void editor_yank_line(EditorState *state) {
+    if (state->current_line >= state->num_lines) return;
+
+    if (state->yank_register) {
+        free(state->yank_register);
+    }
+    // Aloca memória para a linha e a quebra de linha
+    state->yank_register = malloc(strlen(state->lines[state->current_line]) + 2);
+    if (state->yank_register) {
+        strcpy(state->yank_register, state->lines[state->current_line]);
+        strcat(state->yank_register, "\n"); // Adiciona a quebra de linha como no Vim
+        snprintf(state->status_msg, sizeof(state->status_msg), "1 line yanked");
+    }
+}
+
 void editor_global_paste(EditorState *state) {
     if (!global_yank_register || global_yank_register[0] == '\0') {
         snprintf(state->status_msg, sizeof(state->status_msg), "Global yank register is empty");
@@ -999,6 +1014,11 @@ void editor_draw_completion_win(WINDOW *win, EditorState *state) {
 void handle_insert_mode_key(EditorState *state, wint_t ch) {
     WINDOW *win = ACTIVE_WS->janelas[ACTIVE_WS->janela_ativa_idx]->win;
     switch (ch) {
+        case 15: // Ctrl+O
+            state->mode = NORMAL;
+            state->single_command_mode = true;
+            snprintf(state->status_msg, sizeof(state->status_msg), "-- NORMAL (one command) --");
+            break;
         case 22: // Ctrl+V for local paste
             editor_paste(state);
             break;
