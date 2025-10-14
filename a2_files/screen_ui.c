@@ -516,6 +516,9 @@ void editor_redraw(WINDOW *win, EditorState *state) {
             case VISUAL: 
                 strcpy(mode_str, "-- VISUAL --"); 
                 break;
+            case OPERATOR_PENDING:
+                snprintf(mode_str, sizeof(mode_str), "-- (%c) --", state->pending_operator);
+                break;
             default: strcpy(mode_str, "--          --"); break;
         }
         char display_filename[40];
@@ -988,6 +991,8 @@ void display_shortcuts_screen() {
     fprintf(temp_file, "    %-20s %s\n", "i", "Enter insert mode");
     fprintf(temp_file, "    %-20s %s\n", "v", "Enter visual mode");
     fprintf(temp_file, "    %-20s %s\n", ":", "Enter command mode");
+    fprintf(temp_file, "    %-20s %s\n", "q", "Start/stop macro recording");
+    fprintf(temp_file, "    %-20s %s\n", "@", "Playback macro");
     fprintf(temp_file, "    %-20s %s\n", "p", "Paste from local register");
     fprintf(temp_file, "    %-20s %s\n", "P", "Paste from global register");
     fprintf(temp_file, "    %-20s %s\n", "m", "Paste from move register (after a visual cut)");
