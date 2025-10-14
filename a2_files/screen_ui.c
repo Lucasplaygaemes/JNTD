@@ -944,31 +944,16 @@ void display_shortcuts_screen() {
     fprintf(temp_file, "    %-20s %s\n", "Ctrl+A", "Find previous occurrence");
     fprintf(temp_file, "    %-20s %s\n", "Ctrl+G", "Open directory navigator");
     fprintf(temp_file, "    %-20s %s\n", "Alt+B", "Open recent files");
-    fprintf(temp_file, "    %-20s %s\n", "Ctrl+u", "Undo");
-    fprintf(temp_file, "    %-20s %s\n", "Ctrl+r", "Redo");
-    fprintf(temp_file, "    %-20s %s\n", "Alt+U", "Paste above the cursor from global register");
-    fprintf(temp_file, "    %-20s %s\n", "Alt+J", "Paste below the cursor from global register");
-    fprintf(temp_file, "    %-20s %s\n", "Alt+TAB", "Increase identation");
-    fprintf(temp_file, "    %-20s %s\n", "Shift+TAB", "Decrease identation");
-        
-    fprintf(temp_file, "\n");
-
-    fprintf(temp_file, "Window Management:\n");
-    fprintf(temp_file, "    %-20s %s\n", "Ctrl+W", "Create new workspace");
-    fprintf(temp_file, "    %-20s %s\n", "Alt+Enter", "Split window");
-    fprintf(temp_file, "    %-20s %s\n", "Alt+X", "Close active window/split");
-    fprintf(temp_file, "    %-20s %s\n", "Ctrl+]", "Next window");
-    fprintf(temp_file, "    %-20s %s\n", "Ctrl+[", "Previous window");
-    fprintf(temp_file, "    %-20s %s\n", "Alt+N / Alt+M", "Cycle to next/previous workspace");
-    fprintf(temp_file, "    %-20s %s\n", "Alt+.", "Cycle layout");
-    fprintf(temp_file, "    %-20s %s\n", "Alt+R", "Rotate windows");
-    fprintf(temp_file, "    %-20s %s\n", "Alt+[1-9]", "Move window to workspace [1-9]");
+    fprintf(temp_file, "    %-20s %s\n", "Alt+Z", "Undo");
+    fprintf(temp_file, "    %-20s %s\n", "Alt+Y", "Redo");
     fprintf(temp_file, "    %-20s %s\n", "Alt+H", "Start gf2");
     fprintf(temp_file, "    %-20s %s\n", "Alt+G", "Change directory");
-    fprintf(temp_file, "    %-20s %s\n", ":ksc", "Show this shortcuts screen");
-    fprintf(temp_file, "    %-20s %s\n", ":set wrap/nowrap", "Enable/disable word wrap");
-    fprintf(temp_file, "    %-20s %s\n", ":toggle_auto_indent", "Toggle auto-indent on newline");
-    fprintf(temp_file, "    %-20s %s\n", ":mtw <ws>", "Move active window to workspace");
+    fprintf(temp_file, "\n");
+
+    fprintf(temp_file, "Pasting (All Modes):\n");
+    fprintf(temp_file, "    %-20s %s\n", "Ctrl+V", "Paste from local register");
+    fprintf(temp_file, "    %-20s %s\n", "Alt+V", "Paste from global register");
+    fprintf(temp_file, "    %-20s %s\n", "Alt+P", "Paste from system clipboard");
     fprintf(temp_file, "\n");
 
     fprintf(temp_file, "Window Management:\n");
@@ -1003,26 +988,25 @@ void display_shortcuts_screen() {
     fprintf(temp_file, "    %-20s %s\n", "i", "Enter insert mode");
     fprintf(temp_file, "    %-20s %s\n", "v", "Enter visual mode");
     fprintf(temp_file, "    %-20s %s\n", ":", "Enter command mode");
+    fprintf(temp_file, "    %-20s %s\n", "p", "Paste from local register");
+    fprintf(temp_file, "    %-20s %s\n", "P", "Paste from global register");
+    fprintf(temp_file, "    %-20s %s\n", "m", "Paste from move register (after a visual cut)");
+    fprintf(temp_file, "    %-20s %s\n", "Ctrl+Del / Ctrl+K", "Delete line");
     fprintf(temp_file, "    %-20s %s\n", "u", "Open line above and enter insert mode");
     fprintf(temp_file, "    %-20s %s\n", "U", "Open line below and enter insert mode");
-    fprintf(temp_file, "    %-20s %s\n", "Alt+K", "Paste from global register");
-    fprintf(temp_file, "    %-20s %s\n", "m", "Paste from move register");
-    fprintf(temp_file, "    %-20s %s\n", "Ctrl+Del / Ctrl+K", "Delete line");
     fprintf(temp_file, "\n");
 
     fprintf(temp_file, "Insert Mode:\n");
     fprintf(temp_file, "    %-20s %s\n", "Esc", "Return to normal mode");
-    fprintf(temp_file, "    %-20s %s\n", "Ctrl+P / Tab", "Autocomplete");
+    fprintf(temp_file, "    %-20s %s\n", "Ctrl+P / Tab", "Trigger autocompletion");
     fprintf(temp_file, "\n");
 
-    fprintf(temp_file, "Visual Mode:\n");
+    fprintf(temp_file, "Visual Mode (Copying):\n");
     fprintf(temp_file, "    %-20s %s\n", "s", "Start/end selection");
-    fprintf(temp_file, "    %-20s %s\n", "y", "Copy (yank) selection");
-    fprintf(temp_file, "    %-20s %s\n", "m", "Cut (move) selection");
-    fprintf(temp_file, "    %-20s %s\n", "p", "Paste from local register");
+    fprintf(temp_file, "    %-20s %s\n", "y", "Copy (yank) selection to local register");
     fprintf(temp_file, "    %-20s %s\n", "Ctrl+Y", "Copy selection to global register");
-    fprintf(temp_file, "    %-20s %s\n", "Alt+O", "Copy selection to system clipboard");
-    fprintf(temp_file, "    %-20s %s\n", "Alt+P", "Paste from system clipboard");
+    fprintf(temp_file, "    %-20s %s\n", "Alt+Y", "Copy selection to system clipboard");
+    fprintf(temp_file, "    %-20s %s\n", "m", "Cut the selection to the move register");
     fprintf(temp_file, "\n");
 
     fprintf(temp_file, "Terminal/GDB:\n");
