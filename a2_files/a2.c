@@ -157,7 +157,7 @@ void process_editor_input(EditorState *state, wint_t ch, bool *should_exit) {
                    editor_ident_line(state, state->current_line);
                 }
             }
-            else if (next_ch == 'o' || next_ch == 'O') {
+            else if (next_ch == 'y' || next_ch == 'Y') { // Changed from 'o' to 'y' for system clipboard copy
                 if (state->mode == VISUAL && state->visual_selection_mode != VISUAL_MODE_NONE) copy_selection_to_clipboard(state);
             }
             else if (next_ch == 'u' || next_ch == 'U') {
@@ -168,7 +168,7 @@ void process_editor_input(EditorState *state, wint_t ch, bool *should_exit) {
                 editor_global_paste(state);
                 state->mode = INSERT;
             }
-            else if (next_ch == 'k' || next_ch == 'K') editor_global_paste(state);
+            // Removed Alt+k for global paste. Use 'P' in NORMAL mode instead.
             else if (next_ch == 'j' || next_ch == 'J') {
                 state->current_col = strlen(state->lines[state->current_line]);
                 editor_handle_enter(state);
@@ -179,6 +179,14 @@ void process_editor_input(EditorState *state, wint_t ch, bool *should_exit) {
                 else if (state->mode == VISUAL && state->visual_selection_mode != VISUAL_MODE_NONE) {
                     editor_delete_selection(state);
                     paste_from_clipboard(state);
+                }
+            }
+            else if (next_ch == 'v' || next_ch == 'V') { // Global Paste
+                if (state->mode == VISUAL && state->visual_selection_mode != VISUAL_MODE_NONE) {
+                    editor_delete_selection(state);
+                    editor_global_paste(state);
+                } else { // NORMAL or INSERT
+                    editor_global_paste(state);
                 }
             }
         }
@@ -192,6 +200,10 @@ void process_editor_input(EditorState *state, wint_t ch, bool *should_exit) {
         switch (state->mode) {
             case VISUAL:
                 switch (ch) {
+                    case 22: // Ctrl+V for local paste
+                        editor_delete_selection(state);
+                        editor_paste(state);
+                        break;
                     case KEY_BTAB: {
                         push_undo(state);
                         int start_line, end_line;
@@ -348,14 +360,10 @@ void process_editor_input(EditorState *state, wint_t ch, bool *should_exit) {
                 break;
             case NORMAL:
                 switch (ch) {
-                    
-                    case 21:
-                        do_undo(state);
+                    case 22: // Ctrl+V for local paste
+                        editor_paste(state);
                         break;
-                    case 18:
-                        do_redo(state);
-                        break;
-                    //shift tab
+                            //shift tab
                     case KEY_BTAB:
                         push_undo(state);
                         editor_unindent_line(state, state->current_line); break;
@@ -380,6 +388,12 @@ void process_editor_input(EditorState *state, wint_t ch, bool *should_exit) {
                         state->current_line = 0;
                         state->current_col = 0;
                         state->ideal_col = 0;
+                        break;
+                    case 'p': // Paste from local register
+                        editor_paste(state);
+                        break;
+                    case 'P': // Paste from global register
+                        editor_global_paste(state);
                         break;
                     case 'm':
                         if (state->is_moving) {
