@@ -944,8 +944,8 @@ void display_shortcuts_screen() {
     fprintf(temp_file, "    %-20s %s\n", "Ctrl+A", "Find previous occurrence");
     fprintf(temp_file, "    %-20s %s\n", "Ctrl+G", "Open directory navigator");
     fprintf(temp_file, "    %-20s %s\n", "Alt+B", "Open recent files");
-    fprintf(temp_file, "    %-20s %s\n", "Alt+Z", "Undo");
-    fprintf(temp_file, "    %-20s %s\n", "Alt+Y", "Redo");
+    fprintf(temp_file, "    %-20s %s\n", "Ctrl+u", "Undo");
+    fprintf(temp_file, "    %-20s %s\n", "Ctrl+r", "Redo");
     fprintf(temp_file, "    %-20s %s\n", "Alt+U", "Paste above the cursor from global register");
     fprintf(temp_file, "    %-20s %s\n", "Alt+J", "Paste below the cursor from global register");
     fprintf(temp_file, "    %-20s %s\n", "Alt+TAB", "Increase identation");

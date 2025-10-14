@@ -106,7 +106,7 @@ void process_editor_input(EditorState *state, wint_t ch, bool *should_exit) {
         }
     }
         
-    if (ch == 27) { // ESC
+    if (ch == 27 || ch == 31) { // ESC
         nodelay(active_win, TRUE);
         int next_ch = wgetch(active_win);
         nodelay(active_win, FALSE);
@@ -128,8 +128,6 @@ void process_editor_input(EditorState *state, wint_t ch, bool *should_exit) {
             else if (next_ch == 'x' || next_ch == 'X') fechar_janela_ativa(should_exit);
             else if (next_ch == 'b' || next_ch == 'B') display_recent_files();
             else if (next_ch == 'd' || next_ch == 'D') prompt_and_create_gdb_workspace();
-            else if (next_ch == 'z' || next_ch == 'Z') do_undo(state);
-            else if (next_ch == 'y' || next_ch == 'Y') do_redo(state);
             else if (next_ch == 'h' || next_ch == 'H') gf2_starter();
             else if (next_ch == 'f' || next_ch == 'w') editor_move_to_next_word(state);
             else if (next_ch == 'b' || next_ch == 'q') editor_move_to_previous_word(state);
@@ -350,7 +348,14 @@ void process_editor_input(EditorState *state, wint_t ch, bool *should_exit) {
                 break;
             case NORMAL:
                 switch (ch) {
-                            //shift tab
+                    
+                    case 21:
+                        do_undo(state);
+                        break;
+                    case 18:
+                        do_redo(state);
+                        break;
+                    //shift tab
                     case KEY_BTAB:
                         push_undo(state);
                         editor_unindent_line(state, state->current_line); break;

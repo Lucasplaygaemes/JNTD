@@ -1038,6 +1038,12 @@ void handle_insert_mode_key(EditorState *state, wint_t ch) {
             }
             break;
         }
+        case 18:
+            do_redo(state);
+            break;
+        case 21:
+            do_undo(state);
+            break;
         case KEY_DOWN: {
             if (state->word_wrap_enabled) {
                 int r, cols; getmaxyx(win, r, cols); if (cols <= 0) break;
