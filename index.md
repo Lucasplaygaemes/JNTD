@@ -121,6 +121,10 @@ This commands work everywhere.
 | `i` | Enter Insert Mode |
 | `v` | Enter Visual Mode |
 | `:` | Enter Command Mode |
+| `q` | Start/stop macro recording to a register (e.g., `qa`). |
+| `@` | Playback macro from a register (e.g., `@a`). |
+| `@@` | Repeat the last executed macro. |
+| `yy` | Yank (copy) the current line. |
 | `p` | Paste from local register. |
 | `P` | Paste from global register. |
 | `m` | Paste from the move register (after a visual cut) |
@@ -133,6 +137,7 @@ This commands work everywhere.
 | Shortcut | Description |
 |---|---|
 | `Esc` | Return to Normal Mode |
+| `Ctrl+O` | Execute a single Normal mode command. |
 | `Ctrl+P` / `Tab` | Trigger autocompletion |
 
 ### Visual Mode
