@@ -767,7 +767,9 @@ void display_help_screen() {
         { ":lsp-references", "List all references to a symbol." },
         { ":lsp-rename <n>", "Rename the symbol under the cursor to <new_name>." },
         { ":lsp-symbols", "List symbols in the current document." },
-        { ":lsp-refresh", "Force a refresh of LSP diagnostics." }
+        { ":lsp-refresh", "Force a refresh of LSP diagnostics." },
+        { ":savemacros", "Save current macros to file." },
+        { ":loadmacros", "Load macros from file." }
     };
     int num_commands = sizeof(commands) / sizeof(commands[0]);
 
