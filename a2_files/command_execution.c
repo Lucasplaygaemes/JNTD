@@ -43,11 +43,9 @@ void process_command(EditorState *state, bool *should_exit) {
         return;
     } else if (strcmp(command, "wq") == 0) {
         save_file(state);
-        if (state->lsp_enabled) {
-            lsp_did_save(state);
+        if (!state->buffer_modified) { // Only close if save was successful
+            fechar_janela_ativa(should_exit);
         }
-        *should_exit = true;
-        fechar_janela_ativa(should_exit);
         return;
     } else if (strcmp(command, "w") == 0) {
         if (strlen(args) > 0) {
