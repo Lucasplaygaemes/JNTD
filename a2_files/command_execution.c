@@ -110,10 +110,14 @@ void process_command(EditorState *state, bool *should_exit) {
         }
         else {
             snprintf(state->status_msg, sizeof(state->status_msg), "Unknown argument for set: %s", args);
-        }
-        
-    } else if (strcmp(command, "term") == 0) {
-        executar_comando_em_novo_workspace(args);
+                }
+            } else if (strcmp(command, "savemacros") == 0) {
+                save_macros(state);
+            } else if (strcmp(command, "loadmacros") == 0) {
+                load_macros(state);
+                snprintf(state->status_msg, sizeof(state->status_msg), "Macros loaded.");
+            } else if (strcmp(command, "term") == 0) {
+                executar_comando_em_novo_workspace(args);
         
       // LSP Commands
     } else if (strncmp(command, "lsp-restart", 11) == 0) {
