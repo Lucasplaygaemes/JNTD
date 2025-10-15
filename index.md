@@ -42,6 +42,8 @@ Both a2 and JNTD use commands or shortcuts similar to Vim.
 | `:timer` | Show the work time report. |
 | `:toggle_auto_indent` | Toggle auto-indent on newline. |
 | `:mtw <ws_num>` | Move current window to a specific workspace. |
+| `:savemacros` | Save the current session's macros to `~/.a2_macros`. |
+| `:loadmacros` | Load macros from `~/.a2_macros`. |
 
 ### LSP Commands
 

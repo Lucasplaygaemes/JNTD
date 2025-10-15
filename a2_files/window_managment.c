@@ -90,6 +90,12 @@ void handle_gdb_session(int pty_fd, pid_t child_pid);
 
 void free_editor_state(EditorState* state) {
     if (!state) return;
+
+    // Properly shut down the LSP client before freeing the state
+    if (state->lsp_client) {
+        lsp_shutdown(state);
+    }
+
     if (state->filename[0] != '[') {
         save_last_line(state->filename, state->current_line);
     }
@@ -277,7 +283,15 @@ void fechar_janela_ativa(bool *should_exit) {
         ws->janelas[i] = ws->janelas[i+1];
     }
     ws->num_janelas--;
-    ws->janelas = realloc(ws->janelas, sizeof(JanelaEditor*) * ws->num_janelas);
+    
+    // Safely reallocate the array, checking for errors.
+    JanelaEditor **new_janelas = realloc(ws->janelas, sizeof(JanelaEditor*) * ws->num_janelas);
+    if (!new_janelas) {
+        // If realloc fails, we are in a bad state. Exit gracefully.
+        perror("realloc failed when closing window");
+        exit(EXIT_FAILURE);
+    }
+    ws->janelas = new_janelas;
 
     // Update the active index
     if (ws->janela_ativa_idx >= ws->num_janelas) {
@@ -313,7 +327,14 @@ void fechar_workspace_ativo(bool *should_exit) {
         gerenciador_workspaces.workspaces[i] = gerenciador_workspaces.workspaces[i+1];
     }
     gerenciador_workspaces.num_workspaces--;
-    gerenciador_workspaces.workspaces = realloc(gerenciador_workspaces.workspaces, sizeof(GerenciadorJanelas*) * gerenciador_workspaces.num_workspaces);
+    
+    // Safely reallocate the array, checking for errors.
+    GerenciadorJanelas **new_workspaces = realloc(gerenciador_workspaces.workspaces, sizeof(GerenciadorJanelas*) * gerenciador_workspaces.num_workspaces);
+    if (!new_workspaces) {
+        perror("realloc failed when closing workspace");
+        exit(EXIT_FAILURE);
+    }
+    gerenciador_workspaces.workspaces = new_workspaces;
 
     // Update active index
     if (gerenciador_workspaces.workspace_ativo_idx >= gerenciador_workspaces.num_workspaces) {
