@@ -16,6 +16,8 @@ void save_last_line(const char *filename, int line);
 int load_last_line(const char *filename);
 FileRecoveryChoice display_recovery_prompt(WINDOW *parent_win, EditorState *state);
 void handle_file_recovery(EditorState *state, const char *original_filename, const char *sv_filename);
+void save_macros(EditorState *state);
+void load_macros(EditorState *state);
 
 // Helper function
 const char * get_syntax_file_from_extension(const char* filename);

@@ -442,3 +442,117 @@ void handle_file_recovery(EditorState *state, const char *original_filename, con
         }
     }
 }
+
+// Helper to get the path for the macros file
+void get_macros_filename(char *buffer, size_t size) {
+    const char *home_dir = getenv("HOME");
+    if (home_dir) {
+        snprintf(buffer, size, "%s/.a2_macros", home_dir);
+    } else {
+        // Fallback if HOME is not set
+        snprintf(buffer, size, ".a2_macros");
+    }
+}
+
+void save_macros(EditorState *state) {
+    char path[PATH_MAX];
+    get_macros_filename(path, sizeof(path));
+
+    FILE *f = fopen(path, "w");
+    if (!f) {
+        snprintf(state->status_msg, sizeof(state->status_msg), "Error saving macros: %s", strerror(errno));
+        return;
+    }
+
+    for (int i = 0; i < 26; i++) {
+        if (state->macro_registers[i]) {
+            char reg = 'a' + i;
+            char *content = state->macro_registers[i];
+            fprintf(f, "%c:", reg);
+            // Escape and write content
+            for (size_t j = 0; j < strlen(content); j++) {
+                char c = content[j];
+                if (c == '\\') {
+                    fputs("\\\\", f);
+                } else if (c == '\n') {
+                    fputs("\\n", f);
+                } else if (!isprint(c)) {
+                    fprintf(f, "\\x%02x", (unsigned char)c);
+                } else {
+                    fputc(c, f);
+                }
+            }
+            fputc('\n', f);
+        }
+    }
+    fclose(f);
+    snprintf(state->status_msg, sizeof(state->status_msg), "Macros saved to %s", path);
+}
+
+void load_macros(EditorState *state) {
+    char path[PATH_MAX];
+    get_macros_filename(path, sizeof(path));
+
+    FILE *f = fopen(path, "r");
+    if (!f) {
+        // File doesn't exist, which is fine on first startup.
+        return;
+    }
+
+    // Clear existing macros before loading
+    for (int i = 0; i < 26; i++) {
+        if (state->macro_registers[i]) {
+            free(state->macro_registers[i]);
+            state->macro_registers[i] = NULL;
+        }
+    }
+
+    char line[MAX_LINE_LEN * 4]; // Allow for escaped content
+    while (fgets(line, sizeof(line), f)) {
+        if (strlen(line) < 3 || line[1] != ':') continue; // Invalid line format
+
+        int reg_idx = line[0] - 'a';
+        if (reg_idx < 0 || reg_idx >= 26) continue; // Invalid register
+
+        char *escaped_content = line + 2;
+        // Trim newline
+        escaped_content[strcspn(escaped_content, "\n")] = 0;
+
+        char *unescaped = malloc(strlen(escaped_content) + 1);
+        size_t unescaped_len = 0;
+        for (size_t i = 0; i < strlen(escaped_content); ) {
+            if (escaped_content[i] == '\\') {
+                i++; // Move past the backslash
+                if (i >= strlen(escaped_content)) break;
+                
+                if (escaped_content[i] == '\\') {
+                    unescaped[unescaped_len++] = '\\';
+                    i++;
+                } else if (escaped_content[i] == 'n') {
+                    unescaped[unescaped_len++] = '\n';
+                    i++;
+                } else if (escaped_content[i] == 'x') {
+                    if (i + 2 < strlen(escaped_content)) {
+                        char hex[3] = { escaped_content[i+1], escaped_content[i+2], '\0' };
+                        unescaped[unescaped_len++] = (char)strtol(hex, NULL, 16);
+                        i += 3;
+                    } else { i++; }
+                } else {
+                    // Not a valid escape, just treat it literally
+                    unescaped[unescaped_len++] = escaped_content[i];
+                    i++;
+                }
+            } else {
+                unescaped[unescaped_len++] = escaped_content[i];
+                i++;
+            }
+        }
+        unescaped[unescaped_len] = '\0';
+        
+        state->macro_registers[reg_idx] = strdup(unescaped);
+        free(unescaped);
+    }
+
+    fclose(f);
+    // No status message for automatic loading
+}
