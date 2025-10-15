@@ -61,7 +61,10 @@ void inicializar_ncurses() {
 }
 
 void process_editor_input(EditorState *state, wint_t ch, bool *should_exit) {
-    
+    // Store initial window/workspace counts to detect if a window is closed.
+    int initial_num_workspaces = gerenciador_workspaces.num_workspaces;
+    int initial_num_windows = (initial_num_workspaces > 0) ? ACTIVE_WS->num_janelas : 0;
+
     if (state->is_recording_macro && !(state->mode == NORMAL && ch == 'q')) {
         int reg_idx = state->recording_register_idx;
         char new_chars[MB_CUR_MAX + 1];
@@ -582,7 +585,31 @@ void process_editor_input(EditorState *state, wint_t ch, bool *should_exit) {
                 handle_command_mode_key(state, ch, should_exit);
                 break;
         }
-    }    
+        
+    // After processing input, if the window was closed, the state is invalid. Return immediately.
+    if (gerenciador_workspaces.num_workspaces < initial_num_workspaces ||
+        (initial_num_workspaces > 0 && ACTIVE_WS->num_janelas < initial_num_windows)) {
+        return;
+    }
+        
+    // After processing an input key, check if we need to revert from single command mode.
+    if (state->single_command_mode) {
+        // If the command resulted in staying in NORMAL mode (e.g., a movement)
+        // or finishing an operator (e.g., 'yy'), then revert to INSERT mode.
+        if (state->mode == NORMAL) {
+            state->mode = INSERT;
+            state->single_command_mode = false;
+            state->status_msg[0] = '\0';
+        }
+        // If the command switched to another major mode (like COMMAND or VISUAL),
+        // respect that new mode and just cancel the single command behavior.
+        else if (state->mode == COMMAND || state->mode == VISUAL || state->mode == INSERT) {
+            state->single_command_mode = false;
+        }
+        // If we are in OPERATOR_PENDING, we do nothing and wait for the next keypress
+        // to complete the operation.
+    }
+}    
 
 
 bool handle_global_shortcut(int ch, bool *should_exit) {
@@ -625,6 +652,9 @@ int main(int argc, char *argv[]) {
     inicializar_ncurses();
     
     inicializar_workspaces();
+
+    // Automatically load macros on startup
+    load_macros(ACTIVE_WS->janelas[0]->estado);
 
     EditorState *initial_state = ACTIVE_WS->janelas[0]->estado;
     char cwd[PATH_MAX];
@@ -708,15 +738,7 @@ int main(int argc, char *argv[]) {
             if (active_jw->tipo == TIPOJANELA_EDITOR) {
                 wint_t ch;
                 if (wget_wch(stdscr, &ch) != ERR) {
-                     EditorState *active_state = active_jw->estado;
-                     process_editor_input(active_state, ch, &should_exit);
-                     
-                     // Logic to return to INSERT mode
-                     if (active_state->single_command_mode) {
-                         active_state->mode = INSERT;
-                         active_state->single_command_mode = false;
-                         active_state->status_msg[0] = '\0';
-                     }
+                     process_editor_input(active_jw->estado, ch, &should_exit);
                 }
             } else if (active_jw->tipo == TIPOJANELA_TERMINAL && active_jw->pty_fd != -1) {
                 char input_buf[256];
