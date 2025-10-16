@@ -491,11 +491,24 @@ void save_macros(EditorState *state) {
 
 void load_macros(EditorState *state) {
     char path[PATH_MAX];
-    get_macros_filename(path, sizeof(path));
+    FILE *f = NULL;
 
-    FILE *f = fopen(path, "r");
+    // 1. Try to load from the user's home directory first.
+    const char *home_dir = getenv("HOME");
+    if (home_dir) {
+        snprintf(path, sizeof(path), "%s/.a2_macros", home_dir);
+        f = fopen(path, "r");
+    }
+
+    // 2. If not found in home, try the current working directory (project root).
     if (!f) {
-        // File doesn't exist, which is fine on first startup.
+        snprintf(path, sizeof(path), ".a2_macros");
+        f = fopen(path, "r");
+    }
+
+    // 3. If still not found, do nothing.
+    if (!f) {
+        // File doesn't exist in either location, which is fine.
         return;
     }
 

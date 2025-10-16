@@ -114,6 +114,8 @@ void process_command(EditorState *state, bool *should_exit) {
             } else if (strcmp(command, "loadmacros") == 0) {
                 load_macros(state);
                 snprintf(state->status_msg, sizeof(state->status_msg), "Macros loaded.");
+            } else if (strcmp(command, "listmacros") == 0) {
+                display_macros_list(state);
             } else if (strcmp(command, "term") == 0) {
                 executar_comando_em_novo_workspace(args);
         
