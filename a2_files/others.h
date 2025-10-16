@@ -57,4 +57,7 @@ void editor_draw_completion_win(WINDOW *win, EditorState *state);
 void handle_insert_mode_key(EditorState *state, wint_t ch);
 void handle_command_mode_key(EditorState *state, wint_t ch, bool *should_exit);
 
+void editor_toggle_comment(EditorState *state);
+
+
 #endif // OTHERS_H

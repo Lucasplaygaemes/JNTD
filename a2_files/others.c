@@ -1298,3 +1298,86 @@ void editor_unindent_line(EditorState *state, int line_num) {
     }
 }
 
+void editor_toggle_comment(EditorState *state) {
+    const char *comment_str = "//";
+    int comment_len = strlen(comment_str);
+    
+    int start_line, end_line;
+    if (state->mode == VISUAL && state->visual_selection_mode != VISUAL_MODE_NONE) {
+        if (state->selection_start_line < state->current_line) {
+            start_line = state->selection_start_line;
+            end_line = state->current_line;
+        } else {
+            start_line = state->current_line;
+            end_line = state->selection_start_line;
+        }
+    } else {
+        start_line = state->current_line;
+        end_line = state->current_line;
+        
+    }
+    
+    
+    push_undo(state);
+    clear_redo_stack(state);
+    
+    bool all_commented = true;
+    for (int i = start_line; i <= end_line; i++) {
+        char *line = state->lines[i];
+        char *trimmed_line = trim_whitespace(line);
+        
+        if (strncmp(trimmed_line, comment_str, comment_len) != 0) {
+            all_commented = false;
+            break;    
+        }
+    }
+            
+    for (int i = start_line; i <= end_line; i++) {
+        char *line = state->lines[i];
+        char *trimmed_line = trim_whitespace(line);
+        
+        if (all_commented) {
+            char *first_char = line;
+            while (*first_char && isspace(*first_char)) {
+                first_char++;
+            }
+            
+            if (strncmp(first_char, comment_str, comment_len) == 0) {
+                memmove(first_char, first_char + comment_len, strlen(first_char + comment_len) + 1);
+                if (*first_char == ' ') {
+                    memmove(first_char, first_char + 1, strlen(first_char + 1) + 1);
+                }
+            }
+        } else {
+            
+            int indent_len = 0;
+            while (line[indent_len] && isspace(line[indent_len])) {
+                indent_len++;
+            }
+            
+            if (line[indent_len] == '\0') continue;
+            
+            int final_comment_len = comment_len + 1;
+            char *new_line = malloc(strlen(line) + final_comment_len + 1);
+            if (!new_line) continue;
+            
+            strncpy(new_line, line, indent_len);
+            strcpy(new_line + indent_len, comment_str);
+            strcpy(new_line + indent_len + comment_len, " ");
+            strcpy(new_line + indent_len + final_comment_len, line + indent_len);
+            
+            free(state->lines[i]);
+            state->lines[i] = new_line;
+        
+        }
+    }
+    state->buffer_modified = true;
+    if (state->lsp_enabled) {
+        lsp_did_change(state);
+    }
+    
+    if (state->mode == VISUAL) {
+        state->mode = NORMAL;
+        state->visual_selection_mode = VISUAL_MODE_NONE;
+    }
+}

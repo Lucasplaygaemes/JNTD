@@ -148,6 +148,7 @@ void process_editor_input(EditorState *state, wint_t ch, bool *should_exit) {
             else if (next_ch == 'm') ciclar_workspaces(1);
             else if (next_ch == '\n' || next_ch == KEY_ENTER) criar_nova_janela(NULL);
             else if (next_ch == 'x' || next_ch == 'X') fechar_janela_ativa(should_exit);
+            else if (next_ch == 'c' || next_ch == 'C') editor_toggle_comment(state);
             else if (next_ch == 'b' || next_ch == 'B') display_recent_files();
             else if (next_ch == 'd' || next_ch == 'D') prompt_and_create_gdb_workspace();
             else if (next_ch == 'h' || next_ch == 'H') gf2_starter();
@@ -178,6 +179,7 @@ void process_editor_input(EditorState *state, wint_t ch, bool *should_exit) {
                 } else {
                    editor_ident_line(state, state->current_line);
                 }
+                flushinp(); // Discard any pending typeahead to prevent key repeat issues
             }
             else if (next_ch == 'y' || next_ch == 'Y') { // Changed from 'o' to 'y' for system clipboard copy
                 if (state->mode == VISUAL && state->visual_selection_mode != VISUAL_MODE_NONE) copy_selection_to_clipboard(state);
