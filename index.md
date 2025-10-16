@@ -44,6 +44,7 @@ Both a2 and JNTD use commands or shortcuts similar to Vim.
 | `:mtw <ws_num>` | Move current window to a specific workspace. |
 | `:savemacros` | Save the current session's macros to `~/.a2_macros`. |
 | `:loadmacros` | Load macros from `~/.a2_macros`. |
+| `:listmacros` | Display all loaded macros. |
 
 ### LSP Commands
 
@@ -120,6 +121,7 @@ This commands work everywhere.
 
 | Shortcut | Description |
 |---|---|
+| `Alt+c` | Toggle comment on the current line or visual selection. |
 | `i` | Enter Insert Mode |
 | `v` | Enter Visual Mode |
 | `:` | Enter Command Mode |
