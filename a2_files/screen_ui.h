@@ -19,5 +19,6 @@ bool is_selected(EditorState *state, int line_idx, int col_idx);
 bool confirm_action(const char *prompt);
 void display_shortcuts_screen();
 void display_shortcuts_screen();
+void display_macros_list(EditorState *state);
 
 #endif // SCREEN_UI_H

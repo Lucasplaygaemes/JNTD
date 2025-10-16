@@ -1025,3 +1025,77 @@ void display_shortcuts_screen() {
 
     display_output_screen("--- Keyboard Shortcuts ---", temp_filename);
 }
+
+// Helper function to make macro content readable for display
+void format_macro_for_display(const char* raw_macro, char* display_buf, size_t buf_size) {
+    size_t display_idx = 0;
+    for (size_t i = 0; raw_macro[i] != '\0' && display_idx < buf_size - 10; i++) {
+        unsigned char c = raw_macro[i];
+        const char* representation = NULL;
+
+        switch(c) {
+            case '\n': representation = "<ENTER>"; break;
+            case '\t': representation = "<TAB>"; break;
+            case '\x1b': representation = "<ESC>"; break; // 27
+            case '\x0b': representation = "<C-K>"; break; // 11 (Ctrl+K, used for delete line)
+            // You can add more user-friendly names for other control characters here
+            default:
+                if (isprint(c)) {
+                    display_buf[display_idx++] = c;
+                } else {
+                    // For other non-printable chars, show a generic hex code
+                    snprintf(&display_buf[display_idx], 6, "<x%02X>", c);
+                    display_idx += 5;
+                }
+                break;
+        }
+
+        if (representation) {
+            size_t len = strlen(representation);
+            if (display_idx + len < buf_size) {
+                strcpy(&display_buf[display_idx], representation);
+                display_idx += len;
+            }
+        }
+    }
+    display_buf[display_idx] = '\0';
+}
+
+void display_macros_list(EditorState *state) {
+    char temp_filename[] = "/tmp/macro_list.XXXXXX";
+    int fd = mkstemp(temp_filename);
+    if (fd == -1) {
+        snprintf(state->status_msg, sizeof(state->status_msg), "Error creating temporary file.");
+        return;
+    }
+
+    FILE *temp_file = fdopen(fd, "w");
+    if (!temp_file) {
+        close(fd);
+        snprintf(state->status_msg, sizeof(state->status_msg), "Error opening temporary file.");
+        return;
+    }
+
+    fprintf(temp_file, "--- Loaded Macros ---\n\n");
+
+    bool found_any = false;
+    for (int i = 0; i < 26; i++) {
+        if (state->macro_registers[i] && state->macro_registers[i][0] != '\0') {
+            found_any = true;
+            char reg_char = 'a' + i;
+            char display_buf[MAX_LINE_LEN]; // Re-use a defined constant for buffer size
+
+            format_macro_for_display(state->macro_registers[i], display_buf, sizeof(display_buf));
+
+            fprintf(temp_file, "    @%c: %s\n", reg_char, display_buf);
+        }
+    }
+
+    if (!found_any) {
+        fprintf(temp_file, "No macros loaded. Record one with 'q<register>'.\n");
+    }
+
+    fclose(temp_file);
+
+    display_output_screen("--- Macro List ---", temp_filename);
+}
