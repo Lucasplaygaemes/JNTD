@@ -769,7 +769,8 @@ void display_help_screen() {
         { ":lsp-symbols", "List symbols in the current document." },
         { ":lsp-refresh", "Force a refresh of LSP diagnostics." },
         { ":savemacros", "Save current macros to file." },
-        { ":loadmacros", "Load macros from file." }
+        { ":loadmacros", "Load macros from file." },
+        { ":listmacros", "Display all loaded macros." }
     };
     int num_commands = sizeof(commands) / sizeof(commands[0]);
 
@@ -990,6 +991,7 @@ void display_shortcuts_screen() {
     fprintf(temp_file, "\n");
 
     fprintf(temp_file, "Normal Mode (Actions):\n");
+    fprintf(temp_file, "    %-20s %s\n", "Alt+c", "Toggle comment on line/selection");
     fprintf(temp_file, "    %-20s %s\n", "i", "Enter insert mode");
     fprintf(temp_file, "    %-20s %s\n", "v", "Enter visual mode");
     fprintf(temp_file, "    %-20s %s\n", ":", "Enter command mode");
