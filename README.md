@@ -19,26 +19,16 @@ Then, install the dependencys and run Make with
 ```bash
 ./install.sh
 ```
-## A2
-A2 is being my main project for a while, about 4 months straight, and will probably be for a lot more.
-Because how the things are going, a2 will be my main project, i will seperate them one from the another, but not for now i guess. Still deciding.
-A image of how the a2 is, but remember that it will probably be different for almost everyone, the color's in specfic are because of the terminal theme, it's tokyo night if i'm not mistaken.
-<img width="1919" height="1001" alt="image" src="https://github.com/user-attachments/assets/95da6f40-4294-4162-ac84-5be7ac8bb000" />
-
-
 
 # Documentation!
 Documentation is in - [**Documentation**](./index.md)
-# New Release!
-A lot of things were added! So, any doubt's of keyboard shortcuts? :ksc show all of them.
-Now you can run if not any, most of the termial apps and a terminal by it self insede a2!
 
 # Issues!
 I'm already doing it, and from now on i will add issues always i have a bug or something i need to fix, to improve terminal workflow, i'm using gh and git, because yet gh don't replace git for me.
 I will try to fix then in at max 2 weeks after created, or at least try and add updates about it.
 
 # Multiplatform?
-Both a2 and jntd are not windows compatible, but it can run in most unix or linux based distros.
+JNTD is not windows compatible, but it can run in most unix or linux based distros.
 
 # Plugins?
 JNTD as a plugin functionality, there is a plugin example in the plugins folder.
