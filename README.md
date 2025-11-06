@@ -38,4 +38,4 @@ JNTD is not windows compatible, but it can run in most unix or linux based distr
 JNTD as a plugin functionality, there is a plugin example in the plugins folder.
 
 # Contribuiting
-I would be really gratefull if you want to improve the code, it's always open to commits. and if you want you can contact me via my email. My email is lucasmoura27271@gmail.com, and if you need to say something with me, we can chat by email.
+I would be really gratefull if you want to improve the code, it's always open to commits. and if you want you can contact me via my email. My email is lucasplaygaemes@gmail.com, and if you need to say something with me, we can chat by email.
